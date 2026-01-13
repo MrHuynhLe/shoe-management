@@ -9,7 +9,7 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.vn</groupId>
-    <artifactId>studen-management-backend</artifactId>
+    <artifactId>shoe-management-backend</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>studen-management-backend</name>
     <description>studen-management-backend</description>

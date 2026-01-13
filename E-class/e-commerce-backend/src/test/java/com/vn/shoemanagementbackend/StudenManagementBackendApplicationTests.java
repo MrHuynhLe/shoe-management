@@ -1,4 +1,4 @@
-package com.vn.studenmanagementbackend;
+package com.vn.shoemanagementbackend;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
