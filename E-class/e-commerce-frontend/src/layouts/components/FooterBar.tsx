@@ -30,7 +30,7 @@ const FooterBar = () => {
           <p>
             Hotline:{' '}
             <strong style={{ color: 'red' }}>
-              0389 225 799
+              0389 225 7999
             </strong>
           </p>
           <p>Email: support@sshop.vn</p>
