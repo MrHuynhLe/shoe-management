@@ -1,8 +1,8 @@
-import { Layout, Menu, Badge } from 'antd'
+import { Layout, Badge, Menu } from 'antd'
 import {
   ShoppingCartOutlined,
   UserOutlined,
-  SearchOutlined
+  SearchOutlined,
 } from '@ant-design/icons'
 
 const { Header } = Layout
@@ -15,7 +15,7 @@ const HeaderBar = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 48px'
+        padding: '0 24px',
       }}
     >
       {/* Logo */}
@@ -26,21 +26,19 @@ const HeaderBar = () => {
       {/* Menu */}
       <Menu
         mode="horizontal"
-        style={{ flex: 1, marginLeft: 40 }}
+        style={{ flex: 1, borderBottom: 'none', justifyContent: 'center' }}
         items={[
-          { key: 'intro', label: 'GIỚI THIỆU' },
           { key: 'nike', label: 'NIKE' },
           { key: 'adidas', label: 'ADIDAS' },
           { key: 'jordan', label: 'JORDAN' },
           { key: 'yeezy', label: 'YEEZY' },
           { key: 'other', label: 'OTHER BRANDS' },
           { key: 'sale', label: 'SALE' },
-          { key: 'lace', label: 'DÂY GIÀY' }
         ]}
       />
 
       {/* Icons */}
-      <div style={{ display: 'flex', gap: 20, fontSize: 18 }}>
+      <div style={{ display: 'flex', gap: 20, fontSize: 18, alignItems: 'center' }}>
         <SearchOutlined />
         <UserOutlined />
         <Badge count={3}>
