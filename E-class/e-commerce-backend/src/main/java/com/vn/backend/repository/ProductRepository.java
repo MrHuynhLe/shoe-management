@@ -20,7 +20,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             MIN(v.sellingPrice),
             MAX(v.sellingPrice),
             SUM(v.stockQuantity),
-            img.imageUrl
+            MAX(img.imageUrl)
         )
         FROM Product p
         JOIN p.brand b
@@ -35,8 +35,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             p.code,
             p.name,
             b.name,
-            c.name,
-            img.imageUrl
+            c.name
         ORDER BY p.id DESC
         """,
             countQuery = """
@@ -47,5 +46,3 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     )
     Page<ProductListResponse> findProductList(Pageable pageable);
 }
-
-
