@@ -23,3 +23,24 @@ footer p {
 footer p:hover {
   color: #00b96b;
 }
+.ant-pro-layout-header {
+  overflow: visible !important;
+}
+
+.ant-pro-layout-header .ant-menu {
+  flex-wrap: nowrap !important;
+}
+
+.ant-pro-layout-header .ant-menu-horizontal {
+  display: flex !important;
+}
+
+.ant-pro-layout-header .ant-menu-item {
+  white-space: nowrap;
+}
+
+
+.custom-main-menu.ant-menu-horizontal {
+
+  overflow: visible !important;
+}

@@ -66,21 +66,22 @@ const CustomHeader = () => {
         </div>
       </div>
 
-      
-      <div style={{ width: '100%', overflowX: 'auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <Menu
-            mode="horizontal"
-            selectedKeys={[location.pathname]}
-            onClick={({ key }) => navigate(key)}
-            style={{ borderBottom: 'none', lineHeight: '46px', backgroundColor: 'transparent', minWidth: 'max-content' }}
-            items={[
-              { key: '/', label: 'Trang chủ', icon: <HomeOutlined /> },
-              { key: '/products', label: 'Sản phẩm', icon: <ShoppingCartOutlined /> },
-            ]}
-          />
-        </div>
-      </div>
+      <Menu
+        className="custom-main-menu"
+        mode="horizontal"
+        selectedKeys={[location.pathname]}
+        onClick={({ key }) => navigate(key)}
+        style={{
+          borderBottom: 'none',
+          lineHeight: '46px',
+          backgroundColor: 'transparent',
+          justifyContent: 'center', 
+        }}
+        items={[
+          { key: '/', label: 'Trang chủ', icon: <HomeOutlined /> },
+          { key: '/products', label: 'Sản phẩm', icon: <ShoppingCartOutlined /> },
+        ]}
+      />
     </Header>
   );
 };
