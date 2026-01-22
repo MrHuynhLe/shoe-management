@@ -1,6 +1,6 @@
 import { Button, Input, Space, Table, Tag, Typography, Tooltip, Modal } from 'antd';
 import { PlusOutlined, EyeOutlined, DeleteOutlined, InboxOutlined } from '@ant-design/icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Key } from 'react';
 import { productService } from '@/services/product.service';
 import AddProductForm from '@/layouts/components/AddProductForm';
 import CreateOrderModal from '@/layouts/components/CreateOrderModal';
@@ -11,20 +11,21 @@ import EditVariantModal from './EditVariantModal';
 interface ProductList {
   id: number;
   name: string;
-  code: string;
-
+  code: string; // Mã dòng sản phẩm
+  brandName: string;
+  totalStock: number;
 }
 
 
 interface ProductListWithVariants extends ProductList {
-  key: React.Key;
-  brand: string;
-  totalStock: number;
+  key: Key;
   hasVariants: boolean;
   hasPendingOrder: boolean;
   variants: Variant[]; 
 }
  
+type ProductForTable = Omit<ProductListWithVariants, 'brand'> & { brand: string };
+
 const { Title } = Typography;
 const { Search } = Input;
 
@@ -36,28 +37,21 @@ const ProductManagementPage = () => {
   const [isVariantDetailModalOpen, setIsVariantDetailModalOpen] = useState(false);
   const [isEditVariantModalOpen, setIsEditVariantModalOpen] = useState(false);
   const [editingVariant, setEditingVariant] = useState<Variant | null>(null); // Sử dụng Variant
-
-  const [selectedProduct, setSelectedProduct] = useState<ProductListWithVariants | null>(null); // Sửa kiểu dữ liệu
+  const [selectedProduct, setSelectedProduct] = useState<ProductForTable | null>(null);
+  const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
  
   useEffect(() => {
     setLoading(true);
     productService
       .getProducts(0, 10) 
       .then((res) => {
-        // Dữ liệu giả lập cho variants, stock, và các trạng thái khác
-        const formattedData = res.data.content.map((p: ProductList, index: number) => ({
+        const formattedData: ProductForTable[] = res.data.content.map((p: ProductList) => ({
           ...p,
           key: p.id,
-          code: `SP-${String(p.id).padStart(4, '0')}`,
-          brand: ['Nike', 'Adidas', 'Jordan'][index % 3],
-          // --- SIMULATED DATA ---
-          totalStock: index % 4 === 0 ? 0 : 10 + index, 
+          brand: p.brandName, 
           hasVariants: true, 
-          hasPendingOrder: index === 1, 
-          variants: [
-            { id: `v1-${p.id}`, sku: `SKU-${p.id}-1`, size: '40', color: 'Trắng', stock_quantity: index % 4 === 0 ? 0 : 5, selling_price: 1000000 + index * 10000, is_active: true }, // Thêm selling_price, is_active
-            { id: `v2-${p.id}`, sku: `SKU-${p.id}-2`, size: '41', color: 'Đen', stock_quantity: index % 4 === 0 ? 0 : 5 + index, selling_price: 1100000 + index * 10000, is_active: false }, // Thêm selling_price, is_active
-          ]
+          hasPendingOrder: false, 
+          variants: [], 
         }));
         setProducts(formattedData);
       })
@@ -67,7 +61,6 @@ const ProductManagementPage = () => {
 
   const handleAddProduct = (values: any) => {
     console.log('Submitting new product:', values);
-    // TODO: Gọi API để thêm sản phẩm
     setIsModalOpen(false);
   };
 
@@ -75,13 +68,13 @@ const ProductManagementPage = () => {
     setIsModalOpen(true);
   };
 
-  const showOrderModal = (product: ProductListWithVariants) => {
+  const showOrderModal = (product: ProductForTable) => {
     setSelectedProduct(product);
     setIsOrderModalOpen(true);
   };
 
-  const showVariantDetailModal = (product: ProductListWithVariants) => { 
-    setSelectedProduct(product);
+  const showVariantDetailModal = (record: ProductForTable) => { 
+    setSelectedProductId(record.id);
     setIsVariantDetailModalOpen(true);
   };
   
@@ -90,30 +83,22 @@ const ProductManagementPage = () => {
     setIsEditVariantModalOpen(true);
   };
 
-  const handleDeleteVariant = (variantId: string) => {
+  const handleDeleteVariant = (variantId: number) => {
     console.log('Deleting variant:', variantId);
-    // TODO: Gọi API xóa biến thể
-    // Sau khi xóa thành công, có thể cập nhật lại danh sách biến thể trong selectedProduct
-    if (selectedProduct) {
-      const updatedVariants = selectedProduct.variants.filter(v => v.id !== variantId);
-      setSelectedProduct({ ...selectedProduct, variants: updatedVariants });
-    }
   };
 
   const handleCancelVariantDetailModal = () => {
     setIsVariantDetailModalOpen(false);
-    setSelectedProduct(null);
+    setSelectedProductId(null);
   };
 
   const handleCreateOrder = (values: any) => {
     console.log('Submitting new purchase order:', values);
-    // TODO: Gọi API để tạo phiếu kho
     setIsOrderModalOpen(false);
   };
 
   const handleSaveVariant = (values: Variant) => { 
     console.log('Saving variant changes:', values);
-    // TODO: Gọi API để cập nhật biến thể
     setIsEditVariantModalOpen(false);
   };
 
@@ -149,8 +134,6 @@ const ProductManagementPage = () => {
         if (stock > 0) {
           return <Tag color="green">ĐANG BÁN</Tag>;
         }
-        // Giả định: nếu tồn kho = 0, tạm hiển thị là "Hết hàng"
-        // Logic "Chưa nhập kho" cần thêm trường dữ liệu từ API
         return <Tag color="red">HẾT HÀNG</Tag>;
       },
     },
@@ -199,7 +182,7 @@ const ProductManagementPage = () => {
       </Modal>
        <VariantDetailModal
         open={isVariantDetailModalOpen}
-        variants={selectedProduct?.variants || []} 
+        productId={selectedProductId}
         onCancel={handleCancelVariantDetailModal}
         onEdit={handleEditVariant}
         onDelete={handleDeleteVariant}

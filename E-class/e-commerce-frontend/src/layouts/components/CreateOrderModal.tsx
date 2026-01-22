@@ -1,35 +1,48 @@
 import { useState, useEffect } from 'react';
-import { Modal, Form, Input, InputNumber, Button, Table, Space, Row, Col } from 'antd';
+import { Modal, Form, Input, InputNumber, Button, Table, Row, Col, Spin } from 'antd';
+import { productService } from '@/services/product.service';
 
 
-interface ProductList {
-  id: number;
-  name: string;
-  code: string;
+interface ProductVariantAttributes {
+  COLOR: string;
+  SIZE: string;
 }
 
 interface ProductVariant {
-  id: string;
-  sku: string;
-  size: string;
-  color: string;
-  stock_quantity: number;
-  selling_price: number;
-  is_active: boolean;
+  id: number;
+  code: string;
+  costPrice: number;
+  sellingPrice: number;
+  stockQuantity: number;
+  isActive: boolean;
+  attributes: ProductVariantAttributes;
 }
 
-interface ProductListWithVariants extends ProductList {
-  totalStock?: number;
-  hasVariants?: boolean;
-  hasPendingOrder?: boolean;
-  variants?: ProductVariant[];
+interface ProductDetail {
+  id: number;
+  code: string;
+  name: string;
+  description: string;
+  brandName: string;
+  categoryName: string;
+  originName: string;
+  isActive: boolean;
+  deletedAt: string | null;
+  variants: ProductVariant[];
+  images: string[];
+}
+
+
+interface ProductBasicInfo {
+  id: number;
+  name: string;
 }
 
 const { TextArea } = Input;
 
 interface CreateOrderModalProps {
   open: boolean;
-  product: ProductListWithVariants | null;
+  product: ProductBasicInfo | null; 
   onCancel: () => void;
   onSubmit: (values: any) => void;
 }
@@ -37,25 +50,37 @@ interface CreateOrderModalProps {
 const CreateOrderModal = ({ open, product, onCancel, onSubmit }: CreateOrderModalProps) => {
   const [form] = Form.useForm();
   const [variants, setVariants] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!open) return;                
-    if (!product || !product.variants) {
+    if (open && product?.id) {
+      setLoading(true);
+      productService
+        .getProductById(product.id) 
+        .then(response => {
+          const fetchedProduct: ProductDetail = response.data;
+          if (fetchedProduct && fetchedProduct.variants) {
+            const initialVariants = fetchedProduct.variants.map((variant: ProductVariant, index: number) => ({
+              ...variant,
+              key: variant.id || index, 
+              order_quantity: 0, 
+            }));
+            setVariants(initialVariants);
+            form.setFieldsValue({ variants: initialVariants });
+          } else {
+            setVariants([]);
+          }
+        })
+        .catch(error => {
+          console.error('Failed to fetch product details and variants:', error);
+          setVariants([]);
+        })
+        .finally(() => setLoading(false));
+    } else if (!open) {
       setVariants([]);
       form.resetFields();
-      return;
     }
-
-    const initialVariants = product.variants.map((variant, index) => ({
-      ...variant,
-      key: variant.id || index,
-      order_quantity: 0,
-    }));
-
-    setVariants(initialVariants);
-    form.setFieldsValue({ variants: initialVariants });
-  }, [product, open, form]);
-
+  }, [product?.id, open, form]);
 
   const handleApplyToAll = (value: number | null) => {
     if (value === null || value < 0) return;
@@ -77,10 +102,25 @@ const CreateOrderModal = ({ open, product, onCancel, onSubmit }: CreateOrderModa
   };
 
   const columns = [
-    { title: 'SKU', dataIndex: 'sku', key: 'sku' },
-    { title: 'Size', dataIndex: 'size', key: 'size' },
-    { title: 'Màu', dataIndex: 'color', key: 'color' },
-    { title: 'Tồn hiện tại', dataIndex: 'stock_quantity', key: 'stock_quantity', align: 'center' as const },
+    { title: 'SKU', dataIndex: 'code', key: 'code' }, 
+    {
+      title: 'Size',
+      dataIndex: ['attributes', 'SIZE'], 
+      key: 'size',
+      render: (text: string) => text, 
+    },
+    {
+      title: 'Màu',
+      dataIndex: ['attributes', 'COLOR'], 
+      key: 'color',
+      render: (text: string) => text, 
+    },
+    {
+      title: 'Tồn hiện tại',
+      dataIndex: 'stockQuantity', 
+      key: 'stockQuantity',
+      align: 'center' as const
+    },
     {
       title: 'Nhập số lượng',
       dataIndex: 'order_quantity',
@@ -103,8 +143,8 @@ const CreateOrderModal = ({ open, product, onCancel, onSubmit }: CreateOrderModa
       title={`Tạo phiếu kho cho sản phẩm: ${product?.name || ''}`}
       open={open}
       onCancel={onCancel}
-      width={800}
-      destroyOnHidden
+      width={900} 
+      destroyOnHidden 
       footer={[
         <Button key="back" onClick={onCancel}>
           Hủy
@@ -114,21 +154,23 @@ const CreateOrderModal = ({ open, product, onCancel, onSubmit }: CreateOrderModa
         </Button>,
       ]}
     >
-      <Form form={form} layout="vertical">
-        <Row gutter={16} align="bottom">
-          <Col span={18}>
-            <Form.Item name="notes" label="Ghi chú phiếu">
-              <TextArea rows={1} placeholder="Thêm ghi chú cho phiếu nhập kho" />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="Áp dụng cho tất cả">
-              <InputNumber min={0} placeholder="Số lượng" style={{ width: '100%' }} onChange={handleApplyToAll} />
-            </Form.Item>
-          </Col>
-        </Row>
-        <Table bordered dataSource={variants} columns={columns} pagination={false} rowKey="key" />
-      </Form>
+      <Spin spinning={loading}> 
+        <Form form={form} layout="vertical">
+          <Row gutter={16} align="bottom">
+            <Col span={18}>
+              <Form.Item name="notes" label="Ghi chú phiếu">
+                <TextArea rows={1} placeholder="Thêm ghi chú cho phiếu nhập kho" />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item label="Áp dụng cho tất cả">
+                <InputNumber min={0} placeholder="Số lượng" style={{ width: '100%' }} onChange={handleApplyToAll} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Table bordered dataSource={variants} columns={columns} pagination={false} rowKey="key" />
+        </Form>
+      </Spin>
     </Modal>
   );
 };

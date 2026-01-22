@@ -9,4 +9,6 @@ export const productService = {
     api.get("/v1/products", {
       params: { page, size },
     }),
+  getProductById: (productId: number) =>
+    api.get(`/v1/products/${productId}`),
 };
