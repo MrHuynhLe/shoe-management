@@ -3,6 +3,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Entity
@@ -22,15 +23,23 @@ public class Product {
     @JoinColumn(name = "brand_id")
     private Brand brand;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "origin_id")
+    private Origin origin;
+    @OneToMany(mappedBy = "product", fetch = FetchType.LAZY)
+    private List<ProductImage> images;
     @ManyToOne
     @JoinColumn(name = "category_id")
     private Category category;
 
+
     @Column(name = "is_active")
-    private Boolean isActive;
+    private Boolean isActive = true;
+
+    @Column(name = "deleted_at")
+    private OffsetDateTime deletedAt;
 
     @OneToMany(mappedBy = "product")
     private List<ProductVariant> variants;
-    @OneToMany(mappedBy = "product")
-    private List<ProductImage> images;
+
 }

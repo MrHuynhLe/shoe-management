@@ -1,6 +1,7 @@
 package com.vn.backend.controller;
 
 import com.vn.backend.dto.response.PageResponse;
+import com.vn.backend.dto.response.ProductDetailResponse;
 import com.vn.backend.dto.response.ProductListResponse;
 import com.vn.backend.service.ProductService;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,12 @@ public class ProductController {
         return ResponseEntity.ok(
                 productService.getProductList(page, size)
         );
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ProductDetailResponse> getProductDetail(@PathVariable Long id) {
+
+        return ResponseEntity.ok(productService.getProductDetail(id));
     }
 
 }

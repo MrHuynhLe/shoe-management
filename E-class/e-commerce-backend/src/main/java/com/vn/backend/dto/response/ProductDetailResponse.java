@@ -1,28 +1,25 @@
 package com.vn.backend.dto.response;
 
 import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.List;
 
-@Getter
+@Data
 @AllArgsConstructor
-public class ProductListResponse {
-
+@NoArgsConstructor
+public class ProductDetailResponse {
     private Long id;
     private String code;
     private String name;
+    private String description;
     private String brandName;
     private String categoryName;
     private String originName;
-    private BigDecimal minPrice;
-    private BigDecimal maxPrice;
-    private Long totalStock;
-    private String imageUrl;
     private Boolean isActive;
     private OffsetDateTime deletedAt;
-
+    private List<ProductVariantResponse> variants;
+    private List<String> images;
 }
-
