@@ -7,7 +7,9 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 @Entity
-@Table(name = "products")
+@Table(name = "products"  ,uniqueConstraints = {
+@UniqueConstraint(columnNames = "code")
+    })
 @Getter @Setter
 public class Product {
 
@@ -42,4 +44,7 @@ public class Product {
     @OneToMany(mappedBy = "product")
     private List<ProductVariant> variants;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "supplier_id")
+    private Supplier supplier;
 }

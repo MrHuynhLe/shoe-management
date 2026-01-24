@@ -14,52 +14,38 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     @Query(
             value = """
-    SELECT new com.vn.backend.dto.response.ProductListResponse(
-        p.id,
-        p.code,
-        p.name,
-        b.name,
-         o.name,
-        c.name,
-        MIN(v.sellingPrice),
-        MAX(v.sellingPrice),
-        SUM(v.stockQuantity),
-        MAX(img.imageUrl),
-        p.isActive,
-        p.deletedAt
-    )
-    FROM Product p
-     JOIN p.origin o
-    JOIN p.brand b
-    JOIN p.category c
-    JOIN p.variants v
-    LEFT JOIN ProductImage img
-           ON img.product.id = p.id
-          AND img.isPrimary = true
-    WHERE p.isActive = true
-      AND p.deletedAt IS NULL
-      AND v.isActive = true
-      AND v.deletedAt IS NULL
-    GROUP BY
-        p.id,
-        p.code,
-        p.name,
-        b.name,
-        c.name,
-        o.name,
-        p.isActive,
-        p.deletedAt
-    ORDER BY p.id DESC
-    """,
+SELECT new com.vn.backend.dto.response.ProductListResponse(
+    p.id,
+    p.code,
+    p.name,
+    b.name,
+    o.name,
+    c.name,
+    MIN(v.sellingPrice),
+    MAX(v.sellingPrice),
+    SUM(v.stockQuantity),
+    MAX(img.imageUrl),
+    p.isActive,
+    p.deletedAt
+)
+FROM Product p
+LEFT JOIN p.origin o
+LEFT JOIN p.brand b
+LEFT JOIN p.category c
+LEFT JOIN p.variants v ON (v.isActive = true AND v.deletedAt IS NULL)
+LEFT JOIN ProductImage img ON (img.product.id = p.id AND img.isPrimary = true)
+WHERE p.isActive = true
+  AND p.deletedAt IS NULL
+GROUP BY
+    p.id, p.code, p.name, b.name, o.name, c.name, p.isActive, p.deletedAt
+ORDER BY p.id DESC
+""",
             countQuery = """
-    SELECT COUNT(DISTINCT p.id)
-    FROM Product p
-    JOIN p.variants v
-    WHERE p.isActive = true
-      AND p.deletedAt IS NULL
-      AND v.isActive = true
-      AND v.deletedAt IS NULL
-    """
+SELECT COUNT(p.id)
+FROM Product p
+WHERE p.isActive = true
+  AND p.deletedAt IS NULL
+"""
     )
     Page<ProductListResponse> findProductList(Pageable pageable);
 
@@ -76,5 +62,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 """)
     Optional<Product> findActiveDetailById(@Param("id") Long id);
 
+    boolean existsByCodeAndDeletedAtIsNull(String code);
+
+    Optional<Product> findByIdAndDeletedAtIsNull(Long id);
 
 }

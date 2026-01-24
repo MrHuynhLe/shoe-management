@@ -1,6 +1,22 @@
-import { Modal, Table, Space, Button, Tag, Spin, Descriptions, Typography } from 'antd';
+import {
+  Modal,
+  Table,
+  Space,
+  Button,
+  Tag,
+  Spin,
+  Descriptions,
+  Typography,
+  Divider,
+  Form,
+  Row,
+  Col,
+  Select,
+  InputNumber,
+  Upload,
+} from 'antd';
 import { useState, useEffect } from 'react';
-import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { EditOutlined, DeleteOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons';
 import { productService } from '@/services/product.service';
 
 export interface ProductVariantAttributes {
@@ -36,11 +52,13 @@ interface VariantDetailModalProps {
   onCancel: () => void;
   onEdit: (record: Variant) => void;
   onDelete: (id: number) => void;
+  onAddVariant: (values: any) => void;
 }
 
-const VariantDetailModal: React.FC<VariantDetailModalProps> = ({ open, productId, onCancel, onEdit, onDelete }) => {
+const VariantDetailModal: React.FC<VariantDetailModalProps> = ({ open, productId, onCancel, onEdit, onDelete, onAddVariant }) => {
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(false);
+  const [addVariantForm] = Form.useForm();
 
   useEffect(() => {
     if (open && productId) {
@@ -58,6 +76,7 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({ open, productId
         });
     } else if (!open) {
       setProduct(null); 
+      addVariantForm.resetFields();
     }
   }, [open, productId]);
 
@@ -86,6 +105,12 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({ open, productId
     },
   ];
 
+  const handleAddVariantFinish = (values: any) => {
+    console.log('Adding variant:', values);
+    onAddVariant({ ...values, productId });
+    addVariantForm.resetFields();
+  };
+
   return (
     <Modal
       title={`Chi tiết sản phẩm: ${product?.name || ''}`}
@@ -113,6 +138,52 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({ open, productId
               bordered
               pagination={false}
             />
+
+            <Divider>Thêm biến thể mới</Divider>
+            <Form form={addVariantForm} layout="vertical" onFinish={handleAddVariantFinish}>
+              <Row gutter={16}>
+                <Col span={6}>
+                  <Form.Item name="size" label="Size" rules={[{ required: true }]}>
+                    <Select placeholder="Chọn size" />
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
+                  <Form.Item name="color" label="Màu" rules={[{ required: true }]}>
+                    <Select placeholder="Chọn màu" />
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
+                  <Form.Item name="costPrice" label="Giá vốn" rules={[{ required: true }]}>
+                    <InputNumber style={{ width: '100%' }} placeholder="Giá nhập" />
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
+                  <Form.Item name="sellingPrice" label="Giá bán" rules={[{ required: true }]}>
+                    <InputNumber style={{ width: '100%' }} placeholder="Giá bán" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    name="variantImages"
+                    label="Ảnh riêng của biến thể"
+                    valuePropName="fileList"
+                    getValueFromEvent={(e) => (Array.isArray(e) ? e : e?.fileList)}
+                  >
+                    <Upload beforeUpload={() => false} listType="picture-card">
+                      <div>
+                        <PlusOutlined />
+                        <div style={{ marginTop: 8 }}>Tải lên</div>
+                      </div>
+                    </Upload>
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Form.Item>
+                <Button type="primary" htmlType="submit" icon={<PlusOutlined />}>
+                  Thêm biến thể
+                </Button>
+              </Form.Item>
+            </Form>
           </Space>
         )}
       </Spin>

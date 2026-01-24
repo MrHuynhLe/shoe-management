@@ -3,6 +3,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.OffsetDateTime;
+
 @Entity
 @Table(name = "brands")
 @Getter @Setter
@@ -15,4 +17,6 @@ public class Brand {
 
     @Column(name = "is_active")
     private Boolean isActive;
+    @Column(name = "deleted_at")
+    private OffsetDateTime deletedAt;
 }
