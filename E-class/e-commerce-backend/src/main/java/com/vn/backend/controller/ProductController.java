@@ -1,12 +1,19 @@
 package com.vn.backend.controller;
 
+import com.vn.backend.dto.request.ProductCreateRequest;
 import com.vn.backend.dto.response.PageResponse;
 import com.vn.backend.dto.response.ProductDetailResponse;
 import com.vn.backend.dto.response.ProductListResponse;
+import com.vn.backend.entity.Product;
 import com.vn.backend.service.ProductService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/v1/products")
@@ -32,4 +39,13 @@ public class ProductController {
         return ResponseEntity.ok(productService.getProductDetail(id));
     }
 
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> createWithImages(
+            @RequestPart("data") @Valid ProductCreateRequest request,
+            @RequestPart(value = "image", required = false) MultipartFile image,
+            @RequestPart(value = "images", required = false) List<MultipartFile> images
+    ) {
+        Product product = productService.createWithImages(request, image, images);
+        return ResponseEntity.ok(product);
+    }
 }

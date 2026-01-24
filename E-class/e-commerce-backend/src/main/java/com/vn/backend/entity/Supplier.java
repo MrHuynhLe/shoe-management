@@ -1,27 +1,31 @@
 package com.vn.backend.entity;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
 
 import java.time.OffsetDateTime;
 
 @Entity
-@Table(name = "categories")
-@Getter
-@Setter
-public class Category {
+@Table(name = "suppliers")
+@Data
+public class Supplier {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false, unique = true, length = 50)
+    private String code;
+
+    @Column(nullable = false)
     private String name;
 
-    @Column(name = "size_chart_url")
-    private String sizeChartUrl;
+    @Column(length = 20)
+    private String phone;
 
     @Column(name = "is_active")
-    private Boolean isActive;
+    private Boolean isActive = true;
+
     @Column(name = "deleted_at")
     private OffsetDateTime deletedAt;
 }

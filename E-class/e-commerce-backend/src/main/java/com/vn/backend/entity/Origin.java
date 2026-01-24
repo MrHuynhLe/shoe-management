@@ -1,5 +1,6 @@
 package com.vn.backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.OffsetDateTime;
@@ -18,9 +19,6 @@ public class Origin {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-//    @Column(name = "code", nullable = false, unique = true, length = 50)
-//    private String code;
-
     @Column(name = "name", nullable = false, length = 255)
     private String name;
 
@@ -37,7 +35,8 @@ public class Origin {
     private OffsetDateTime updatedAt;
 
 
-    @OneToMany(mappedBy = "origin", fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "origin")
+    @JsonIgnore
     private List<Product> products;
 
 
