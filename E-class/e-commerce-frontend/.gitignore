@@ -22,3 +22,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+E-class/e-commerce-backend/src/main/resources/static/image/
+E-class/e-commerce-backend/uploads/
