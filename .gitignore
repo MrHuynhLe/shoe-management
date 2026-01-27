@@ -31,7 +31,6 @@ build/
 
 ### VS Code ###
 .vscode/
-E-class/e-commerce-backend/src/main/resources/static/image/
 E-class/e-commerce-backend/uploads/
 # user uploaded files
 uploads/
