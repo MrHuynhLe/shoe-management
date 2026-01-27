@@ -8,6 +8,6 @@ public/uploads/
 
 # backend uploads
 E-class/e-commerce-backend/uploads/
-E-class/e-commerce-backend/src/main/resources/static/image/
-# backend static images
-E-class/e-commerce-backend/src/main/resources/static/image/
+
+# backend static uploads
+E-class/e-commerce-backend/src/main/resources/static/
