@@ -48,4 +48,9 @@ public class ProductController {
         Product product = productService.createWithImages(request, image, images);
         return ResponseEntity.ok(product);
     }
+    @PostMapping(value = "/upload-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<String> uploadImage(@RequestPart("file") MultipartFile file) {
+        String fileUrl = productService.uploadSingleImage(file);
+        return ResponseEntity.ok(fileUrl);
+    }
 }
