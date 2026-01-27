@@ -27,16 +27,18 @@ public class ProductVariant {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true)
+    @Column(nullable = false, unique = true)
     private String code;
 
     @Column(nullable = false, unique = true)
     private String barcode;
 
-    @Column(name = "selling_price")
+    @Column(nullable = false)
     private BigDecimal sellingPrice;
-    @Column(name = "cost_price")
+
+    @Column(nullable = false)
     private BigDecimal costPrice;
+
     @Column(name = "stock_quantity")
     private Integer stockQuantity;
 

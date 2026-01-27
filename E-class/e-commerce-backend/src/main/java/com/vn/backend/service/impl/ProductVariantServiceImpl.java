@@ -13,13 +13,17 @@ import com.vn.backend.repository.ProductVariantRepository;
 import com.vn.backend.repository.VariantAttributeValueRepository;
 import com.vn.backend.service.ProductVariantService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
+@Slf4j
 public class ProductVariantServiceImpl implements ProductVariantService {
 
     private final ProductVariantRepository productVariantRepository;
@@ -65,6 +69,11 @@ public class ProductVariantServiceImpl implements ProductVariantService {
     // create
     @Override
     public ProductVariantResponse create(ProductVariantCreateRequest request) {
+        // Test log
+        log.info("REQUEST CODE = {}", request.getCode());
+        log.info("REQUEST PRODUCT_ID = {}", request.getProductId());
+        log.info("REQUEST ATTR_VALUE_IDS = {}", request.getAttributeValueIds());
+
         // 1️⃣ LẤY PRODUCT
         Product product = productRepository.findById(request.getProductId())
                 .orElseThrow(() -> new RuntimeException("Product không tồn tại"));
@@ -72,6 +81,22 @@ public class ProductVariantServiceImpl implements ProductVariantService {
         // 2️⃣ LẤY ATTRIBUTE VALUES
         List<AttributeValue> attributeValues =
                 attributeValueRepository.findAllById(request.getAttributeValueIds());
+
+        // CHECK KHÔNG CHO TRÙNG ATTRIBUTE (SIZE, COLOR...)
+        long distinctAttrCount = attributeValues.stream()
+                .map(av -> av.getAttribute().getId())
+                .distinct()
+                .count();
+
+        if (distinctAttrCount != attributeValues.size()) {
+            throw new RuntimeException(
+                    "Một SKU không được có 2 giá trị cùng loại Attribute (SIZE, COLOR...)"
+            );
+        }
+
+        if (attributeValues.size() != request.getAttributeValueIds().size()) {
+            throw new RuntimeException("Có AttributeValue không tồn tại");
+        }
 
         if (attributeValues.isEmpty()) {
             throw new RuntimeException("AttributeValue không hợp lệ");
@@ -89,10 +114,12 @@ public class ProductVariantServiceImpl implements ProductVariantService {
         ProductVariant variant = new ProductVariant();
         variant.setProduct(product);
         variant.setBarcode(generateBarcode());
-        variant.setBarcode(code); // hoặc sinh barcode riêng
+        variant.setCode(request.getCode());// hoặc sinh barcode riêng
         variant.setSellingPrice(request.getSellingPrice());
         variant.setCostPrice(request.getCostPrice());
-        variant.setStockQuantity(request.getStockQuantity());
+        variant.setStockQuantity(
+                Optional.ofNullable(request.getStockQuantity()).orElse(0)
+        );
         variant.setIsActive(true);
 
         // 6️⃣ SAVE VARIANT TRƯỚC
