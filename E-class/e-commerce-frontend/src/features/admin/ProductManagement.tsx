@@ -40,23 +40,27 @@ const ProductManagementPage = () => {
   const [selectedProduct, setSelectedProduct] = useState<ProductForTable | null>(null);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
 
-  useEffect(() => {
+  const fetchProducts = () => {
     setLoading(true);
     productService
-      .getProducts(0, 10)
+      .getProducts(0, 10) 
       .then((res) => {
         const formattedData: ProductForTable[] = res.data.content.map((p: ProductList) => ({
           ...p,
           key: p.id,
           brand: p.brandName,
-          hasVariants: true,
-          hasPendingOrder: false,
+          hasVariants: true, 
+          hasPendingOrder: false, 
           variants: [],
         }));
         setProducts(formattedData);
       })
       .catch((error) => console.error('Lỗi khi tải danh sách sản phẩm:', error))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchProducts();
   }, []);
 
   const handleAddProduct = async (values: any) => {
@@ -170,8 +174,29 @@ const ProductManagementPage = () => {
     setIsEditVariantModalOpen(false);
   };
 
-  const handleAddVariant = (values: any) => {
-    console.log('Adding new variant to product:', values);
+  const handleAddVariant = async (data: { productId: number; variants: any[] }) => {
+    const { productId, variants } = data;
+
+    try {
+      setLoading(true);
+
+      await productService.bulkCreateVariants(productId, variants);
+      notification.success({
+        message: 'Thành công',
+        description: 'Các biến thể đã được thêm thành công!',
+      });
+      handleCancelVariantDetailModal();
+      fetchProducts(); 
+    } catch (error: any) {
+      console.error('Failed to add variants:', error);
+      const serverMessage = error.response?.data?.message || 'Đã có lỗi xảy ra khi thêm biến thể.';
+      notification.error({
+        message: 'Thêm biến thể thất bại',
+        description: typeof serverMessage === 'string' ? serverMessage : 'Dữ liệu không hợp lệ, vui lòng kiểm tra lại.',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const columns = [

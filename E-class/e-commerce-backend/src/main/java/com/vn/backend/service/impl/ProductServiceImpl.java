@@ -16,6 +16,11 @@
     import org.springframework.stereotype.Service;
     import org.springframework.web.multipart.MultipartFile;
 
+    import java.io.IOException;
+    import java.nio.file.Files;
+    import java.nio.file.Path;
+    import java.nio.file.Paths;
+    import java.nio.file.StandardCopyOption;
     import java.util.Comparator;
     import java.util.List;
     import java.util.stream.Collectors;
@@ -172,5 +177,26 @@
             }
 
             return product;
+        }
+        @Override
+        public String uploadSingleImage(MultipartFile file) {
+            try {
+                // Đường dẫn tương đối đến thư mục static trong project của bạn
+                Path root = Paths.get("src/main/resources/static/image");
+                if (!Files.exists(root)) {
+                    Files.createDirectories(root);
+                }
+
+                // Tạo tên file duy nhất để không bị ghi đè
+                String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
+
+                // Lưu file vật lý
+                Files.copy(file.getInputStream(), root.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
+
+                // Trả về đường dẫn để Frontend lưu vào DB (ví dụ: /image/123_anh.png)
+                return "/image/" + fileName;
+            } catch (IOException e) {
+                throw new RuntimeException("Không thể lưu file ảnh: " + e.getMessage());
+            }
         }
     }

@@ -6,6 +6,8 @@ import lombok.*;
 @Entity
 @Table(name = "attribute_values")
 @Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class AttributeValue {

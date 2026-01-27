@@ -20,4 +20,5 @@ public interface ProductService {
             MultipartFile primaryImage,
             List<MultipartFile> galleryImages
     );
+    String uploadSingleImage(MultipartFile file);
 }
