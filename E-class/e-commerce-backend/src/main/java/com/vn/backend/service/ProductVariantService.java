@@ -7,12 +7,6 @@ import com.vn.backend.dto.request.VariantBulkRequest;
 public interface ProductVariantService {
     void createBulkVariants(VariantBulkRequest request);
   
-    List<ProductVariantResponse> getAllVariants();
 
-    List<ProductVariantResponse> getVariantsByProduct(Long productId);
-
-    ProductVariantResponse getVariantDetail(Long id);
-
-    ProductVariantResponse create(ProductVariantCreateRequest request);
 
 }

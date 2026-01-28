@@ -74,30 +74,3 @@ public class ProductVariantServiceImpl implements ProductVariantService {
             }
         }
     }
-        @Override
-    public List<ProductVariantResponse> getAllVariants() {
-
-        return productVariantRepository.findAllActiveWithAttributes()
-                .stream()
-                .map(this::toResponse)
-                .toList();
-    }
-          @Override
-    public List<ProductVariantResponse> getVariantsByProduct(Long productId) {
-
-        return productVariantRepository.findByProductIdWithAttributes(productId)
-                .stream()
-                .map(this::toResponse)
-                .toList();
-    }
-    @Override
-    public ProductVariantResponse getVariantDetail(Long id) {
-
-        ProductVariant variant = productVariantRepository.findActiveById(id)
-                .orElseThrow(() ->
-                        new RuntimeException("Product variant not found with id: " + id)
-                );
-
-        return toResponse(variant);
-    }
-}
