@@ -73,6 +73,7 @@ public class ProductVariantServiceImpl implements ProductVariantService {
                 productImageRepository.save(img);
             }
         }
+    }
         @Override
     public List<ProductVariantResponse> getAllVariants() {
 
