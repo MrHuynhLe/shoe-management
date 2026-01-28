@@ -22,18 +22,58 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
-@Slf4j
+
 public class ProductVariantServiceImpl implements ProductVariantService {
 
-    private final ProductVariantRepository productVariantRepository;
+    private final ProductVariantRepository variantRepository;
     private final ProductRepository productRepository;
-    private final VariantAttributeValueRepository variantAttributeValueRepository;
-    private final AttributeValueRepository attributeValueRepository; // ✅ thêm
+    private final AttributeValueRepository attributeValueRepository;
+    private final ProductImageRepository productImageRepository;
 
-
-    // ================= GET ALL =================
     @Override
+    @Transactional
+    public void createBulkVariants(VariantBulkRequest request) {
+
+        Product product = productRepository.findById(request.getProductId())
+                .orElseThrow(() -> new ResourceNotFoundException("Sản phẩm không tồn tại"));
+
+        for (VariantBulkRequest.VariantItemRequest item : request.getVariants()) {
+
+            ProductVariant variant = new ProductVariant();
+            variant.setProduct(product);
+            variant.setCode(item.getCode());
+            variant.setCostPrice(item.getCostPrice());
+            variant.setSellingPrice(item.getSellingPrice());
+            variant.setStockQuantity(item.getStockQuantity());
+            variant.setIsActive(true);
+
+            List<VariantAttributeValue> vavList = item.getAttributeValueIds().stream().map(attrId -> {
+                AttributeValue av = attributeValueRepository.findById(attrId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thuộc tính ID: " + attrId));
+
+                VariantAttributeValue vav = new VariantAttributeValue();
+                vav.setVariant(variant);
+                vav.setAttributeValue(av);
+                return vav;
+            }).collect(Collectors.toList());
+
+            variant.setVariantAttributeValues(vavList);
+
+            ProductVariant savedVariant = variantRepository.save(variant);
+
+            if (item.getImageUrl() != null) {
+                ProductImage img = new ProductImage();
+                img.setProduct(product);
+                img.setProductVariant(savedVariant);
+                img.setImageUrl(item.getImageUrl());
+                
+                img.setIsPrimary(false);
+
+                img.setDisplayOrder(0);
+                productImageRepository.save(img);
+            }
+        }
+        @Override
     public List<ProductVariantResponse> getAllVariants() {
 
         return productVariantRepository.findAllActiveWithAttributes()
@@ -41,9 +81,7 @@ public class ProductVariantServiceImpl implements ProductVariantService {
                 .map(this::toResponse)
                 .toList();
     }
-
-    // ================= GET BY PRODUCT =================
-    @Override
+          @Override
     public List<ProductVariantResponse> getVariantsByProduct(Long productId) {
 
         return productVariantRepository.findByProductIdWithAttributes(productId)
@@ -51,8 +89,6 @@ public class ProductVariantServiceImpl implements ProductVariantService {
                 .map(this::toResponse)
                 .toList();
     }
-
-    // ================= GET DETAIL =================
     @Override
     public ProductVariantResponse getVariantDetail(Long id) {
 
@@ -62,121 +98,5 @@ public class ProductVariantServiceImpl implements ProductVariantService {
                 );
 
         return toResponse(variant);
-    }
-
-
-
-    // create
-    @Override
-    public ProductVariantResponse create(ProductVariantCreateRequest request) {
-        // Test log
-        log.info("REQUEST CODE = {}", request.getCode());
-        log.info("REQUEST PRODUCT_ID = {}", request.getProductId());
-        log.info("REQUEST ATTR_VALUE_IDS = {}", request.getAttributeValueIds());
-
-        // 1️⃣ LẤY PRODUCT
-        Product product = productRepository.findById(request.getProductId())
-                .orElseThrow(() -> new RuntimeException("Product không tồn tại"));
-
-        // 2️⃣ LẤY ATTRIBUTE VALUES
-        List<AttributeValue> attributeValues =
-                attributeValueRepository.findAllById(request.getAttributeValueIds());
-
-        // CHECK KHÔNG CHO TRÙNG ATTRIBUTE (SIZE, COLOR...)
-        long distinctAttrCount = attributeValues.stream()
-                .map(av -> av.getAttribute().getId())
-                .distinct()
-                .count();
-
-        if (distinctAttrCount != attributeValues.size()) {
-            throw new RuntimeException(
-                    "Một SKU không được có 2 giá trị cùng loại Attribute (SIZE, COLOR...)"
-            );
-        }
-
-        if (attributeValues.size() != request.getAttributeValueIds().size()) {
-            throw new RuntimeException("Có AttributeValue không tồn tại");
-        }
-
-        if (attributeValues.isEmpty()) {
-            throw new RuntimeException("AttributeValue không hợp lệ");
-        }
-
-        // 3️⃣ SINH CODE TỪ ATTRIBUTE
-        String code = generateVariantCode(product, attributeValues);
-
-        // 4️⃣ CHECK TRÙNG CODE (QUAN TRỌNG)
-        if (productVariantRepository.existsByCodeAndDeletedAtIsNull(code)) {
-            throw new RuntimeException("Variant đã tồn tại: " + code);
-        }
-
-        // 5️⃣ TẠO VARIANT
-        ProductVariant variant = new ProductVariant();
-        variant.setProduct(product);
-        variant.setBarcode(generateBarcode());
-        variant.setCode(request.getCode());// hoặc sinh barcode riêng
-        variant.setSellingPrice(request.getSellingPrice());
-        variant.setCostPrice(request.getCostPrice());
-        variant.setStockQuantity(
-                Optional.ofNullable(request.getStockQuantity()).orElse(0)
-        );
-        variant.setIsActive(true);
-
-        // 6️⃣ SAVE VARIANT TRƯỚC
-        productVariantRepository.save(variant);
-
-        // 7️⃣ GẮN ATTRIBUTE ↔ VARIANT
-        List<VariantAttributeValue> vavs = attributeValues.stream()
-                .map(av -> {
-                    VariantAttributeValue vav = new VariantAttributeValue();
-                    vav.setVariant(variant);
-                    vav.setAttributeValue(av);
-                    return vav;
-                })
-                .toList();
-
-        variantAttributeValueRepository.saveAll(vavs);
-        variant.setVariantAttributeValues(vavs);
-
-        // 8️⃣ RETURN RESPONSE
-        return toResponse(variant);
-    }
-    // ================= MAPPER =================
-    private ProductVariantResponse toResponse(ProductVariant variant) {
-
-        List<VariantAttributeValue> vavs =
-                Optional.ofNullable(variant.getVariantAttributeValues())
-                        .orElse(List.of());
-
-        Map<String, String> attributes = vavs.stream()
-                .collect(Collectors.toMap(
-                        v -> v.getAttributeValue().getAttribute().getCode(),
-                        v -> v.getAttributeValue().getValue(),
-                        (a, b) -> a // tránh crash nếu trùng key
-                ));
-
-        return new ProductVariantResponse(
-                variant.getId(),
-                variant.getCode(),
-                variant.getCostPrice(),
-                variant.getSellingPrice(),
-                variant.getStockQuantity(),
-                variant.getIsActive(),
-                attributes
-        );
-    }
-    // TỰ SINH
-    private String generateVariantCode(Product product, List<AttributeValue> values) {
-
-        String attrPart = values.stream()
-                .map(AttributeValue::getValue)
-                .sorted()
-                .collect(Collectors.joining("-"));
-
-        return product.getCode() + "-" + attrPart;
-    }
-    // CODE TỰ SINH
-    private String generateBarcode() {
-        return "BC" + System.currentTimeMillis();
     }
 }

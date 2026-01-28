@@ -1,4 +1,5 @@
 package com.vn.backend.entity;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -53,8 +54,10 @@ public class ProductVariant {
 
     @ManyToOne
     @JoinColumn(name = "product_id")
+    @JsonIgnoreProperties("productVariants")
     private Product product;
-    @OneToMany(mappedBy = "variant", fetch = FetchType.LAZY)
+
+    @OneToMany(mappedBy = "variant", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<VariantAttributeValue> variantAttributeValues;
 }
 
