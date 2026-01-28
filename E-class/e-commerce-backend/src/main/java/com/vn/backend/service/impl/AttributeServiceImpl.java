@@ -21,8 +21,6 @@ public class AttributeServiceImpl implements AttributeService {
     @Override
     public List<AttributeResponse> getAttributesForVariant() {
         List<Attribute> attributes = attributeRepository.findAll();
-
-        // Validate: Nếu DB chưa setup thuộc tính cơ bản
         if (attributes.isEmpty()) {
             throw new
                     ResourceNotFoundException("Chưa cấu hình các thuộc tính (Size, Color) trong hệ thống");

@@ -141,12 +141,10 @@
             );
             product.setDeletedAt(null);
 
-            // 3. Lưu product trước để có ID
             product = productRepository.save(product);
 
             int order = 1;
 
-// Ảnh chính
             if (primaryImage != null && !primaryImage.isEmpty()) {
                 String url = fileStorageService.store(primaryImage);
 
@@ -159,7 +157,6 @@
                 productImageRepository.save(img);
             }
 
-// Ảnh gallery
             if (galleryImages != null && !galleryImages.isEmpty()) {
                 for (MultipartFile file : galleryImages) {
                     if (file.isEmpty()) continue;
