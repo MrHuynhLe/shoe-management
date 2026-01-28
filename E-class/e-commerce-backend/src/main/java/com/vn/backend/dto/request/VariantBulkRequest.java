@@ -28,6 +28,6 @@ public class VariantBulkRequest {
         private Integer stockQuantity;
         private String imageUrl;
         @NotEmpty(message = "Mỗi biến thể phải có ít nhất 1 thuộc tính")
-        private List<Integer> attributeValueIds;
+        private List<Long> attributeValueIds;
     }
 }

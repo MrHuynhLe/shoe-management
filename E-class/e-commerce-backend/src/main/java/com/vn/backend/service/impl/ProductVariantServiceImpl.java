@@ -1,28 +1,21 @@
 package com.vn.backend.service.impl;
 
-
-import com.vn.backend.dto.request.ProductVariantCreateRequest;
-import com.vn.backend.dto.response.ProductVariantResponse;
-import com.vn.backend.entity.AttributeValue;
-import com.vn.backend.entity.Product;
-import com.vn.backend.entity.ProductVariant;
-import com.vn.backend.entity.VariantAttributeValue;
+import com.vn.backend.dto.request.VariantBulkRequest;
+import com.vn.backend.entity.*;
+import com.vn.backend.exception.ResourceNotFoundException;
 import com.vn.backend.repository.AttributeValueRepository;
+import com.vn.backend.repository.ProductImageRepository;
 import com.vn.backend.repository.ProductRepository;
 import com.vn.backend.repository.ProductVariantRepository;
-import com.vn.backend.repository.VariantAttributeValueRepository;
 import com.vn.backend.service.ProductVariantService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.*;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-
 public class ProductVariantServiceImpl implements ProductVariantService {
 
     private final ProductVariantRepository variantRepository;
@@ -66,7 +59,7 @@ public class ProductVariantServiceImpl implements ProductVariantService {
                 img.setProduct(product);
                 img.setProductVariant(savedVariant);
                 img.setImageUrl(item.getImageUrl());
-                
+
                 img.setIsPrimary(false);
 
                 img.setDisplayOrder(0);
@@ -74,3 +67,4 @@ public class ProductVariantServiceImpl implements ProductVariantService {
             }
         }
     }
+}
