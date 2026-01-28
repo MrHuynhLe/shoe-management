@@ -178,19 +178,13 @@
         @Override
         public String uploadSingleImage(MultipartFile file) {
             try {
-                // Đường dẫn tương đối đến thư mục static trong project của bạn
                 Path root = Paths.get("src/main/resources/static/image");
                 if (!Files.exists(root)) {
                     Files.createDirectories(root);
                 }
 
-                // Tạo tên file duy nhất để không bị ghi đè
                 String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
-
-                // Lưu file vật lý
                 Files.copy(file.getInputStream(), root.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
-
-                // Trả về đường dẫn để Frontend lưu vào DB (ví dụ: /image/123_anh.png)
                 return "/image/" + fileName;
             } catch (IOException e) {
                 throw new RuntimeException("Không thể lưu file ảnh: " + e.getMessage());

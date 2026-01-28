@@ -21,5 +21,31 @@ public class ProductVariantController {
     public ResponseEntity<String> createBulk(@RequestBody VariantBulkRequest request) {
         variantService.createBulkVariants(request);
         return ResponseEntity.ok("Thành công");
+
+    }
+  
+     @GetMapping
+    public ResponseEntity<List<ProductVariantResponse>> getAll() {
+        return ResponseEntity.ok(
+                variantService.getAllVariants()
+        );
+    }
+
+   @GetMapping("/product/{productId}")
+    public ResponseEntity<List<ProductVariantResponse>> getByProduct(
+            @PathVariable Long productId
+    ) {
+        return ResponseEntity.ok(
+                variantService.getVariantsByProduct(productId)
+        );
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ProductVariantResponse> getDetail(
+            @PathVariable Long id
+    ) {
+        return ResponseEntity.ok(
+                variantService.getVariantDetail(id)
+        );
     }
 }

@@ -1,7 +1,12 @@
 package com.vn.backend.service.impl;
 
+import com.vn.backend.dto.request.ProductImageCreateRequest;
+import com.vn.backend.entity.Product;
 import com.vn.backend.entity.ProductImage;
+import com.vn.backend.entity.ProductVariant;
 import com.vn.backend.repository.ProductImageRepository;
+import com.vn.backend.repository.ProductRepository;
+import com.vn.backend.repository.ProductVariantRepository;
 import com.vn.backend.service.ProductImageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -13,6 +18,9 @@ import java.util.List;
 public class ProductImageServiceImpl implements ProductImageService {
 
     private final ProductImageRepository productImageRepository;
+    private final ProductRepository productRepository;
+    private final ProductVariantRepository productVariantRepository;
+
 
     @Override
     public List<String> getImagesByProductId(Long productId) {
@@ -38,4 +46,41 @@ public class ProductImageServiceImpl implements ProductImageService {
                 .map(ProductImage::getImageUrl)
                 .orElse(null);
     }
+
+    @Override
+    public void create(ProductImageCreateRequest request) {
+
+        Product product = productRepository.findById(request.getProductId())
+                .orElseThrow(() -> new RuntimeException("Product không tồn tại"));
+
+        ProductVariant variant = null;
+
+        if (request.getProductVariantId() != null) {
+            variant = productVariantRepository.findById(request.getProductVariantId())
+                    .orElseThrow(() -> new RuntimeException("Variant không tồn tại"));
+        }
+
+        // 🔥 LOGIC PRIMARY
+        if (Boolean.TRUE.equals(request.getIsPrimary())) {
+            if (variant != null) {
+                // ảnh variant
+                productImageRepository.resetPrimaryVariantImage(variant.getId());
+            } else {
+                // ảnh product
+                productImageRepository.resetPrimaryProductImage(product.getId());
+            }
+        }
+
+        ProductImage image = new ProductImage();
+        image.setProduct(product);
+        image.setProductVariant(variant);
+        image.setImageUrl(request.getImageUrl());
+        image.setIsPrimary(Boolean.TRUE.equals(request.getIsPrimary()));
+        image.setDisplayOrder(
+                request.getDisplayOrder() != null ? request.getDisplayOrder() : 0
+        );
+
+        productImageRepository.save(image);
+    }
+
 }

@@ -1,4 +1,3 @@
-
 # global ignores
 node_modules/
 dist/
@@ -12,4 +11,3 @@ E-class/e-commerce-backend/uploads/
 
 # backend static uploads
 E-class/e-commerce-backend/src/main/resources/static/
-
