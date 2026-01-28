@@ -9,7 +9,18 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 @Entity
-@Table(name = "product_variants")
+@Table(
+        name = "product_variants",
+        indexes = {
+                @Index(name = "idx_product_variants_barcode", columnList = "barcode")
+        },
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uq_product_variants_barcode",
+                        columnNames = {"barcode"}
+                )
+        }
+)
 @Getter @Setter
 public class ProductVariant {
 
@@ -17,12 +28,18 @@ public class ProductVariant {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false, unique = true)
     private String code;
 
-    @Column(name = "selling_price")
+    @Column(nullable = false, unique = true)
+    private String barcode;
+
+    @Column(nullable = false)
     private BigDecimal sellingPrice;
-    @Column(name = "cost_price")
+
+    @Column(nullable = false)
     private BigDecimal costPrice;
+
     @Column(name = "stock_quantity")
     private Integer stockQuantity;
 
