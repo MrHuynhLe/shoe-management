@@ -1,29 +1,21 @@
-import ProLayout, { PageContainer } from '@ant-design/pro-layout';
-import { Link, Outlet, useLocation } from 'react-router-dom';
-import FooterBar from './components/FooterBar';
+import { Layout } from 'antd';
+import { Outlet } from 'react-router-dom';
 import CustomHeader from './components/CustomHeader';
-import { ConfigProvider } from 'antd'; 
-import antdViVN from 'antd/locale/vi_VN'; 
-import proViVN from '@ant-design/pro-provider/es/locale/vi_VN'; 
+import FooterBar from './components/FooterBar';
+
+const { Content } = Layout;
 
 const MainLayout = () => {
-  const location = useLocation();
-
   return (
-    <ConfigProvider locale={{ ...antdViVN, ...proViVN }}>
-      <ProLayout
-        style={{ minHeight: '100vh' }}      
-        layout="top"
-        contentWidth="Fluid"
-        location={location}
-        headerRender={() => <CustomHeader />}
-        footerRender={() => <FooterBar />}
-      >
-        <PageContainer>
+    <Layout style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', minWidth: '1200px' }}>
+      <CustomHeader />
+      <Content style={{ flex: '1 0 auto', padding: '24px 48px', background: '#f8f9fa' }}>
+        <div style={{ background: '#fff', padding: 24, minHeight: '100%', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
           <Outlet />
-        </PageContainer>
-      </ProLayout>
-    </ConfigProvider>
+        </div>
+      </Content>
+      <FooterBar />
+    </Layout>
   );
 };
 

@@ -22,8 +22,7 @@ import { EditOutlined, DeleteOutlined, PlusOutlined, UploadOutlined } from '@ant
 import { productService } from '@/services/product.service';
 import { App} from 'antd';
 export interface ProductVariantAttributes {
-  COLOR: string;
-  SIZE: string;
+  [key: string]: string;
 }
 
 export interface Variant {
@@ -34,6 +33,7 @@ export interface Variant {
   stockQuantity: number;
   isActive: boolean;
   attributes: ProductVariantAttributes;
+  images?: string[];
 }
 
 export interface ProductDetail {
@@ -46,6 +46,7 @@ export interface ProductDetail {
   originName: string;
   isActive: boolean;
   variants: Variant[];
+  images: string[];
 }
 
 interface VariantDetailModalProps {
@@ -70,10 +71,8 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [addVariantForm] = Form.useForm();
-  const [sizes, setSizes] = useState<AttributeOption[]>([]);
-  const [colors, setColors] = useState<AttributeOption[]>([]);
-  const [selectedBulkSizes, setSelectedBulkSizes] = useState<string[]>([]);
-  const [selectedBulkColors, setSelectedBulkColors] = useState<string[]>([]);
+  const [dynamicAttributes, setDynamicAttributes] = useState<any[]>([]);
+  const [selectedBulkAttributes, setSelectedBulkAttributes] = useState<Record<string, string[]>>({});
   const [bulkCostPrice, setBulkCostPrice] = useState<number | null>(null);
   const [bulkSellingPrice, setBulkSellingPrice] = useState<number | null>(null);
 
@@ -82,23 +81,7 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
       try {
 
         const response = await productService.getAttributes();
-        const attributes = response.data;
-
-        const sizeAttribute = attributes.find((attr: any) => attr.code === 'SIZE');
-        const colorAttribute = attributes.find((attr: any) => attr.code === 'COLOR');
-
-        const formatOptions = (values: any[]): AttributeOption[] =>
-          values.map(item => ({ label: item.value, value: item.value, id: item.id })); 
-        if (sizeAttribute && sizeAttribute.values) {
-          setSizes(formatOptions(sizeAttribute.values));
-        } else {
-          setSizes([]);
-        }
-        if (colorAttribute && colorAttribute.values) {
-          setColors(formatOptions(colorAttribute.values));
-        } else {
-          setColors([]);
-        }
+        setDynamicAttributes(response.data || []);
       } catch (error) {
         console.error("Failed to fetch attributes:", error);
         notification.error({
@@ -125,13 +108,48 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
     } else if (!open) {
       setProduct(null);
       addVariantForm.resetFields();
+      setSelectedBulkAttributes({});
     }
   }, [open, productId, addVariantForm]);
 
+  // Helper to get all existing and currently-in-form combinations
+  const getExistingAndFormCombinations = (excludeIndex?: number) => {
+    const combinations = new Set<string>(); // Using a Set to store unique combinations
+
+    // Helper to create a sorted, stable key from attribute values
+    const createCombinationKey = (attributes: Record<string, string>) => {
+      return Object.keys(attributes).sort().map(key => `${key}:${attributes[key]}`).join('|');
+    };
+
+    // 1. Add combinations from variants already saved in the backend
+    if (product?.variants) {
+      product.variants.forEach(v => {
+        combinations.add(createCombinationKey(v.attributes));
+      });
+    }
+
+    // 2. Add combinations from other variants currently in the form
+    const currentFormVariants = addVariantForm.getFieldsValue().variants || [];
+    currentFormVariants.forEach((v: any, index: number) => {
+      // Check if the variant has attributes and is not the one to be excluded
+      if ((excludeIndex === undefined || index !== excludeIndex) && v && v.attributes) {
+        const hasAllAttributes = dynamicAttributes.every(attr => v.attributes[attr.code]);
+        if (hasAllAttributes) {
+          combinations.add(createCombinationKey(v.attributes));
+        }
+      }
+    });
+
+    return combinations;
+  };
+
   const columns = [
     { title: 'SKU', dataIndex: 'code', key: 'code' },
-    { title: 'Size', dataIndex: ['attributes', 'SIZE'], key: 'size' },
-    { title: 'Màu', dataIndex: ['attributes', 'COLOR'], key: 'color' },
+    ...dynamicAttributes.map(attr => ({
+      title: attr.name,
+      dataIndex: ['attributes', attr.code],
+      key: attr.code,
+    })),
     { title: 'Giá bán', dataIndex: 'sellingPrice', key: 'sellingPrice', render: (price: number) => price.toLocaleString('vi-VN') + ' ₫' },
     { title: 'Tồn kho', dataIndex: 'stockQuantity', key: 'stockQuantity' },
     {
@@ -167,19 +185,25 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
     try {
       setLoading(true);
 
+      // Map form data to the DTO structure expected by the backend
       const variantsToSubmit = values.variants.map((variant: any) => {
-        const sizeAttr = sizes.find(s => s.value === variant.size);
-        const colorAttr = colors.find(c => c.value === variant.color);
-        const attrIds = [sizeAttr?.id, colorAttr?.id].filter(Boolean);
+        const attributeValueIds: number[] = [];
+        // Find the ID for each selected attribute value
+        for (const attr of dynamicAttributes) {
+          const selectedValue = variant.attributes[attr.code];
+          const attrValue = attr.values.find((v: any) => v.value === selectedValue);
+          if (attrValue) {
+            attributeValueIds.push(attrValue.id);
+          }
+        }
 
         return {
-
-          code: generateSku(variant.size, variant.color),
+          code: variant.sku || generateSku(variant.attributes),
           costPrice: variant.costPrice,
           sellingPrice: variant.sellingPrice,
           stockQuantity: variant.stockQuantity || 0,
-          imageUrl: variant.imageUrl || null,
-          attributeValueIds: attrIds,
+          imageUrl: variant.imageUrl || null, // Assuming imageUrl is handled by upload
+          attributeValueIds: attributeValueIds,
         };
       });
 
@@ -202,50 +226,74 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
     }
   };
 
-  const generateSku = (size?: string, color?: string) => {
+  const generateSku = (attributes: Record<string, string> = {}) => {
     const productCode = product?.code || 'PRODUCT';
-    const sizeCode = (size || 'SIZE').toUpperCase().replace(/\s/g, '');
+    // Create a SKU part from each attribute, sorted by attribute code for consistency
+    const attributeParts = dynamicAttributes
+      .sort((a, b) => a.code.localeCompare(b.code))
+      .map(attr => {
+        const value = attributes[attr.code] || attr.code;
+        return value
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/đ/g, "d").replace(/Đ/g, "D")
+          .toUpperCase()
+          .replace(/\s/g, '');
+      })
+      .join('-');
 
-    const colorCode = (color || 'COLOR')
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/đ/g, "d").replace(/Đ/g, "D")
-      .toUpperCase()
-      .replace(/\s/g, '');
-
-    return `${productCode}-${sizeCode}-${colorCode}`.toUpperCase();
+    return `${productCode}-${attributeParts}`;
   };
 
   const handleGenerateVariants = () => {
-    if (selectedBulkSizes.length === 0 || selectedBulkColors.length === 0) {
+    const selectedValues = Object.values(selectedBulkAttributes).filter(v => v.length > 0);
+    if (selectedValues.length < dynamicAttributes.length) {
       notification.warning({
         message: 'Thiếu thông tin',
-        description: 'Vui lòng chọn ít nhất một size và một màu để tạo hàng loạt.',
+        description: `Vui lòng chọn ít nhất một giá trị cho mỗi thuộc tính để tạo hàng loạt.`,
       });
       return;
     }
 
-    const existingVariants = addVariantForm.getFieldValue('variants') || [];
-    const newVariants: any[] = [];
+    const existingFormVariants = addVariantForm.getFieldValue('variants') || [];
+    const allExistingCombinations = getExistingAndFormCombinations();
+    const createCombinationKey = (attributes: Record<string, string>) => {
+      return Object.keys(attributes).sort().map(key => `${key}:${attributes[key]}`).join('|');
+    };
 
-    selectedBulkSizes.forEach(size => {
-      selectedBulkColors.forEach(color => {
-        const isDuplicate = existingVariants.some((v: any) => v && v.size === size && v.color === color);
-        if (!isDuplicate) {
-          newVariants.push({
-            size,
-            color,
-            sku: generateSku(size, color),
-            costPrice: null,
-            sellingPrice: null,
-            stockQuantity: 0,
-            variantImages: []
-          });
+    const newVariantsToAdd: any[] = [];
+    let duplicateCount = 0;
+
+    // A recursive function to generate all combinations
+    const generateCombinations = (attrIndex: number, currentCombination: any) => {
+      if (attrIndex === dynamicAttributes.length) {
+        const combinationKey = createCombinationKey(currentCombination);
+        if (!allExistingCombinations.has(combinationKey)) {
+          newVariantsToAdd.push({ attributes: currentCombination, sku: generateSku(currentCombination) });
         }
-      });
-    });
+        else {
+          duplicateCount++;
+        }
+        return;
+      }
 
-    addVariantForm.setFieldsValue({ variants: [...existingVariants, ...newVariants] });
+      const currentAttr = dynamicAttributes[attrIndex];
+      const selectedValuesForAttr = selectedBulkAttributes[currentAttr.code] || [];
+      selectedValuesForAttr.forEach(value => {
+        generateCombinations(attrIndex + 1, { ...currentCombination, [currentAttr.code]: value });
+      });
+    };
+
+    generateCombinations(0, {});
+
+    if (duplicateCount > 0) {
+      notification.warning({
+        message: 'Bỏ qua biến thể trùng lặp',
+        description: `Đã bỏ qua ${duplicateCount} biến thể trùng lặp (Size/Màu đã tồn tại hoặc đã có trong form).`,
+      });
+    }
+
+    addVariantForm.setFieldsValue({ variants: [...existingFormVariants, ...newVariantsToAdd] });
   };
 
   const handleApplyBulkPrices = () => {
@@ -276,8 +324,7 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
 
   const handleResetForm = () => {
     addVariantForm.resetFields();
-    setSelectedBulkSizes([]);
-    setSelectedBulkColors([]);
+    setSelectedBulkAttributes({});
     setBulkCostPrice(null);
     setBulkSellingPrice(null);
   };
@@ -312,14 +359,17 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
             <Divider>Thêm biến thể mới</Divider>
             <Space direction="vertical" style={{ width: '100%', marginBottom: 16 }}>
               <Typography.Text>Tạo hàng loạt theo thuộc tính</Typography.Text>
-              <Row gutter={16}>
-                <Col span={8}>
-                  <Select mode="multiple" allowClear style={{ width: '100%' }} placeholder="Chọn các size" value={selectedBulkSizes} onChange={setSelectedBulkSizes} options={sizes} />
-                </Col>
-                <Col span={8}>
-                  <Select mode="multiple" allowClear style={{ width: '100%' }} placeholder="Chọn các màu" value={selectedBulkColors} onChange={setSelectedBulkColors} options={colors} />
-                </Col>
-                <Col span={8}>
+              <Row gutter={[16, 16]}>
+                {dynamicAttributes.map(attr => (
+                  <Col span={24 / (dynamicAttributes.length + 1)} key={attr.code}>
+                    <Select
+                      mode="multiple" allowClear style={{ width: '100%' }}
+                      placeholder={`Chọn ${attr.name}`}
+                      onChange={(values) => setSelectedBulkAttributes(prev => ({ ...prev, [attr.code]: values }))}
+                      options={attr.values.map((v: any) => ({ label: v.value, value: v.value }))} />
+                  </Col>
+                ))}
+                <Col span={24 / (dynamicAttributes.length + 1)}>
                   <Button onClick={handleGenerateVariants} block>Tạo hàng loạt</Button>
                 </Col>
               </Row>
@@ -357,9 +407,9 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
               onValuesChange={(changedValues, allValues) => {
                 if (changedValues.variants) {
                   const changedIndex = changedValues.variants.findIndex((v: any) => v && (v.size || v.color));
-                  if (changedIndex !== -1) {
+                  if (changedIndex !== -1 && allValues.variants[changedIndex]?.attributes) {
                     const target = allValues.variants[changedIndex];
-                    const newSku = generateSku(target.size, target.color);
+                    const newSku = generateSku(target.attributes);
                     const currentVariants = [...allValues.variants];
                     currentVariants[changedIndex] = { ...target, sku: newSku };
                     addVariantForm.setFieldsValue({ variants: currentVariants });
@@ -369,9 +419,10 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
             >
 
               <Row gutter={8} style={{ marginBottom: 8, padding: '0 8px' }}>
-                <Col span={5}><Typography.Text strong>SKU (Review)</Typography.Text></Col>
-                <Col span={3}><Typography.Text strong>Size</Typography.Text></Col>
-                <Col span={3}><Typography.Text strong>Màu</Typography.Text></Col>
+                <Col span={4}><Typography.Text strong>SKU (Review)</Typography.Text></Col>
+                {dynamicAttributes.map(attr => (
+                  <Col span={3} key={attr.code}><Typography.Text strong>{attr.name}</Typography.Text></Col>
+                ))}
                 <Col span={3}><Typography.Text strong>Giá vốn</Typography.Text></Col>
                 <Col span={3}><Typography.Text strong>Giá bán</Typography.Text></Col>
                 <Col span={3}><Typography.Text strong>Tồn kho</Typography.Text></Col>
@@ -387,20 +438,21 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
                             <Input placeholder="SKU" disabled />
                           </Form.Item>
                         </Col>
-                        <Col span={3}>
-                          <Form.Item {...restField} name={[name, 'size']} rules={[{ required: true, message: 'Chọn' }]} noStyle>
-                            <Select options={sizes} placeholder="Size" style={{ width: '100%' }} />
-                          </Form.Item>
-                        </Col>
-                        <Col span={3}>
-                          <Form.Item {...restField} name={[name, 'color']} rules={[{ required: true, message: 'Chọn' }]} noStyle>
-                            <Select options={colors} placeholder="Màu" style={{ width: '100%' }} />
-                          </Form.Item>
-                        </Col>
+                        {dynamicAttributes.map(attr => (
+                          <Col span={3} key={attr.code}>
+                            <Form.Item {...restField} name={[name, 'attributes', attr.code]} rules={[{ required: true, message: 'Chọn' }]} noStyle>
+                              <Select
+                                placeholder={attr.name}
+                                style={{ width: '100%' }}
+                                options={attr.values.map((v: any) => ({ label: v.value, value: v.value }))}
+                              />
+                            </Form.Item>
+                          </Col>
+                        ))}
                         <Col span={3}>
                           <Form.Item {...restField} name={[name, 'costPrice']} rules={[{ required: true, message: 'Nhập' }]} noStyle>
                             <InputNumber placeholder="Giá vốn" style={{ width: '100%' }}
-                              formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                              formatter={(value) => value ? `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' ₫' : ''}
                               parser={(value) => value!.replace(/\$\s?|(,*)/g, '')}
                             />
                           </Form.Item>
@@ -408,7 +460,7 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
                         <Col span={3}>
                           <Form.Item {...restField} name={[name, 'sellingPrice']} rules={[{ required: true, message: 'Nhập' }]} noStyle>
                             <InputNumber placeholder="Giá bán" style={{ width: '100%' }}
-                              formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                              formatter={(value) => value ? `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' ₫' : ''}
                               parser={(value) => value!.replace(/\$\s?|(,*)/g, '')}
                             />
                           </Form.Item>

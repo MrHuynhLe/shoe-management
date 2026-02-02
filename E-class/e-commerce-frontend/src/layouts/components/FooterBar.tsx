@@ -4,10 +4,10 @@ const { Footer } = Layout
 
 const FooterBar = () => {
   return (
-    <Footer style={{ background: '#f5f5f5', padding: '24px 64px' }}>
+    <Footer style={{ background: '#001529', color: 'rgba(255, 255, 255, 0.65)', padding: '40px 48px' }}>
       <Row gutter={[32, 24]}>
         <Col xs={24} md={6}>
-          <h3 style={{ color: '#00b96b', marginBottom: 12 }}>
+          <h3 style={{ color: '#fff', marginBottom: 16 }}>
             S-Shop Online
           </h3>
           <p style={{ color: '#555' }}>
@@ -15,21 +15,21 @@ const FooterBar = () => {
           </p>
         </Col>
         <Col xs={24} md={6}>
-          <h4>Hệ thống cửa hàng</h4>
-          <p>25 Xuân Phương, Nam Từ Liêm</p>
-          <p>Phương Canh, Hà Nội</p>
+          <h4 style={{ color: 'rgba(255, 255, 255, 0.85)' }}>Hệ thống cửa hàng</h4>
+          <p>25 Xuân Phương, Nam Từ Liêm, Hà Nội</p>
+          <p>120 Phương Canh, Nam Từ Liêm, Hà Nội</p>
         </Col>
         <Col xs={24} md={6}>
-          <h4>Chính sách</h4>
-          <p>Chính sách đổi trả</p>
-          <p>Chính sách bảo hành</p>
-          <p>Chính sách vận chuyển</p>
+          <h4 style={{ color: 'rgba(255, 255, 255, 0.85)' }}>Chính sách</h4>
+          <p><a href="#" style={{ color: 'rgba(255, 255, 255, 0.65)' }}>Chính sách đổi trả</a></p>
+          <p><a href="#" style={{ color: 'rgba(255, 255, 255, 0.65)' }}>Chính sách bảo hành</a></p>
+          <p><a href="#" style={{ color: 'rgba(255, 255, 255, 0.65)' }}>Chính sách vận chuyển</a></p>
         </Col>
         <Col xs={24} md={6}>
-          <h4>Liên hệ</h4>
+          <h4 style={{ color: 'rgba(255, 255, 255, 0.85)' }}>Liên hệ</h4>
           <p>
             Hotline:{' '}
-            <strong style={{ color: 'red' }}>
+            <strong style={{ color: '#1677ff' }}>
               0389 225 7999
             </strong>
           </p>
@@ -37,7 +37,7 @@ const FooterBar = () => {
         </Col>
       </Row>
 
-      <Divider />
+      <Divider style={{ borderColor: 'rgba(255, 255, 255, 0.25)' }} />
 
       <div style={{ textAlign: 'center', color: '#888' }}>
         © {new Date().getFullYear()} S-Shop Online. All rights reserved.

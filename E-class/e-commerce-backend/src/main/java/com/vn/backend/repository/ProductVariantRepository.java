@@ -36,7 +36,6 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     """)
     List<ProductVariant> findByProductIdWithAttributes(@Param("productId") Long productId);
 
-    // 🔹 GET DETAIL
     @Query("""
         SELECT pv
         FROM ProductVariant pv

@@ -13,8 +13,7 @@ const ProductFilterSidebar = () => {
     const fetchFilterData = async () => {
       setLoading(true);
       try {
-        // Gọi API thực tế 
-        
+
         await new Promise(resolve => setTimeout(resolve, 1000)); 
         const mockData = {
           brands: ['Nike', 'Adidas', 'Jordan', 'Yeezy', 'Other Brands'],
