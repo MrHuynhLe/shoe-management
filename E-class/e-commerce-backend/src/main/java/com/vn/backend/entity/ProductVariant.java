@@ -9,18 +9,8 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 @Entity
-@Table(
-        name = "product_variants",
-        indexes = {
-                @Index(name = "idx_product_variants_barcode", columnList = "barcode")
-        },
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uq_product_variants_barcode",
-                        columnNames = {"barcode"}
-                )
-        }
-)
+@Table(name = "product_variants", indexes = {@Index(name = "idx_product_variants_barcode", columnList = "barcode")
+}, uniqueConstraints = {@UniqueConstraint(name = "uq_product_variants_barcode", columnNames = {"barcode"})})
 @Getter @Setter
 public class ProductVariant {
 
