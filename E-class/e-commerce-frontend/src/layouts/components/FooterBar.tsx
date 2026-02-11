@@ -29,7 +29,7 @@ const FooterBar = () => {
           <h4 style={{ color: 'rgba(255, 255, 255, 0.85)' }}>Liên hệ</h4>
           <p>
             Hotline:{' '}
-            <strong style={{ color: '#1677ff' }}>
+            <strong style={{ color: '#69b1ff' }}>
               0389 225 7999
             </strong>
           </p>

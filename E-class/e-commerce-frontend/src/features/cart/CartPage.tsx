@@ -1,9 +1,45 @@
-import { useState } from 'react';
-import { Row, Col, Image, Typography, Button, Space, Divider, InputNumber, Checkbox, Card, Empty, notification, Modal, Steps, Form, Input, Radio } from 'antd';
+import { useState, useMemo } from 'react';
+import {
+  Row,
+  Col,
+  Image,
+  Typography,
+  Button,
+  Space,
+  Divider,
+  InputNumber,
+  Checkbox,
+  Card,
+  Empty,
+  notification,
+  Modal,
+  Steps,
+  Form,
+  Input,
+  Radio,
+} from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
+import type { CheckboxChangeEvent } from 'antd/es/checkbox';
 
 const { Title, Text } = Typography;
+interface CartItem {
+  id: number;
+  productId: number;
+  name: string;
+  imageUrl: string;
+  size: string;
+  color: string;
+  price: number;
+  quantity: number;
+  stock: number;
+}
+
+interface ShippingInfo {
+  name: string;
+  phone: string;
+  address: string;
+}
 
 const initialCartItems = [
   {
@@ -38,11 +74,15 @@ const mockCurrentUser = {
 };
 
 const CartPage = () => {
-  const [cartItems, setCartItems] = useState(initialCartItems);
+  const [cartItems, setCartItems] = useState<CartItem[]>(initialCartItems);
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
-  const [shippingInfo, setShippingInfo] = useState({ name: mockCurrentUser.name, phone: mockCurrentUser.phone, address: mockCurrentUser.address });
+  const [shippingInfo, setShippingInfo] = useState<ShippingInfo>({
+    name: mockCurrentUser.name,
+    phone: mockCurrentUser.phone,
+    address: mockCurrentUser.address,
+  });
   const [paymentMethod, setPaymentMethod] = useState('cod');
   const navigate = useNavigate();
   const [form] = Form.useForm();
@@ -50,9 +90,7 @@ const CartPage = () => {
   const handleQuantityChange = (itemId: number, quantity: number | null) => {
     if (quantity === null) return;
     setCartItems(
-      cartItems.map(item =>
-        item.id === itemId ? { ...item, quantity } : item
-      )
+      cartItems.map(item => (item.id === itemId ? { ...item, quantity } : item))
     );
   };
 
@@ -70,18 +108,19 @@ const CartPage = () => {
     }
   };
 
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
+  const handleSelectAll = (e: CheckboxChangeEvent) => {
+    if (e.target.checked) {
       setSelectedItems(cartItems.map(item => item.id));
     } else {
       setSelectedItems([]);
     }
   };
 
-  const isAllSelected = cartItems.length > 0 && selectedItems.length === cartItems.length;
+  const selectedProducts = useMemo(() =>
+    cartItems.filter(item => selectedItems.includes(item.id)), [cartItems, selectedItems]);
 
-  const selectedProducts = cartItems.filter(item => selectedItems.includes(item.id));
-  const totalPrice = selectedProducts.reduce((total, item) => total + item.price * item.quantity, 0);
+  const totalPrice = useMemo(() =>
+    selectedProducts.reduce((total, item) => total + item.price * item.quantity, 0), [selectedProducts]);
 
   const handleOpenCheckoutModal = () => {
     if (selectedProducts.length === 0) {
@@ -96,7 +135,7 @@ const CartPage = () => {
         shippingInfo,
         paymentMethod,
         items: selectedProducts,
-        total: finalPrice,
+        total: finalPrice, 
     });
 
     setIsCheckoutModalOpen(false);
@@ -107,10 +146,10 @@ const CartPage = () => {
   };
 
   const handleNextStep = async () => {
-    if (currentStep === 0) { 
+    if (currentStep === 0) {
       try {
         const values = await form.validateFields();
-        setShippingInfo(values); 
+        setShippingInfo(values);
         setCurrentStep(currentStep + 1);
       } catch (error) {
         console.log('Validation Failed:', error);
@@ -132,19 +171,31 @@ const CartPage = () => {
 
   const shippingFee = selectedProducts.length > 0 ? 30000 : 0;
   const finalPrice = totalPrice + shippingFee;
+  const isAllSelected = cartItems.length > 0 && selectedItems.length === cartItems.length;
+  const isIndeterminate = selectedItems.length > 0 && !isAllSelected;
+
 
   return (
     <div style={{ padding: '24px' }}>
       <Title level={2}>Giỏ hàng</Title>
       <Row gutter={[24, 24]}>
         <Col xs={24} lg={16}>
-          <Card>
-            <Row align="middle" style={{ marginBottom: 16, padding: '0 16px' }}>
+          <Card
+            bordered={false}
+            style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)', transition: 'all 0.3s' }}
+          >
+            <Row
+              align="middle"
+              style={{
+                padding: '12px 16px',
+                background: '#F0F8FF',
+              }}
+            >
               <Col span={12}>
                 <Checkbox
-                  indeterminate={selectedItems.length > 0 && selectedItems.length < cartItems.length}
+                  indeterminate={isIndeterminate}
                   checked={isAllSelected}
-                  onChange={(e) => handleSelectAll(e.target.checked)}
+                  onChange={handleSelectAll}
                 >
                   Chọn tất cả ({cartItems.length} sản phẩm)
                 </Checkbox>
@@ -156,12 +207,27 @@ const CartPage = () => {
             <Divider style={{ margin: 0 }} />
             {cartItems.map(item => (
               <div key={item.id}>
-                <Row align="middle" style={{ padding: '16px' }}>
+                <Row
+                  align="middle"
+                  style={{
+                    padding: '16px',
+                    transition: 'all 0.3s',
+                    borderRadius: '8px',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#E6F0FF';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
+                >
                   <Col span={12}>
                     <Space align="start">
                       <Checkbox
                         checked={selectedItems.includes(item.id)}
-                        onChange={(e) => handleSelectItem(item.id, e.target.checked)}
+                        onChange={e => handleSelectItem(item.id, e.target.checked)}
                       />
                       <Image src={item.imageUrl} width={80} height={80} style={{ objectFit: 'cover', borderRadius: '4px' }} />
                       <div style={{ marginLeft: 8 }}>
@@ -180,17 +246,17 @@ const CartPage = () => {
                       min={1}
                       max={item.stock}
                       value={item.quantity}
-                      onChange={(value) => handleQuantityChange(item.id, value)}
+                      onChange={value => handleQuantityChange(item.id, value)}
                       style={{ width: 60 }}
                     />
                   </Col>
                   <Col span={3} style={{ textAlign: 'center' }}>
-                    <Text strong color="red">{(item.price * item.quantity).toLocaleString('vi-VN')} ₫</Text>
+                    <Text strong style={{ color: '#d32f2f' }}>{(item.price * item.quantity).toLocaleString('vi-VN')} ₫</Text>
                   </Col>
                   <Col span={1} style={{ textAlign: 'right' }}>
                     <Button
                       type="text"
-                      icon={<DeleteOutlined />}
+                      icon={<DeleteOutlined style={{ fontSize: '18px' }} />}
                       onClick={() => handleRemoveItem(item.id)}
                       danger
                     />
@@ -202,7 +268,12 @@ const CartPage = () => {
           </Card>
         </Col>
         <Col xs={24} lg={8}>
-          <Card title="Tổng kết">
+          <Card
+            title="Tổng kết"
+            headStyle={{ background: '#F0F8FF', fontWeight: 600 }}
+            hoverable
+            style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)', transition: 'all 0.3s' }}
+          >
             <Row justify="space-between" style={{ marginBottom: 8 }}>
               <Text>Tạm tính</Text>
               <Text strong>{totalPrice.toLocaleString('vi-VN')} ₫</Text>
@@ -214,7 +285,7 @@ const CartPage = () => {
             <Divider />
             <Row justify="space-between">
               <Text strong>Tổng cộng</Text>
-              <Title level={3} style={{ margin: 0, color: '#d0021b' }}>{finalPrice.toLocaleString('vi-VN')} ₫</Title>
+              <Title level={3} style={{ margin: 0, color: '#0052D9' }}>{finalPrice.toLocaleString('vi-VN')} ₫</Title>
             </Row>
             <Divider />
             <Button
@@ -238,7 +309,7 @@ const CartPage = () => {
         footer={
           <Space>
             {currentStep > 0 && <Button onClick={() => setCurrentStep(currentStep - 1)}>Quay lại</Button>}
-            {currentStep < 3 && <Button type="primary" onClick={handleNextStep}>Tiếp tục</Button>}
+            {currentStep < 2 && <Button type="primary" onClick={handleNextStep}>Tiếp tục</Button>}
             {currentStep === 3 && <Button type="primary" onClick={handleConfirmOrder}>Xác nhận và Đặt hàng</Button>}
           </Space>
         }
@@ -246,13 +317,12 @@ const CartPage = () => {
         <Steps current={currentStep} style={{ marginBottom: 24 }}>
           <Steps.Step title="Giao hàng" />
           <Steps.Step title="Mã giảm giá" />
-          <Steps.Step title="Thanh toán" />
           <Steps.Step title="Xác nhận" />
         </Steps>
 
         <div style={{ marginTop: 24, minHeight: 200 }}>
           {currentStep === 0 && (
-            <Form form={form} layout="vertical" initialValues={shippingInfo} onValuesChange={(_, values) => setShippingInfo(values)}>
+            <Form form={form} layout="vertical" initialValues={shippingInfo}>
               <Title level={4}>1. Thông tin giao hàng</Title>
               <Form.Item name="name" label="Họ và tên người nhận" rules={[{ required: true, message: 'Vui lòng nhập họ tên!' }]}>
                 <Input />
@@ -276,24 +346,11 @@ const CartPage = () => {
           )}
           {currentStep === 2 && (
             <div>
-              <Title level={4}>3. Phương thức thanh toán</Title>
-              <Radio.Group onChange={(e) => setPaymentMethod(e.target.value)} value={paymentMethod}>
-                <Space direction="vertical">
-                  <Radio value="cod">Thanh toán khi nhận hàng (COD)</Radio>
-                  <Radio value="bank">Chuyển khoản ngân hàng</Radio>
-                  <Radio value="vnpay">Thanh toán qua VNPAY</Radio>
-                </Space>
-              </Radio.Group>
-            </div>
-          )}
-          {currentStep === 3 && (
-            <div>
               <Title level={4}>4. Xác nhận đơn hàng</Title>
               <Card size="small">
                 <p><strong>Người nhận:</strong> {shippingInfo.name}</p>
                 <p><strong>Số điện thoại:</strong> {shippingInfo.phone}</p>
                 <p><strong>Địa chỉ:</strong> {shippingInfo.address}</p>
-                <p><strong>Phương thức thanh toán:</strong> {paymentMethod === 'cod' ? 'Thanh toán khi nhận hàng' : (paymentMethod === 'bank' ? 'Chuyển khoản ngân hàng' : 'VNPAY')}</p>                
                 <Divider />
                 <Title level={5}>Sản phẩm</Title>
                 {selectedProducts.map(item => (
@@ -307,7 +364,7 @@ const CartPage = () => {
                   </Row>
                 ))}
                 <Divider />
-                <Row justify="space-between"><Text>Tổng cộng:</Text> <Title level={4} style={{ margin: 0, color: '#d0021b' }}>{finalPrice.toLocaleString('vi-VN')} ₫</Title></Row>
+                <Row justify="space-between"><Text>Tổng cộng:</Text> <Title level={4} style={{ margin: 0, color: '#0052D9' }}>{finalPrice.toLocaleString('vi-VN')} ₫</Title></Row>
               </Card>
             </div>
           )}
