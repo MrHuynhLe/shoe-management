@@ -44,25 +44,25 @@ const AddProductForm = ({ onFinish, onCancel }: { onFinish: (values: any) => voi
           productService.getSuppliers(),
         ]);
 
-       const formatOptions = (raw: any) => {
-  let list: any[] = [];
+        const formatOptions = (raw: any) => {
+          let list: any[] = [];
 
-  if (Array.isArray(raw)) {
-    list = raw;
-  } else if (raw?.content && Array.isArray(raw.content)) {
-    list = raw.content;
-  } else if (raw?.data && Array.isArray(raw.data)) {
-    list = raw.data;
-  } else {
-    console.error("Invalid options payload:", raw);
-    return [];
-  }
+          if (Array.isArray(raw)) {
+            list = raw;
+          } else if (raw?.content && Array.isArray(raw.content)) {
+            list = raw.content;
+          } else if (raw?.data && Array.isArray(raw.data)) {
+            list = raw.data;
+          } else {
+            console.error("Invalid options payload:", raw);
+            return [];
+          }
 
-  return list.map((item: any) => ({
-    label: item.name,
-    value: item.id
-  }));
-};
+          return list.map((item: any) => ({
+            label: item.name,
+            value: item.id
+          }));
+        };
 
         setBrands(formatOptions(brandsRes.data));
         setCategories(formatOptions(categoriesRes.data));
@@ -131,7 +131,7 @@ const AddProductForm = ({ onFinish, onCancel }: { onFinish: (values: any) => voi
         <TextArea rows={4} placeholder="Mô tả chi tiết, câu chuyện sản phẩm..." />
       </Form.Item>
       <Form.Item name="images" label="Ảnh chung sản phẩm" valuePropName="fileList" getValueFromEvent={(e) => (Array.isArray(e) ? e : e?.fileList)}>
-        <Upload.Dragger name="files" listType="picture-card" beforeUpload={() => false}> 
+        <Upload.Dragger name="files" listType="picture-card" beforeUpload={() => false}>
           <p className="ant-upload-drag-icon"><PlusOutlined /></p>
           <p className="ant-upload-text">Kéo & thả hoặc nhấn để chọn ảnh</p>
         </Upload.Dragger>

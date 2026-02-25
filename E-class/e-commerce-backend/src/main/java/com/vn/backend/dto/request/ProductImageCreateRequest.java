@@ -9,7 +9,6 @@ public class ProductImageCreateRequest {
 
     private Long productId;
 
-    // nullable → ảnh chung
     private Long productVariantId;
 
     private String imageUrl;

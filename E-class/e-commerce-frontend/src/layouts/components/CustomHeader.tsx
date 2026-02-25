@@ -1,13 +1,13 @@
-import { Badge, Layout, Menu, Space, Input, Dropdown } from 'antd';
+import { Badge, Layout, Menu, Space, Input, Dropdown, Row, Col, ConfigProvider } from 'antd';
 import {
   HomeOutlined,
-  SearchOutlined,
   ShoppingCartOutlined,
+  AppstoreOutlined,
+  SolutionOutlined,
   UserOutlined,
 } from '@ant-design/icons';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import logo from '@/assets/logo-shoe-shop.png';
-
 
 const { Header } = Layout;
 
@@ -17,7 +17,6 @@ const CustomHeader = () => {
 
   const handleUserMenuClick = ({ key }: { key: string }) => {
     if (key === 'logout') {
-      // Xử lý logic đăng xuất ở đây
       console.log('Đăng xuất');
     }
   };
@@ -31,57 +30,72 @@ const CustomHeader = () => {
 
   return (
     <Header
-      style={{
-        background: '#fff',
-        padding: '0 24px',
-        height: 'auto',
-        lineHeight: 'initial',
-        display: 'flex',
-        flexDirection: 'column',
-      }}
+      style={{ background: '#E6F0FF', padding: '0 48px' }} 
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', height: '64px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <img src={logo} alt="S-Shop Logo" style={{ height: '40px' }} />
-          <h1 style={{ fontSize: '20px', fontWeight: 'bold', margin: 0 }}>
-            S-Shop Online
-          </h1>
-        </div>
-        <div key="actions">
-          <Space size="large">
-            <Input.Search placeholder="Tìm kiếm sản phẩm..." style={{ width: 200 }} />
-            <Link to="/cart">
-              <Badge count={3}>
-                <ShoppingCartOutlined style={{ fontSize: 18, color: 'rgba(0, 0, 0, 0.88)' }} />
+      <Row align="middle" style={{ height: '100%' }}>
+        <Col flex={1}>
+          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <img src={logo} alt="S-Shop Logo" style={{ height: '40px' }} />
+            <h1 style={{ fontSize: '24px', fontWeight: 'bolder', margin: 0, color: '#0040A8' }}>
+              S-Shop Online
+            </h1>
+          </Link>
+        </Col>
+        <Col flex={1}>
+          <ConfigProvider
+            theme={{
+              components: {
+                Menu: {
+                  itemSelectedColor: '#0052D9', 
+                  itemSelectedBg: 'transparent', 
+                  itemHoverBg: '#D6E4FF',
+                  itemHoverColor: '#0052D9', 
+                },
+              },
+            }}
+          >
+            <Menu
+              mode="horizontal"
+              selectedKeys={[location.pathname]} 
+              onClick={({ key }) => navigate(key)}
+              style={{ background: 'transparent', borderBottom: 'none', lineHeight: '62px', display: 'flex', justifyContent: 'center', fontSize: '18px', fontWeight: 500 }}
+              items={[
+                { key: '/', label: 'Trang chủ', icon: <HomeOutlined /> },
+                { key: '/products', label: 'Sản phẩm', icon: <AppstoreOutlined /> },
+              ]}
+            />
+          </ConfigProvider>
+        </Col>
+        <Col flex={1} style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+          <Space size={24} align="center">
+            <Input.Search placeholder="Tìm kiếm..." style={{ width: 300, paddingTop: '16px', color: '#0052D9' }} />
+            <Link to="/my-orders" style={{ color: '#0052D9', display: 'inline-block', transition: 'transform 0.2s' }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.15)'}
+              onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+            >
+              <SolutionOutlined style={{ fontSize: 24 }} />
+            </Link>
+            <Link to="/cart" style={{ color: '#0052D9', display: 'inline-block', transition: 'transform 0.2s' }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.15)'}
+              onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+            >
+              <Badge count={3} size="small">
+                <ShoppingCartOutlined style={{ fontSize: 24 }} />
               </Badge>
             </Link>
-            <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} placement="bottomRight">
-              <a onClick={(e) => e.preventDefault()}>
-                <Space>
-                  <UserOutlined style={{ fontSize: 18, color: 'rgba(0, 0, 0, 0.88)' }} />
-                </Space>
+            <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} placement="bottomRight" >
+              <a
+                onClick={(e) => e.preventDefault()}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#0052D9', transition: 'transform 0.2s' }}
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.15)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                <UserOutlined style={{ fontSize: 24 }} />
               </a>
             </Dropdown>
           </Space>
-        </div>
-      </div>
-
-      <Menu
-        className="custom-main-menu"
-        mode="horizontal"
-        selectedKeys={[location.pathname]}
-        onClick={({ key }) => navigate(key)}
-        style={{
-          borderBottom: 'none',
-          lineHeight: '46px',
-          backgroundColor: 'transparent',
-          justifyContent: 'center', 
-        }}
-        items={[
-          { key: '/', label: 'Trang chủ', icon: <HomeOutlined /> },
-          { key: '/products', label: 'Sản phẩm', icon: <ShoppingCartOutlined /> },
-        ]}
-      />
+        </Col>
+      </Row>
     </Header>
   );
 };

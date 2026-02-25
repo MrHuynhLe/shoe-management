@@ -1,62 +1,28 @@
 package com.vn.backend.controller;
 
-
-import com.vn.backend.dto.request.ProductVariantCreateRequest;
-import com.vn.backend.dto.response.ProductVariantResponse;
+import com.vn.backend.dto.request.VariantBulkRequest;
 import com.vn.backend.service.ProductVariantService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @RestController
-@RequestMapping("/v1/product-variants")
-@RequiredArgsConstructor
+@RequestMapping("/v1/variants")
 @CrossOrigin(origins = "http://localhost:5173")
+@RequiredArgsConstructor
 public class ProductVariantController {
 
-    private final ProductVariantService productVariantService;
+    private final ProductVariantService variantService;
 
-    // ✅ GET ALL
-    @GetMapping
-    public ResponseEntity<List<ProductVariantResponse>> getAll() {
-        return ResponseEntity.ok(
-                productVariantService.getAllVariants()
-        );
-    }
+    @PostMapping(value = "/bulk", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<String> createBulk(@RequestBody VariantBulkRequest request) {
+        variantService.createBulkVariants(request);
+        return ResponseEntity.ok("Thành công");
 
-    // ✅ GET BY PRODUCT
-    @GetMapping("/product/{productId}")
-    public ResponseEntity<List<ProductVariantResponse>> getByProduct(
-            @PathVariable Long productId
-    ) {
-        return ResponseEntity.ok(
-                productVariantService.getVariantsByProduct(productId)
-        );
     }
+  
 
-    // ✅ GET DETAIL
-    @GetMapping("/{id}")
-    public ResponseEntity<ProductVariantResponse> getDetail(
-            @PathVariable Long id
-    ) {
-        return ResponseEntity.ok(
-                productVariantService.getVariantDetail(id)
-        );
-    }
-    // ================= CREATE =================
-    // CREATE SKU
-    @PostMapping
-    public ResponseEntity<?> create(@RequestBody ProductVariantCreateRequest request) {
-        return ResponseEntity.ok(productVariantService.create(request));
-    }
-
-
-    // ✅ TEST
-    @GetMapping("/test")
-    public String test() {
-        return "OK";
-    }
 }

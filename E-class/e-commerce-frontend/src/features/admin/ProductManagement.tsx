@@ -1,4 +1,4 @@
-import { Button, Input, Space, Table, Tag, Typography, Tooltip, Modal, notification } from 'antd';
+import { Button, Input, Space, Table, Tag, Typography, Tooltip, Modal, notification, Image } from 'antd';
 import { PlusOutlined, EyeOutlined, DeleteOutlined, InboxOutlined } from '@ant-design/icons';
 import { useEffect, useState, Key } from 'react';
 import { productService } from '@/services/product.service';
@@ -14,6 +14,11 @@ interface ProductList {
   code: string; 
   brandName: string;
   totalStock: number;
+  minPrice: number;
+  maxPrice: number;
+  minCostPrice: number;
+  maxCostPrice: number;
+  imageUrl: string;
 }
 
 
@@ -28,6 +33,7 @@ type ProductForTable = Omit<ProductListWithVariants, 'brand'> & { brand: string 
 
 const { Title } = Typography;
 const { Search } = Input;
+const IMAGE_BASE_URL = 'http://localhost:8080/api';
 
 const ProductManagementPage = () => {
   const [products, setProducts] = useState<ProductListWithVariants[]>([]);
@@ -40,23 +46,27 @@ const ProductManagementPage = () => {
   const [selectedProduct, setSelectedProduct] = useState<ProductForTable | null>(null);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
 
-  useEffect(() => {
+  const fetchProducts = () => {
     setLoading(true);
     productService
-      .getProducts(0, 10)
+      .getProducts(0, 10) 
       .then((res) => {
         const formattedData: ProductForTable[] = res.data.content.map((p: ProductList) => ({
           ...p,
           key: p.id,
           brand: p.brandName,
-          hasVariants: true,
-          hasPendingOrder: false,
+          hasVariants: true, 
+          hasPendingOrder: false, 
           variants: [],
         }));
         setProducts(formattedData);
       })
       .catch((error) => console.error('Lỗi khi tải danh sách sản phẩm:', error))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchProducts();
   }, []);
 
   const handleAddProduct = async (values: any) => {
@@ -170,8 +180,29 @@ const ProductManagementPage = () => {
     setIsEditVariantModalOpen(false);
   };
 
-  const handleAddVariant = (values: any) => {
-    console.log('Adding new variant to product:', values);
+  const handleAddVariant = async (data: { productId: number; variants: any[] }) => {
+    const { productId, variants } = data;
+
+    try {
+      setLoading(true);
+
+      await productService.bulkCreateVariants(productId, variants);
+      notification.success({
+        message: 'Thành công',
+        description: 'Các biến thể đã được thêm thành công!',
+      });
+      handleCancelVariantDetailModal();
+      fetchProducts(); 
+    } catch (error: any) {
+      console.error('Failed to add variants:', error);
+      const serverMessage = error.response?.data?.message || 'Đã có lỗi xảy ra khi thêm biến thể.';
+      notification.error({
+        message: 'Thêm biến thể thất bại',
+        description: typeof serverMessage === 'string' ? serverMessage : 'Dữ liệu không hợp lệ, vui lòng kiểm tra lại.',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const columns = [
@@ -181,6 +212,16 @@ const ProductManagementPage = () => {
       width: 60,
       align: 'center' as const,
       render: (_text: any, _record: any, index: number) => index + 1,
+    },
+    {
+      title: 'Ảnh',
+      dataIndex: 'imageUrl',
+      key: 'imageUrl',
+      width: 80,
+      align: 'center' as const,
+      render: (imageUrl: string) => (
+        <Image width={50} src={`${IMAGE_BASE_URL}${imageUrl}`} />
+      ),
     },
     {
       title: 'Mã sản phẩm',
@@ -196,7 +237,20 @@ const ProductManagementPage = () => {
       title: 'Hãng',
       dataIndex: 'brand',
       key: 'brand',
+      align: 'center' as const,
     },
+    {
+      title: 'Giá bán',
+      key: 'price',
+      align: 'center' as const,
+      render: (_: any, record: ProductList) => {
+        if (record.minPrice === record.maxPrice) {
+          return `${record.minPrice.toLocaleString('vi-VN')} ₫`;
+        }
+        return `${record.minPrice.toLocaleString('vi-VN')} ₫ - ${record.maxPrice.toLocaleString('vi-VN')} ₫`;
+      },
+    },
+    { title: 'Tổng tồn kho', dataIndex: 'totalStock', key: 'totalStock', align: 'center' as const },
     {
       title: 'Trạng thái',
       dataIndex: 'totalStock',
@@ -240,7 +294,7 @@ const ProductManagementPage = () => {
           Thêm mới sản phẩm
         </Button>
       </div>
-      <Table columns={columns} dataSource={products} bordered loading={loading} rowKey="key" />
+      <Table columns={columns} dataSource={products} bordered loading={loading} rowKey="key" size="middle" />
 
       <Modal
         title="Thêm mới sản phẩm"
@@ -248,7 +302,7 @@ const ProductManagementPage = () => {
         onCancel={() => setIsModalOpen(false)}
         footer={null}
         width={1000}
-        destroyOnHidden
+        destroyOnClose
       >
         <AddProductForm onFinish={handleAddProduct} onCancel={() => setIsModalOpen(false)} />
       </Modal>

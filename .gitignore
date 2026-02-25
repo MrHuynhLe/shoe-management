@@ -1,0 +1,13 @@
+# global ignores
+node_modules/
+dist/
+.env
+
+# frontend uploads
+public/uploads/
+
+# backend uploads
+E-class/e-commerce-backend/uploads/
+
+# backend static uploads
+E-class/e-commerce-backend/src/main/resources/static/

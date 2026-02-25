@@ -1,4 +1,5 @@
 package com.vn.backend.entity;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -8,18 +9,8 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 @Entity
-@Table(
-        name = "product_variants",
-        indexes = {
-                @Index(name = "idx_product_variants_barcode", columnList = "barcode")
-        },
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uq_product_variants_barcode",
-                        columnNames = {"barcode"}
-                )
-        }
-)
+@Table(name = "product_variants", indexes = {@Index(name = "idx_product_variants_barcode", columnList = "barcode")
+}, uniqueConstraints = {@UniqueConstraint(name = "uq_product_variants_barcode", columnNames = {"barcode"})})
 @Getter @Setter
 public class ProductVariant {
 
@@ -53,8 +44,10 @@ public class ProductVariant {
 
     @ManyToOne
     @JoinColumn(name = "product_id")
+    @JsonIgnoreProperties("productVariants")
     private Product product;
-    @OneToMany(mappedBy = "variant", fetch = FetchType.LAZY)
+
+    @OneToMany(mappedBy = "variant", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<VariantAttributeValue> variantAttributeValues;
 }
 

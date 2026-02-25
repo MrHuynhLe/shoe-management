@@ -16,6 +16,11 @@
     import org.springframework.stereotype.Service;
     import org.springframework.web.multipart.MultipartFile;
 
+    import java.io.IOException;
+    import java.nio.file.Files;
+    import java.nio.file.Path;
+    import java.nio.file.Paths;
+    import java.nio.file.StandardCopyOption;
     import java.util.Comparator;
     import java.util.List;
     import java.util.stream.Collectors;
@@ -136,12 +141,9 @@
             );
             product.setDeletedAt(null);
 
-            // 3. Lưu product trước để có ID
             product = productRepository.save(product);
 
             int order = 1;
-
-// Ảnh chính
             if (primaryImage != null && !primaryImage.isEmpty()) {
                 String url = fileStorageService.store(primaryImage);
 
@@ -154,7 +156,6 @@
                 productImageRepository.save(img);
             }
 
-// Ảnh gallery
             if (galleryImages != null && !galleryImages.isEmpty()) {
                 for (MultipartFile file : galleryImages) {
                     if (file.isEmpty()) continue;
@@ -172,5 +173,20 @@
             }
 
             return product;
+        }
+        @Override
+        public String uploadSingleImage(MultipartFile file) {
+            try {
+                Path root = Paths.get("src/main/resources/static/image");
+                if (!Files.exists(root)) {
+                    Files.createDirectories(root);
+                }
+
+                String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
+                Files.copy(file.getInputStream(), root.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
+                return "/image/" + fileName;
+            } catch (IOException e) {
+                throw new RuntimeException("Không thể lưu file ảnh: " + e.getMessage());
+            }
         }
     }
