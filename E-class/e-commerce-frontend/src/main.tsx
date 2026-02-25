@@ -1,12 +1,17 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import App from './app/App'
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import App from "./app/App";
 
-import 'antd/dist/reset.css'
-import './styles/global.css'
+import "antd/dist/reset.css";
+import "./styles/global.css";
 
-createRoot(document.getElementById('root')!).render(
+import { ConfigProvider } from "antd";
+import viVN from "antd/locale/vi_VN";
+
+createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <ConfigProvider locale={viVN}>
+      <App />
+    </ConfigProvider>
   </StrictMode>
-)
+);

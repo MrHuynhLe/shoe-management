@@ -3,18 +3,21 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.util.List;
 
 @Entity
 @Table(name = "products")
-@Getter @Setter
+@Getter
+@Setter
 public class Product {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // ⭐ QUAN TRỌNG: code không được trùng
+    @Column(nullable = false, unique = true)
     private String code;
+
     private String name;
     private String description;
 
@@ -26,11 +29,15 @@ public class Product {
     @JoinColumn(name = "category_id")
     private Category category;
 
-    @Column(name = "is_active")
-    private Boolean isActive;
+    @ManyToOne
+    @JoinColumn(name = "origin_id")
+    private Origin origin;
 
-    @OneToMany(mappedBy = "product")
-    private List<ProductVariant> variants;
-    @OneToMany(mappedBy = "product")
-    private List<ProductImage> images;
+    @ManyToOne
+    @JoinColumn(name = "supplier_id")
+    private Supplier supplier;
+
+    @Column(name = "is_active")
+    private Boolean isActive = true;
 }
+
