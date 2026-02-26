@@ -17,6 +17,7 @@
     import org.springframework.web.multipart.MultipartFile;
 
     import java.io.IOException;
+    import java.math.BigDecimal;
     import java.nio.file.Files;
     import java.nio.file.Path;
     import java.nio.file.Paths;
@@ -51,6 +52,21 @@
             return PageMapper.toPageResponse(pageData, dto -> dto);
         }
 
+
+        @Override
+        public PageResponse<ProductListResponse> searchProducts(
+                String keyword, Long brandId, Long categoryId,
+                BigDecimal minPrice, BigDecimal maxPrice,
+                int page, int size) {
+
+            Pageable pageable = PageRequest.of(page, size);
+
+            Page<ProductListResponse> pageData = productRepository.searchProducts(
+                    keyword, brandId, categoryId, minPrice, maxPrice, pageable
+            );
+
+            return PageMapper.toPageResponse(pageData, dto -> dto);
+        }
 
         @Override
         public ProductDetailResponse getProductDetail(Long id) {

@@ -13,6 +13,16 @@ export const productService = {
   getProductById: (productId: number) =>
     api.get(`/v1/products/${productId}`),
 
+  searchProducts: (params: {
+    keyword?: string;
+    brandId?: number;
+    categoryId?: number;
+    minPrice?: number;
+    maxPrice?: number;
+    page?: number;
+    size?: number;
+  }) => api.get("/v1/products/search", { params }),
+
   getBrands: () => api.get('/v1/brands'),
   getCategories: () => api.get('/v1/categories'),
   getOrigins: () => api.get('/v1/origins'),
