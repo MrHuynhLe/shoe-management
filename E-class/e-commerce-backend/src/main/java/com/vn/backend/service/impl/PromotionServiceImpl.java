@@ -1,7 +1,9 @@
 package com.vn.backend.service.impl;
 
 import com.vn.backend.dto.request.PromotionRequest;
+import com.vn.backend.dto.request.VoucherApplyRequest;
 import com.vn.backend.dto.response.PromotionResponse;
+import com.vn.backend.dto.response.VoucherApplyResponse;
 import com.vn.backend.entity.Promotion;
 import com.vn.backend.repository.PromotionRepository;
 import com.vn.backend.service.PromotionService;
@@ -11,8 +13,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -57,6 +62,9 @@ public class PromotionServiceImpl implements PromotionService {
         promotion.setDescription(request.getDescription());
         promotion.setDiscountType(request.getDiscountType());
         promotion.setDiscountValue(request.getDiscountValue());
+        promotion.setMinOrderAmount(request.getMinOrderAmount());
+        promotion.setMaxUsage(request.getMaxUsage());
+        promotion.setUsedCount(0);
         promotion.setStartDate(request.getStartDate());
         promotion.setEndDate(request.getEndDate());
         promotion.setIsActive(request.getIsActive());
@@ -76,6 +84,8 @@ public class PromotionServiceImpl implements PromotionService {
         promotion.setDescription(request.getDescription());
         promotion.setDiscountType(request.getDiscountType());
         promotion.setDiscountValue(request.getDiscountValue());
+        promotion.setMinOrderAmount(request.getMinOrderAmount());
+        promotion.setMaxUsage(request.getMaxUsage());
         promotion.setStartDate(request.getStartDate());
         promotion.setEndDate(request.getEndDate());
         promotion.setIsActive(request.getIsActive());
@@ -101,6 +111,89 @@ public class PromotionServiceImpl implements PromotionService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    @Transactional
+    public VoucherApplyResponse applyVoucher(VoucherApplyRequest request) {
+        Optional<Promotion> optPromotion = promotionRepository.findByCode(request.getCode());
+
+        if (optPromotion.isEmpty()) {
+            return VoucherApplyResponse.builder()
+                    .valid(false)
+                    .message("Mã voucher không tồn tại")
+                    .build();
+        }
+
+        Promotion promotion = optPromotion.get();
+        LocalDateTime now = LocalDateTime.now();
+
+        if (!Boolean.TRUE.equals(promotion.getIsActive())) {
+            return VoucherApplyResponse.builder()
+                    .valid(false).voucherCode(promotion.getCode())
+                    .message("Voucher đã bị vô hiệu hoá")
+                    .build();
+        }
+
+        if (promotion.getStartDate() != null && now.isBefore(promotion.getStartDate())) {
+            return VoucherApplyResponse.builder()
+                    .valid(false).voucherCode(promotion.getCode())
+                    .message("Voucher chưa đến thời gian áp dụng")
+                    .build();
+        }
+
+        if (promotion.getEndDate() != null && now.isAfter(promotion.getEndDate())) {
+            return VoucherApplyResponse.builder()
+                    .valid(false).voucherCode(promotion.getCode())
+                    .message("Voucher đã hết hạn")
+                    .build();
+        }
+
+        if (promotion.getMaxUsage() != null && promotion.getUsedCount() >= promotion.getMaxUsage()) {
+            return VoucherApplyResponse.builder()
+                    .valid(false).voucherCode(promotion.getCode())
+                    .message("Voucher đã hết lượt sử dụng")
+                    .build();
+        }
+
+        if (promotion.getMinOrderAmount() != null
+                && request.getOrderAmount().compareTo(promotion.getMinOrderAmount()) < 0) {
+            return VoucherApplyResponse.builder()
+                    .valid(false).voucherCode(promotion.getCode())
+                    .message("Đơn hàng tối thiểu " + promotion.getMinOrderAmount().toPlainString() + "₫ để áp dụng voucher này")
+                    .build();
+        }
+
+        BigDecimal discountAmount;
+        if ("PERCENTAGE".equals(promotion.getDiscountType())) {
+            discountAmount = request.getOrderAmount()
+                    .multiply(promotion.getDiscountValue())
+                    .divide(BigDecimal.valueOf(100), 0, RoundingMode.FLOOR);
+        } else {
+            discountAmount = promotion.getDiscountValue();
+        }
+
+        if (discountAmount.compareTo(request.getOrderAmount()) > 0) {
+            discountAmount = request.getOrderAmount();
+        }
+
+        return VoucherApplyResponse.builder()
+                .valid(true)
+                .voucherCode(promotion.getCode())
+                .voucherName(promotion.getName())
+                .discountType(promotion.getDiscountType())
+                .discountAmount(discountAmount)
+                .message("Áp dụng voucher thành công")
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public void consumeVoucher(String code) {
+        Promotion promotion = promotionRepository.findByCode(code)
+                .orElseThrow(() -> new RuntimeException("Promotion not found: " + code));
+        promotion.setUsedCount(promotion.getUsedCount() + 1);
+        promotionRepository.save(promotion);
+    }
+
     private PromotionResponse mapToResponse(Promotion promotion) {
         PromotionResponse response = new PromotionResponse();
         response.setId(promotion.getId());
@@ -109,6 +202,9 @@ public class PromotionServiceImpl implements PromotionService {
         response.setDescription(promotion.getDescription());
         response.setDiscountType(promotion.getDiscountType());
         response.setDiscountValue(promotion.getDiscountValue());
+        response.setMinOrderAmount(promotion.getMinOrderAmount());
+        response.setMaxUsage(promotion.getMaxUsage());
+        response.setUsedCount(promotion.getUsedCount());
         response.setStartDate(promotion.getStartDate());
         response.setEndDate(promotion.getEndDate());
         response.setIsActive(promotion.getIsActive());

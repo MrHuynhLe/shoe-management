@@ -17,6 +17,8 @@ import EmployeeManagementPage from '@/features/admin/EmployeeManagement'
 import InventoryManagementPage from '@/features/admin/InventoryManagement'
 import OrderManagementPage from '@/features/admin/OrderManagement'
 import RevenueStatisticPage from '@/features/admin/RevenueStatistic'
+import VoucherManagementPage from '@/features/admin/VoucherManagement'
+import Contact from '@/features/contact/Contact'
 
 export const router = createBrowserRouter([
   {
@@ -45,6 +47,10 @@ export const router = createBrowserRouter([
       {
         path: 'my-orders',
         element: <MyOrdersPage />
+      },
+      {
+        path: 'contact',
+        element: <Contact />
       }
     ]
   },
@@ -83,6 +89,10 @@ export const router = createBrowserRouter([
       {
         path: 'revenue',
         element: <RevenueStatisticPage />
+      },
+      {
+        path: 'vouchers',
+        element: <VoucherManagementPage />
       }
     ]
   },

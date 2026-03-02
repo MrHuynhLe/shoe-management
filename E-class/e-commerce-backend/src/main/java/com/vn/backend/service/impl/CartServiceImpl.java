@@ -2,16 +2,12 @@ package com.vn.backend.service.impl;
 
 import com.vn.backend.dto.request.AddCartRequest;
 import com.vn.backend.dto.response.CartResponse;
-import com.vn.backend.dto.response.OrderResponse; // Giả định bạn đã có class này
-import com.vn.backend.entity.Cart;
-import com.vn.backend.entity.CartItem;
-import com.vn.backend.entity.Customer;
-import com.vn.backend.entity.ProductVariant;
+import com.vn.backend.dto.response.OrderResponse;
+import com.vn.backend.entity.*;
 import com.vn.backend.enums.CartStatus;
-import com.vn.backend.repository.CartItemRepository;
-import com.vn.backend.repository.CartRepository;
-import com.vn.backend.repository.CustomerRepository;
-import com.vn.backend.repository.ProductVariantRepository;
+import com.vn.backend.enums.OrderStatus;
+import com.vn.backend.mapper.OrderMapper;
+import com.vn.backend.repository.*;
 import com.vn.backend.service.CartService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,7 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +29,8 @@ public class CartServiceImpl implements CartService {
     private final CartItemRepository cartItemRepository;
     private final CustomerRepository customerRepository;
     private final ProductVariantRepository productVariantRepository;
+    private final OrderRepository orderRepository;
+    private final OrderMapper orderMapper;
 
     @Override
     public CartResponse addToCart(AddCartRequest request) {
@@ -109,14 +110,82 @@ public class CartServiceImpl implements CartService {
 
     @Override
     public OrderResponse checkout(Long customerId) {
-
         Cart cart = cartRepository.findByCustomerIdAndStatus(customerId, CartStatus.ACTIVE)
                 .orElseThrow(() -> new IllegalArgumentException("Nothing to checkout"));
+
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new IllegalArgumentException("Customer not found"));
+
+        List<CartItem> cartItems = cart.getItems();
+        if (cartItems == null || cartItems.isEmpty()) {
+            throw new IllegalArgumentException("Cart is empty");
+        }
+
+        String code = "ORD-" + System.currentTimeMillis();
+
+        Order order = Order.builder()
+                .code(code)
+                .customer(customer)
+                .status(OrderStatus.PENDING.name())
+                .discountAmount(BigDecimal.ZERO)
+                .paymentMethod("COD")
+                .build();
+
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        List<OrderItem> orderItems = new ArrayList<>();
+
+        for (CartItem ci : cartItems) {
+            ProductVariant variant = productVariantRepository.findById(ci.getProductVariantId())
+                    .orElseThrow(() -> new IllegalArgumentException("Product variant not found"));
+
+            BigDecimal unitPrice = variant.getSellingPrice();
+            BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(ci.getQuantity()));
+
+            String variantInfo = "";
+            if (variant.getVariantAttributeValues() != null) {
+                variantInfo = variant.getVariantAttributeValues().stream()
+                        .map(av -> av.getAttributeValue().getAttribute().getCode()
+                                + ": " + av.getAttributeValue().getValue())
+                        .collect(Collectors.joining(", "));
+            }
+
+            String imageUrl = null;
+            if (variant.getImages() != null && !variant.getImages().isEmpty()) {
+                imageUrl = variant.getImages().get(0).getImageUrl();
+            } else if (variant.getProduct().getImages() != null && !variant.getProduct().getImages().isEmpty()) {
+                imageUrl = variant.getProduct().getImages().get(0).getImageUrl();
+            }
+
+            OrderItem orderItem = OrderItem.builder()
+                    .order(order)
+                    .productVariant(variant)
+                    .productName(variant.getProduct().getName())
+                    .variantInfo(variantInfo)
+                    .imageUrl(imageUrl)
+                    .quantity(ci.getQuantity())
+                    .unitPrice(unitPrice)
+                    .totalPrice(lineTotal)
+                    .build();
+
+            orderItems.add(orderItem);
+            totalAmount = totalAmount.add(lineTotal);
+        }
+
+        order.setOrderItems(orderItems);
+        order.setTotalAmount(totalAmount);
+
+        if (customer.getUserProfile() != null) {
+            order.setShippingName(customer.getUserProfile().getFullName());
+            order.setShippingPhone(customer.getUserProfile().getPhone());
+            order.setShippingAddress(customer.getUserProfile().getAddress());
+        }
+
+        orderRepository.save(order);
 
         cart.setStatus(CartStatus.ORDERED);
         cartRepository.save(cart);
 
-        return new OrderResponse();
+        return orderMapper.toOrderResponse(order);
     }
 
     private CartResponse mapToCartResponse(Cart cart) {
