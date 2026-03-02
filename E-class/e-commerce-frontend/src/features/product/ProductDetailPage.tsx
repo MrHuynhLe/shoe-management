@@ -335,7 +335,15 @@ const SuggestedProducts = ({ currentProductId }: { currentProductId: number }) =
             >
               <Card.Meta
                 title={<Link to={`/products/${p.id}`}><Tooltip title={p.name}>{p.name}</Tooltip></Link>}
-                description={<Typography.Text strong style={{ color: '#d0021b' }}>{`${p.minPrice.toLocaleString('vi-VN')} ₫ - ${p.maxPrice.toLocaleString('vi-VN')} ₫`}</Typography.Text>}
+                description={
+                  <Typography.Text strong style={{ color: '#d0021b' }}>
+                    {p.minPrice !== null && p.maxPrice !== null
+                      ? p.minPrice === p.maxPrice
+                        ? `${p.minPrice.toLocaleString('vi-VN')} ₫`
+                        : `${p.minPrice.toLocaleString('vi-VN')} ₫ - ${p.maxPrice.toLocaleString('vi-VN')} ₫`
+                      : 'Chưa có giá'}
+                  </Typography.Text>
+                }
               />
             </Card>
           </Col>

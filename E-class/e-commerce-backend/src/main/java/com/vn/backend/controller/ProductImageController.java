@@ -8,8 +8,9 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/v1/product-images")
+@CrossOrigin(origins = "http://localhost:5173")
 @RequiredArgsConstructor
-@CrossOrigin
+
 public class ProductImageController {
 
     private final ProductImageService productImageService;

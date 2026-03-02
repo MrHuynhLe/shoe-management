@@ -11,7 +11,7 @@ import EditVariantModal from './EditVariantModal';
 interface ProductList {
   id: number;
   name: string;
-  code: string; 
+  code: string;
   brandName: string;
   totalStock: number;
   minPrice: number;
@@ -42,21 +42,21 @@ const ProductManagementPage = () => {
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [isVariantDetailModalOpen, setIsVariantDetailModalOpen] = useState(false);
   const [isEditVariantModalOpen, setIsEditVariantModalOpen] = useState(false);
-  const [editingVariant, setEditingVariant] = useState<Variant | null>(null); 
+  const [editingVariant, setEditingVariant] = useState<Variant | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<ProductForTable | null>(null);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
 
   const fetchProducts = () => {
     setLoading(true);
     productService
-      .getProducts(0, 10) 
+      .getProducts(0, 10)
       .then((res) => {
         const formattedData: ProductForTable[] = res.data.content.map((p: ProductList) => ({
           ...p,
           key: p.id,
           brand: p.brandName,
-          hasVariants: true, 
-          hasPendingOrder: false, 
+          hasVariants: true,
+          hasPendingOrder: false,
           variants: [],
         }));
         setProducts(formattedData);
@@ -192,7 +192,7 @@ const ProductManagementPage = () => {
         description: 'Các biến thể đã được thêm thành công!',
       });
       handleCancelVariantDetailModal();
-      fetchProducts(); 
+      fetchProducts();
     } catch (error: any) {
       console.error('Failed to add variants:', error);
       const serverMessage = error.response?.data?.message || 'Đã có lỗi xảy ra khi thêm biến thể.';
@@ -239,17 +239,25 @@ const ProductManagementPage = () => {
       key: 'brand',
       align: 'center' as const,
     },
-    {
-      title: 'Giá bán',
-      key: 'price',
-      align: 'center' as const,
-      render: (_: any, record: ProductList) => {
-        if (record.minPrice === record.maxPrice) {
-          return `${record.minPrice.toLocaleString('vi-VN')} ₫`;
-        }
-        return `${record.minPrice.toLocaleString('vi-VN')} ₫ - ${record.maxPrice.toLocaleString('vi-VN')} ₫`;
-      },
-    },
+ {
+  title: 'Giá bán',
+  key: 'price',
+  align: 'center' as const,
+  render: (_: any, record: ProductList) => {
+    const { minPrice, maxPrice } = record;
+    if (minPrice === null || maxPrice === null) {
+      return 'Chưa có giá';
+    }
+    const min = Number(minPrice);
+    const max = Number(maxPrice);
+
+    if (min === max) {
+      return `${min.toLocaleString('vi-VN')} ₫`;
+    }
+
+    return `${min.toLocaleString('vi-VN')} ₫ - ${max.toLocaleString('vi-VN')} ₫`;
+  },
+},
     { title: 'Tổng tồn kho', dataIndex: 'totalStock', key: 'totalStock', align: 'center' as const },
     {
       title: 'Trạng thái',
