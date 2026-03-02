@@ -1,9 +1,7 @@
 package com.vn.backend.controller;
 
 import com.vn.backend.dto.request.PromotionRequest;
-import com.vn.backend.dto.request.VoucherApplyRequest;
 import com.vn.backend.dto.response.PromotionResponse;
-import com.vn.backend.dto.response.VoucherApplyResponse;
 import com.vn.backend.service.PromotionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -82,11 +80,5 @@ public class PromotionController {
     public ResponseEntity<Void> deletePromotion(@PathVariable Long id) {
         promotionService.deletePromotion(id);
         return ResponseEntity.noContent().build();
-    }
-
-    @PostMapping("/apply")
-    public ResponseEntity<VoucherApplyResponse> applyVoucher(@RequestBody VoucherApplyRequest request) {
-        VoucherApplyResponse response = promotionService.applyVoucher(request);
-        return ResponseEntity.ok(response);
     }
 }

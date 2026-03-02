@@ -12,9 +12,6 @@ public class PromotionResponse {
     private String description;
     private String discountType;
     private BigDecimal discountValue;
-    private BigDecimal minOrderAmount;
-    private Integer maxUsage;
-    private Integer usedCount;
     private LocalDateTime startDate;
     private LocalDateTime endDate;
     private Boolean isActive;

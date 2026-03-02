@@ -11,8 +11,6 @@ public class PromotionRequest {
     private String description;
     private String discountType;
     private BigDecimal discountValue;
-    private BigDecimal minOrderAmount;
-    private Integer maxUsage;
     private LocalDateTime startDate;
     private LocalDateTime endDate;
     private Boolean isActive = true;

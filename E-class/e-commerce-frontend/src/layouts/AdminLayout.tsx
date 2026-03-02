@@ -10,7 +10,6 @@ import {
   SolutionOutlined,
   LineChartOutlined,
   BellOutlined,
-  GiftOutlined,
 } from '@ant-design/icons';
 import { Dropdown, Space, Avatar, Badge, ConfigProvider } from 'antd';
 import antdViVN from 'antd/locale/vi_VN'; 
@@ -113,12 +112,6 @@ const AdminLayout = () => {
             path: '/admin/customers',
             name: 'Quản lý khách hàng',
             icon: <UserOutlined />,
-          },
-          {
-            key: '/admin/vouchers',
-            path: '/admin/vouchers',
-            name: 'Quản lý voucher',
-            icon: <GiftOutlined />,
           },
           {
             key: '/admin/revenue',

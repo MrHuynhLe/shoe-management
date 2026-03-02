@@ -13,7 +13,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
@@ -31,21 +30,6 @@ public class ProductController {
     ) {
         return ResponseEntity.ok(
                 productService.getProductList(page, size)
-        );
-    }
-
-    @GetMapping("/search")
-    public ResponseEntity<PageResponse<ProductListResponse>> searchProducts(
-            @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) Long brandId,
-            @RequestParam(required = false) Long categoryId,
-            @RequestParam(required = false) BigDecimal minPrice,
-            @RequestParam(required = false) BigDecimal maxPrice,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "12") int size
-    ) {
-        return ResponseEntity.ok(
-                productService.searchProducts(keyword, brandId, categoryId, minPrice, maxPrice, page, size)
         );
     }
 

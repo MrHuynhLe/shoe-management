@@ -6,8 +6,7 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+
 
 @Entity
 @Table(name = "orders", uniqueConstraints = {
@@ -36,44 +35,19 @@ public class Order {
     @ToString.Exclude
     private Customer customer;
 
+
     @Column(name = "total_amount", precision = 15, scale = 2)
     private BigDecimal totalAmount = BigDecimal.ZERO;
 
     @Column(name = "discount_amount", precision = 15, scale = 2, nullable = false)
     private BigDecimal discountAmount = BigDecimal.ZERO;
 
-    @Column(name = "voucher_code", length = 50)
-    private String voucherCode;
-
-    @Column(name = "voucher_name")
-    private String voucherName;
-
     @Column(name = "status", length = 50)
     private String status;
-
-    @Column(name = "shipping_name")
-    private String shippingName;
-
-    @Column(name = "shipping_phone", length = 20)
-    private String shippingPhone;
-
-    @Column(name = "shipping_address", columnDefinition = "TEXT")
-    private String shippingAddress;
-
-    @Column(name = "payment_method", length = 50)
-    private String paymentMethod;
-
-    @Column(name = "note", columnDefinition = "TEXT")
-    private String note;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
 
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    @Builder.Default
-    private List<OrderItem> orderItems = new ArrayList<>();
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Row, Col, Image, Typography, Button, Space, Tag, Divider, Spin, notification, InputNumber, Card, Tooltip, Form, Input, Rate, List, Avatar, Collapse, Breadcrumb } from 'antd';
-import { ShoppingCartOutlined, ArrowLeftOutlined, HomeOutlined } from '@ant-design/icons';
+import { Row, Col, Image, Typography, Button, Space, Tag, Divider, Spin, notification, InputNumber, Card, Tooltip, Form, Input, Rate, List, Avatar, Collapse } from 'antd';
+import { ShoppingCartOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { productService } from '@/services/product.service';
 import { ProductDetail, Variant } from '../admin/VariantDetailModal';
 import { Link } from 'react-router-dom';
@@ -174,24 +174,16 @@ const ProductDetailPage = () => {
   return (
     <Spin spinning={loading} size="large" tip="Đang tải sản phẩm...">
       <div style={{ opacity: loading ? 0.5 : 1, transition: 'opacity 0.3s ease' }}>
-        <Breadcrumb
-          style={{ marginBottom: 24 }}
-          items={[
-            { title: <Link to="/"><HomeOutlined /> Trang chủ</Link> },
-            { title: <Link to="/products">Sản phẩm</Link> },
-            { title: product?.name || '...' },
-          ]}
-        />
         <Button
           icon={<ArrowLeftOutlined />}
           onClick={() => navigate('/products')}
-          style={{ marginBottom: '24px', borderRadius: 8 }}
+          style={{ marginBottom: '24px' }}
         >
           Quay lại
         </Button>
         <Row gutter={[32, 32]}>
           <Col xs={24} md={12}>
-            <div style={{ border: '1px solid #f0f0f0', borderRadius: 12, padding: 12, aspectRatio: '1 / 1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fafafa' }}>
+            <div style={{ border: '1px solid #f0f0f0', borderRadius: '8px', padding: '8px', aspectRatio: '1 / 1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Image
                 width="100%"
                 height="100%"
@@ -204,7 +196,7 @@ const ProductDetailPage = () => {
             <Row gutter={[10, 10]} style={{ marginTop: 16, maxHeight: '220px', overflowY: 'auto' }}>
               {imageListToDisplay.map((img, index) => (
                 <Col span={4} key={index}>
-                  <div style={{ aspectRatio: '1 / 1', border: selectedImage === `${IMAGE_BASE_URL}${img}` ? '2px solid #1a1a2e' : '2px solid #f0f0f0', borderRadius: 8, padding: '4px', cursor: 'pointer', transition: 'transform 0.2s ease, border-color 0.2s ease' }}
+                  <div style={{ aspectRatio: '1 / 1', border: selectedImage === `${IMAGE_BASE_URL}${img}` ? '2px solid #1677ff' : '2px solid #f0f0f0', borderRadius: '4px', padding: '4px', cursor: 'pointer', transition: 'transform 0.2s ease, border-color 0.2s ease' }}
                        onClick={() => setSelectedImage(`${IMAGE_BASE_URL}${img}`)}
                        onMouseOver={(e) => { e.currentTarget.style.transform = 'scale(1.05)'; if (selectedImage !== `${IMAGE_BASE_URL}${img}`) e.currentTarget.style.borderColor = '#91caff'; }}
                        onMouseOut={(e) => { e.currentTarget.style.transform = 'scale(1)'; if (selectedImage !== `${IMAGE_BASE_URL}${img}`) e.currentTarget.style.borderColor = '#f0f0f0'; }}
@@ -223,12 +215,10 @@ const ProductDetailPage = () => {
             </Row>
           </Col>
           <Col xs={24} md={12}>
-            <Title level={2} style={{ fontWeight: 800, fontSize: '32px', color: '#1a1a2e' }}>{product.name}</Title>
-            <div style={{ background: '#fff5f5', padding: '12px 20px', borderRadius: 8, display: 'inline-block', marginBottom: 16 }}>
-              <Title level={3} style={{ color: '#d0021b', margin: 0, fontWeight: 700, fontSize: '28px' }}>
-                {selectedVariant ? `${selectedVariant.sellingPrice.toLocaleString('vi-VN')} ₫` : 'Chọn Size và Màu để xem giá'}
-              </Title>
-            </div>
+            <Title level={2} style={{ fontWeight: '700', fontSize: '28px' }}>{product.name}</Title>
+            <Title level={3} style={{ color: '#d0021b', marginTop: 0, fontWeight: '600' }}>
+              {selectedVariant ? `${selectedVariant.sellingPrice.toLocaleString('vi-VN')} ₫` : 'Chọn Size và Màu để xem giá'}
+            </Title>
             <Space>
               <Tag color="blue">{product.brandName}</Tag>
               <Tag color="purple">{product.categoryName}</Tag>
@@ -245,13 +235,6 @@ const ProductDetailPage = () => {
                     type={selectedSize === size ? 'primary' : 'default'}
                     onClick={() => handleSelectSize(size)}
                     disabled={isSizeDisabled(size)}
-                    style={{
-                      minWidth: 56,
-                      height: 40,
-                      borderRadius: 8,
-                      fontWeight: selectedSize === size ? 700 : 500,
-                      ...(selectedSize === size ? { background: '#1a1a2e', borderColor: '#1a1a2e' } : {}),
-                    }}
                   >
                     {size}
                   </Button>
@@ -268,13 +251,6 @@ const ProductDetailPage = () => {
                     type={selectedColor === color ? 'primary' : 'default'}
                     onClick={() => handleSelectColor(color)}
                     disabled={isColorDisabled(color)}
-                    style={{
-                      minWidth: 56,
-                      height: 40,
-                      borderRadius: 8,
-                      fontWeight: selectedColor === color ? 700 : 500,
-                      ...(selectedColor === color ? { background: '#1a1a2e', borderColor: '#1a1a2e' } : {}),
-                    }}
                   >
                     {color}
                   </Button>
@@ -301,15 +277,6 @@ const ProductDetailPage = () => {
                 size="large"
                 onClick={handleAddToCart}
                 disabled={!selectedVariant}
-                style={{
-                  height: 56,
-                  padding: '0 48px',
-                  fontSize: 18,
-                  fontWeight: 700,
-                  borderRadius: 12,
-                  background: '#1a1a2e',
-                  borderColor: '#1a1a2e',
-                }}
               >
                 Thêm vào giỏ hàng
               </Button>
@@ -352,58 +319,23 @@ const SuggestedProducts = ({ currentProductId }: { currentProductId: number }) =
 
   return (
     <div>
-      <Title level={3} style={{ fontWeight: 700, color: '#1a1a2e' }}>Có thể bạn cũng thích</Title>
-      <Row gutter={[24, 24]}>
+      <Title level={3} style={{ fontWeight: '600' }}>Có thể bạn cũng thích</Title>
+      <Row gutter={[16, 16]}>
         {products?.content.map((p) => (
           <Col key={p.id} xs={24} sm={12} md={8} lg={6}>
             <Card
               hoverable
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                height: '100%',
-                borderRadius: 12,
-                overflow: 'hidden',
-                border: '1px solid #f0f0f0',
-                transition: 'box-shadow 0.3s ease, transform 0.2s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = '0 8px 30px rgba(0,0,0,0.12)';
-                e.currentTarget.style.transform = 'translateY(-4px)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = 'none';
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}
+              style={{ display: 'flex', flexDirection: 'column', height: '100%', transition: 'transform 0.3s ease, box-shadow 0.3s ease' }}
               bodyStyle={{ padding: '16px', flex: '1' }}
               cover={
-                <Link to={`/products/${p.id}`} style={{ display: 'block', overflow: 'hidden', aspectRatio: '1 / 1' }}>
-                  <img alt={p.name} src={`${IMAGE_BASE_URL}${p.imageUrl}`} style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.4s ease' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.08)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-                  />
+                <Link to={`/products/${p.id}`} style={{ display: 'block', aspectRatio: '1 / 1' }}>
+                  <img alt={p.name} src={`${IMAGE_BASE_URL}${p.imageUrl}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </Link>
               }
             >
               <Card.Meta
-                title={
-                  <Link to={`/products/${p.id}`} style={{ color: '#1a1a2e' }}>
-                    <Tooltip title={p.name}>
-                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', fontSize: 15, fontWeight: 600, lineHeight: '1.4' }}>
-                        {p.name}
-                      </div>
-                    </Tooltip>
-                  </Link>
-                }
-                description={
-                  <div style={{ marginTop: 8 }}>
-                    <Typography.Text strong style={{ color: '#d0021b', fontSize: 16 }}>
-                      {p.minPrice === p.maxPrice
-                        ? `${p.minPrice.toLocaleString('vi-VN')} ₫`
-                        : `${p.minPrice.toLocaleString('vi-VN')} ₫ - ${p.maxPrice.toLocaleString('vi-VN')} ₫`}
-                    </Typography.Text>
-                  </div>
-                }
+                title={<Link to={`/products/${p.id}`}><Tooltip title={p.name}>{p.name}</Tooltip></Link>}
+                description={<Typography.Text strong style={{ color: '#d0021b' }}>{`${p.minPrice.toLocaleString('vi-VN')} ₫ - ${p.maxPrice.toLocaleString('vi-VN')} ₫`}</Typography.Text>}
               />
             </Card>
           </Col>

@@ -1,7 +1,7 @@
+
 package com.vn.backend.dto.response;
 
 import lombok.*;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -10,15 +10,9 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class OrderResponse {
+    public String b;
     private Long id;
     private String code;
-    private String customerName;
-    private String customerPhone;
     private BigDecimal totalAmount;
-    private BigDecimal discountAmount;
-    private String voucherCode;
-    private String status;
-    private int itemCount;
-    private String paymentMethod;
     private LocalDateTime createdAt;
 }
