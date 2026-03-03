@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Row,
   Col,
@@ -19,10 +19,12 @@ import {
   Radio,
 } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useFetcher } from 'react-router-dom';
 import type { CheckboxChangeEvent } from 'antd/es/checkbox';
+import { cartService } from '@/services/cart.service';
 
 const { Title, Text } = Typography;
+const IMAGE_BASE_URL = 'http://localhost:8080/api';
 interface CartItem {
   id: number;
   productId: number;
@@ -41,47 +43,23 @@ interface ShippingInfo {
   address: string;
 }
 
-const initialCartItems = [
-  {
-    id: 1,
-    productId: 101,
-    name: 'Nike Air Force 1 \'07',
-    imageUrl: 'https://static.nike.com/a/images/t_PDP_1728_v1/f_auto,q_auto:eco/b7d9211c-26e7-431a-ac24-b0540fb3c00f/air-force-1-07-shoes-WrLlWX.png',
-    size: '42',
-    color: 'Trắng',
-    price: 2999000,
-    quantity: 1,
-    stock: 10,
-  },
-  {
-    id: 2,
-    productId: 102,
-    name: 'Adidas Ultraboost 22',
-    imageUrl: 'https://assets.adidas.com/images/h_840,f_auto,q_auto,fl_lossy,c_fill,g_auto/c5b321a9596d46449536ae320126f0f7_9366/Giay_Ultraboost_22_DJen_GZ0127_01_standard.jpg',
-    size: '41',
-    color: 'Đen',
-    price: 4500000,
-    quantity: 2,
-    stock: 5,
-  },
-];
-
 const mockCurrentUser = {
   isLoggedIn: true,
+  id: 1,
   name: 'Nguyễn Văn An',
   phone: '0987654321',
   address: '123 Đường ABC, Phường XYZ, Quận 1, TP. HCM'
 };
-
 const CartPage = () => {
-  const [cartItems, setCartItems] = useState<CartItem[]>(initialCartItems);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [shippingInfo, setShippingInfo] = useState<ShippingInfo>({
-    name: mockCurrentUser.name,
-    phone: mockCurrentUser.phone,
-    address: mockCurrentUser.address,
+    name: mockCurrentUser.isLoggedIn ? mockCurrentUser.name : '',
+    phone: mockCurrentUser.isLoggedIn ? mockCurrentUser.phone : '',
+    address: mockCurrentUser.isLoggedIn ? mockCurrentUser.address : '',
   });
   const [paymentMethod, setPaymentMethod] = useState('cod');
   const navigate = useNavigate();
@@ -89,15 +67,48 @@ const CartPage = () => {
 
   const handleQuantityChange = (itemId: number, quantity: number | null) => {
     if (quantity === null) return;
-    setCartItems(
-      cartItems.map(item => (item.id === itemId ? { ...item, quantity } : item))
-    );
+
+    const originalCartItems = [...cartItems];
+    const updatedCartItems = cartItems.map(item => (item.id === itemId ? { ...item, quantity } : item));
+    setCartItems(updatedCartItems);
+
+    cartService.updateItemQuantity(itemId, quantity)
+      .catch((err: any) => {
+        console.error("Failed to update quantity:", err);
+        notification.error({ message: 'Cập nhật số lượng thất bại!' });
+        setCartItems(originalCartItems); 
+      });
   };
 
-  const handleRemoveItem = (itemId: number) => {
-    setCartItems(cartItems.filter(item => item.id !== itemId));
-    setSelectedItems(selectedItems.filter(id => id !== itemId));
-    notification.success({ message: 'Đã xóa sản phẩm khỏi giỏ hàng.' });
+  const fetchCart = async () => {
+    try {
+      setLoading(true);
+
+      const response = await cartService.getCart(mockCurrentUser.id);
+  
+      setCartItems(response.data.items || []);
+    } catch (error: any) {
+      console.error("Failed to fetch cart:", error);
+      notification.error({ message: 'Không thể tải giỏ hàng.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCart();
+  }, []);
+
+  const handleRemoveItem = async (itemId: number) => {
+    try {
+      await cartService.removeItem(itemId);
+      setCartItems(cartItems.filter(item => item.id !== itemId));
+      setSelectedItems(selectedItems.filter(id => id !== itemId));
+      notification.success({ message: 'Đã xóa sản phẩm khỏi giỏ hàng.' });
+    } catch (error: any) {
+      console.error("Failed to remove item:", error);
+      notification.error({ message: 'Xóa sản phẩm thất bại.' });
+    }
   };
 
   const handleSelectItem = (itemId: number, checked: boolean) => {
@@ -151,7 +162,7 @@ const CartPage = () => {
         const values = await form.validateFields();
         setShippingInfo(values);
         setCurrentStep(currentStep + 1);
-      } catch (error) {
+      } catch (error: any) {
         console.log('Validation Failed:', error);
       }
     } else {
@@ -159,7 +170,7 @@ const CartPage = () => {
     }
   };
 
-  if (cartItems.length === 0) {
+  if (!loading && cartItems.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '100px 0' }}>
         <Empty description="Giỏ hàng của bạn đang trống">
@@ -177,7 +188,7 @@ const CartPage = () => {
 
   return (
     <div style={{ padding: '24px' }}>
-      <Title level={2}>Giỏ hàng</Title>
+      <Title level={2}>Giỏ hàng của bạn</Title>
       <Row gutter={[24, 24]}>
         <Col xs={24} lg={16}>
           <Card
@@ -229,7 +240,7 @@ const CartPage = () => {
                         checked={selectedItems.includes(item.id)}
                         onChange={e => handleSelectItem(item.id, e.target.checked)}
                       />
-                      <Image src={item.imageUrl} width={80} height={80} style={{ objectFit: 'cover', borderRadius: '4px' }} />
+                      <Image src={`${IMAGE_BASE_URL}${item.imageUrl}`} width={80} height={80} style={{ objectFit: 'cover', borderRadius: '4px' }} />
                       <div style={{ marginLeft: 8 }}>
                         <Link to={`/products/${item.productId}`}>
                           <Text strong style={{ display: 'block' }}>{item.name}</Text>

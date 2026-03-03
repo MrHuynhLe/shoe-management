@@ -2,22 +2,31 @@ package com.vn.backend.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.util.Map;
 
 @Data
 @AllArgsConstructor
-
+@NoArgsConstructor
 public class CartItemResponse {
+
     private Long cartItemId;
-    private Long productVariantId;
+
+    private Long variantId;
+
     private String productName;
-    private String imageUrl;
+
+    private String variantCode;
 
     private BigDecimal price;
-    private int quantity;
-    private BigDecimal totalPrice;
 
-    private Map<String, String> attributes;
+    private Integer quantity;
+
+    private Integer stockRemaining;
+
+    private BigDecimal subTotal;
+
+    private String imageUrl;
 }
