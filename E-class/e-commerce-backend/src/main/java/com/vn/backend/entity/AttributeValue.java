@@ -5,11 +5,11 @@ import lombok.*;
 
 @Entity
 @Table(name = "attribute_values")
-@Data
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class AttributeValue {
 
     @Id
@@ -23,5 +23,11 @@ public class AttributeValue {
     @Column(nullable = false, length = 255)
     private String value;
 
+    @Column(name = "is_active")
+    private Boolean isActive = true;
+    @PrePersist
+    public void prePersist() {
+        if (isActive == null) isActive = true; // ✅ chặn NULL khi insert
+    }
 
 }
