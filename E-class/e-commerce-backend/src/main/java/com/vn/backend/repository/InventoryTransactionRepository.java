@@ -11,13 +11,13 @@ import java.util.List;
 
 @Repository
 public interface InventoryTransactionRepository extends JpaRepository<InventoryTransaction, Long> {
-
+    
     @Query("SELECT i FROM InventoryTransaction i WHERE i.productVariant.id = :variantId ORDER BY i.createdAt DESC")
     Page<InventoryTransaction> findByProductVariantId(Long variantId, Pageable pageable);
-
+    
     @Query("SELECT i FROM InventoryTransaction i WHERE i.store.id = :storeId ORDER BY i.createdAt DESC")
     Page<InventoryTransaction> findByStoreId(Long storeId, Pageable pageable);
-
+    
     @Query("SELECT i FROM InventoryTransaction i ORDER BY i.createdAt DESC")
     Page<InventoryTransaction> findAllWithPagination(Pageable pageable);
 }

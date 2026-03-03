@@ -1,28 +1,69 @@
 package com.vn.backend.controller;
 
-import com.vn.backend.dto.request.VariantBulkRequest;
+import com.vn.backend.dto.request.ProductVariantRequest;
+import com.vn.backend.dto.response.ProductVariantResponse;
 import com.vn.backend.service.ProductVariantService;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
-@RequestMapping("/v1/variants")
-@CrossOrigin(origins = "http://localhost:5173")
+@RequestMapping("/product-variants")
+@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class ProductVariantController {
 
     private final ProductVariantService variantService;
 
-    @PostMapping(value = "/bulk", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<String> createBulk(@RequestBody VariantBulkRequest request) {
-        variantService.createBulkVariants(request);
-        return ResponseEntity.ok("Thành công");
-
+    // GET /product-variants — tất cả variant chưa xóa
+    @GetMapping
+    public ResponseEntity<List<ProductVariantResponse>> getAll() {
+        return ResponseEntity.ok(variantService.getAllVariants());
     }
-  
 
+    // GET /product-variants/product/{productId} — variant theo sản phẩm
+    @GetMapping("/product/{productId}")
+    public ResponseEntity<List<ProductVariantResponse>> getByProduct(@PathVariable Long productId) {
+        return ResponseEntity.ok(variantService.getVariantsByProduct(productId));
+    }
+
+    // GET /product-variants/{id}
+    @GetMapping("/{id}")
+    public ResponseEntity<ProductVariantResponse> getById(@PathVariable Long id) {
+        return ResponseEntity.ok(variantService.getVariantById(id));
+    }
+
+    // GET /product-variants/code/{code}
+    @GetMapping("/code/{code}")
+    public ResponseEntity<ProductVariantResponse> getByCode(@PathVariable String code) {
+        return ResponseEntity.ok(variantService.getVariantByCode(code));
+    }
+
+    // GET /product-variants/barcode/{barcode}
+    @GetMapping("/barcode/{barcode}")
+    public ResponseEntity<ProductVariantResponse> getByBarcode(@PathVariable String barcode) {
+        return ResponseEntity.ok(variantService.getVariantByBarcode(barcode));
+    }
+
+    // POST /product-variants — tạo variant, tự động sinh barcode
+    @PostMapping
+    public ResponseEntity<ProductVariantResponse> create(@RequestBody ProductVariantRequest request) {
+        return ResponseEntity.ok(variantService.createVariant(request));
+    }
+
+    // PUT /product-variants/{id}
+    @PutMapping("/{id}")
+    public ResponseEntity<ProductVariantResponse> update(@PathVariable Long id,
+                                                          @RequestBody ProductVariantRequest request) {
+        return ResponseEntity.ok(variantService.updateVariant(id, request));
+    }
+
+    // DELETE /product-variants/{id} — soft delete
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        variantService.deleteVariant(id);
+        return ResponseEntity.noContent().build();
+    }
 }

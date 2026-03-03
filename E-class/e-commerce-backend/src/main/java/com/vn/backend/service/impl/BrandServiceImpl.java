@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -48,7 +47,7 @@ public class BrandServiceImpl implements BrandService {
         Brand brand = new Brand();
         brand.setName(request.getName());
         brand.setIsActive(request.getIsActive());
-
+        
         Brand savedBrand = brandRepository.save(brand);
         return mapToResponse(savedBrand);
     }
@@ -58,10 +57,10 @@ public class BrandServiceImpl implements BrandService {
     public BrandResponse updateBrand(Long id, BrandRequest request) {
         Brand brand = brandRepository.findByIdActive(id)
                 .orElseThrow(() -> new RuntimeException("Brand not found with id: " + id));
-
+        
         brand.setName(request.getName());
         brand.setIsActive(request.getIsActive());
-
+        
         Brand updatedBrand = brandRepository.save(brand);
         return mapToResponse(updatedBrand);
     }
@@ -71,8 +70,8 @@ public class BrandServiceImpl implements BrandService {
     public void deleteBrand(Long id) {
         Brand brand = brandRepository.findByIdActive(id)
                 .orElseThrow(() -> new RuntimeException("Brand not found with id: " + id));
-
-        brand.setDeletedAt(OffsetDateTime.now());
+        
+        brand.setDeletedAt(LocalDateTime.now());
         brandRepository.save(brand);
     }
 

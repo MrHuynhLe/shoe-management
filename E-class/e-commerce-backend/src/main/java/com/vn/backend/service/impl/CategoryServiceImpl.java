@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -49,7 +48,7 @@ public class CategoryServiceImpl implements CategoryService {
         category.setName(request.getName());
         category.setSizeChartUrl(request.getSizeChartUrl());
         category.setIsActive(request.getIsActive());
-
+        
         Category savedCategory = categoryRepository.save(category);
         return mapToResponse(savedCategory);
     }
@@ -59,11 +58,11 @@ public class CategoryServiceImpl implements CategoryService {
     public CategoryResponse updateCategory(Long id, CategoryRequest request) {
         Category category = categoryRepository.findByIdActive(id)
                 .orElseThrow(() -> new RuntimeException("Category not found with id: " + id));
-
+        
         category.setName(request.getName());
         category.setSizeChartUrl(request.getSizeChartUrl());
         category.setIsActive(request.getIsActive());
-
+        
         Category updatedCategory = categoryRepository.save(category);
         return mapToResponse(updatedCategory);
     }
@@ -73,8 +72,8 @@ public class CategoryServiceImpl implements CategoryService {
     public void deleteCategory(Long id) {
         Category category = categoryRepository.findByIdActive(id)
                 .orElseThrow(() -> new RuntimeException("Category not found with id: " + id));
-
-        category.setDeletedAt(OffsetDateTime.now());
+        
+        category.setDeletedAt(LocalDateTime.now());
         categoryRepository.save(category);
     }
 

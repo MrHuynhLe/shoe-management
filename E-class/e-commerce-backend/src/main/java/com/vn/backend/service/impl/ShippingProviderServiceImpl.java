@@ -47,7 +47,7 @@ public class ShippingProviderServiceImpl implements ShippingProviderService {
         provider.setCode(request.getCode());
         provider.setName(request.getName());
         provider.setIsActive(request.getIsActive());
-
+        
         ShippingProvider savedProvider = shippingProviderRepository.save(provider);
         return mapToResponse(savedProvider);
     }
@@ -57,11 +57,11 @@ public class ShippingProviderServiceImpl implements ShippingProviderService {
     public ShippingProviderResponse updateShippingProvider(Long id, ShippingProviderRequest request) {
         ShippingProvider provider = shippingProviderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Shipping provider not found with id: " + id));
-
+        
         provider.setCode(request.getCode());
         provider.setName(request.getName());
         provider.setIsActive(request.getIsActive());
-
+        
         ShippingProvider updatedProvider = shippingProviderRepository.save(provider);
         return mapToResponse(updatedProvider);
     }
@@ -71,7 +71,7 @@ public class ShippingProviderServiceImpl implements ShippingProviderService {
     public void deleteShippingProvider(Long id) {
         ShippingProvider provider = shippingProviderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Shipping provider not found with id: " + id));
-
+        
         shippingProviderRepository.delete(provider);
     }
 

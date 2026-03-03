@@ -1,29 +1,25 @@
 package com.vn.backend.config;
 
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.servlet.config.annotation.*;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-
-        String uploadPath = System.getProperty("user.dir") + "/uploads/";
-
-        registry.addResourceHandler("/uploads/**")
-                .addResourceLocations("file:" + uploadPath);
-
         registry.addResourceHandler("/image/**")
-                .addResourceLocations("classpath:/static/image/");
+                .addResourceLocations("classpath:/static/image/")
+                .setCachePeriod(3600);
     }
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-
-        registry.addMapping("/**")
+        registry.addMapping("/image/**")
                 .allowedOrigins("http://localhost:5173")
-                .allowedMethods("*")
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true);
     }

@@ -1,56 +1,93 @@
 package com.vn.backend.controller;
 
-import com.vn.backend.dto.request.ProductCreateRequest;
+import com.vn.backend.dto.request.ProductRequest;
 import com.vn.backend.dto.response.PageResponse;
-import com.vn.backend.dto.response.ProductDetailResponse;
 import com.vn.backend.dto.response.ProductListResponse;
-import com.vn.backend.entity.Product;
+import com.vn.backend.dto.response.ProductResponse;
 import com.vn.backend.service.ProductService;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.MediaType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/v1/products")
-@CrossOrigin(origins = "http://localhost:5173")
+@RequestMapping("/products")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "*")
 public class ProductController {
 
     private final ProductService productService;
 
     @GetMapping
-    public ResponseEntity<PageResponse<ProductListResponse>> getProducts(
+    public ResponseEntity<Page<ProductResponse>> getAllProducts(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "12") int size
-    ) {
-        return ResponseEntity.ok(
-                productService.getProductList(page, size)
-        );
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) {
+
+        Sort sort = sortDir.equalsIgnoreCase("desc")
+                ? Sort.by(sortBy).descending()
+                : Sort.by(sortBy).ascending();
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        Page<ProductResponse> products = productService.getAllProducts(pageable);
+        return ResponseEntity.ok(products);
+    }
+
+    @GetMapping("/active")
+    public ResponseEntity<List<ProductResponse>> getAllActiveProducts() {
+        List<ProductResponse> products = productService.getAllActiveProducts();
+        return ResponseEntity.ok(products);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ProductDetailResponse> getProductDetail(@PathVariable Long id) {
-
-        return ResponseEntity.ok(productService.getProductDetail(id));
-    }
-
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<?> createWithImages(
-            @RequestPart("data") @Valid ProductCreateRequest request,
-            @RequestPart(value = "image", required = false) MultipartFile image,
-            @RequestPart(value = "images", required = false) List<MultipartFile> images
-    ) {
-        Product product = productService.createWithImages(request, image, images);
+    public ResponseEntity<ProductResponse> getProductById(@PathVariable Long id) {
+        ProductResponse product = productService.getProductById(id);
         return ResponseEntity.ok(product);
     }
-    @PostMapping(value = "/upload-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<String> uploadImage(@RequestPart("file") MultipartFile file) {
-        String fileUrl = productService.uploadSingleImage(file);
-        return ResponseEntity.ok(fileUrl);
+
+    @GetMapping("/search")
+    public ResponseEntity<Page<ProductResponse>> searchProducts(
+            @RequestParam String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        Pageable pageable = PageRequest.of(page, size);
+        Page<ProductResponse> products = productService.searchProducts(keyword, pageable);
+        return ResponseEntity.ok(products);
+    }
+
+    @GetMapping("/list")
+    public ResponseEntity<PageResponse<ProductListResponse>> getProductList(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size) {
+
+        return ResponseEntity.ok(productService.getProductList(page, size));
+    }
+
+    @PostMapping
+    public ResponseEntity<ProductResponse> createProduct(@RequestBody ProductRequest request) {
+        ProductResponse product = productService.createProduct(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(product);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ProductResponse> updateProduct(
+            @PathVariable Long id,
+            @RequestBody ProductRequest request) {
+        ProductResponse product = productService.updateProduct(id, request);
+        return ResponseEntity.ok(product);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
+        productService.deleteProduct(id);
+        return ResponseEntity.noContent().build();
     }
 }

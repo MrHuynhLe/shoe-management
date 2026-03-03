@@ -2,10 +2,7 @@ package com.vn.backend.controller;
 
 import com.vn.backend.dto.request.BrandRequest;
 import com.vn.backend.dto.response.BrandResponse;
-import com.vn.backend.entity.Brand;
-import com.vn.backend.repository.BrandRepository;
 import com.vn.backend.service.BrandService;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -18,41 +15,28 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/v1/brands")
-@CrossOrigin(origins = "http://localhost:5173")
+@RequestMapping("/brands")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "*")
 public class BrandController {
 
-    private final BrandRepository brandRepository;
     private final BrandService brandService;
-    // GET all active
-    @GetMapping
-    public List<Brand> getAll() {
-        return brandRepository.findByDeletedAtIsNullAndIsActiveTrue();
-    }
 
-    // POST create
-    @PostMapping
-    public Brand create(@RequestBody @Valid Brand brand) {
-        brand.setId(null);
-        brand.setIsActive(true);
-        return brandRepository.save(brand);
+    @GetMapping
+    public ResponseEntity<Page<BrandResponse>> getAllBrands(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "asc") String sortDir) {
+        
+        Sort sort = sortDir.equalsIgnoreCase("desc") 
+                ? Sort.by(sortBy).descending() 
+                : Sort.by(sortBy).ascending();
+        Pageable pageable = PageRequest.of(page, size, sort);
+        
+        Page<BrandResponse> brands = brandService.getAllBrands(pageable);
+        return ResponseEntity.ok(brands);
     }
-//    @GetMapping
-//    public ResponseEntity<Page<BrandResponse>> getAllBrands(
-//            @RequestParam(defaultValue = "0") int page,
-//            @RequestParam(defaultValue = "10") int size,
-//            @RequestParam(defaultValue = "id") String sortBy,
-//            @RequestParam(defaultValue = "asc") String sortDir) {
-//
-//        Sort sort = sortDir.equalsIgnoreCase("desc")
-//                ? Sort.by(sortBy).descending()
-//                : Sort.by(sortBy).ascending();
-//        Pageable pageable = PageRequest.of(page, size, sort);
-//
-//        Page<BrandResponse> brands = brandService.getAllBrands(pageable);
-//        return ResponseEntity.ok(brands);
-//    }
 
     @GetMapping("/active")
     public ResponseEntity<List<BrandResponse>> getAllActiveBrands() {
@@ -71,13 +55,17 @@ public class BrandController {
             @RequestParam String keyword,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-
+        
         Pageable pageable = PageRequest.of(page, size);
         Page<BrandResponse> brands = brandService.searchBrands(keyword, pageable);
         return ResponseEntity.ok(brands);
     }
 
-
+    @PostMapping
+    public ResponseEntity<BrandResponse> createBrand(@RequestBody BrandRequest request) {
+        BrandResponse brand = brandService.createBrand(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(brand);
+    }
 
     @PutMapping("/{id}")
     public ResponseEntity<BrandResponse> updateBrand(
@@ -92,5 +80,4 @@ public class BrandController {
         brandService.deleteBrand(id);
         return ResponseEntity.noContent().build();
     }
-
 }

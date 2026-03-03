@@ -40,24 +40,24 @@ public class InventoryTransactionServiceImpl implements InventoryTransactionServ
     @Transactional
     public InventoryTransactionResponse createTransaction(InventoryTransactionRequest request) {
         InventoryTransaction transaction = new InventoryTransaction();
-
+        
         // Set product variant
         ProductVariant variant = productVariantRepository.findById(request.getProductVariantId())
                 .orElseThrow(() -> new RuntimeException("Product variant not found"));
         transaction.setProductVariant(variant);
-
+        
         // Set store if provided
         if (request.getStoreId() != null) {
             Store store = storeRepository.findById(request.getStoreId())
                     .orElseThrow(() -> new RuntimeException("Store not found"));
             transaction.setStore(store);
         }
-
+        
         transaction.setTransactionType(request.getTransactionType());
         transaction.setQuantity(request.getQuantity());
         transaction.setReason(request.getReason());
         transaction.setReferenceCode(request.getReferenceCode());
-
+        
         InventoryTransaction savedTransaction = transactionRepository.save(transaction);
         return mapToResponse(savedTransaction);
     }
@@ -79,12 +79,12 @@ public class InventoryTransactionServiceImpl implements InventoryTransactionServ
         response.setId(transaction.getId());
         response.setProductVariantId(transaction.getProductVariant().getId());
         response.setProductVariantCode(transaction.getProductVariant().getCode());
-
+        
         if (transaction.getStore() != null) {
             response.setStoreId(transaction.getStore().getId());
             response.setStoreName(transaction.getStore().getName());
         }
-
+        
         response.setTransactionType(transaction.getTransactionType());
         response.setQuantity(transaction.getQuantity());
         response.setReason(transaction.getReason());

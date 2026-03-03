@@ -13,7 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/v1/inventory-transactions")
+@RequestMapping("/inventory-transactions")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class InventoryTransactionController {
@@ -26,12 +26,12 @@ public class InventoryTransactionController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir) {
-
-        Sort sort = sortDir.equalsIgnoreCase("desc")
-                ? Sort.by(sortBy).descending()
+        
+        Sort sort = sortDir.equalsIgnoreCase("desc") 
+                ? Sort.by(sortBy).descending() 
                 : Sort.by(sortBy).ascending();
         Pageable pageable = PageRequest.of(page, size, sort);
-
+        
         Page<InventoryTransactionResponse> transactions = inventoryTransactionService.getAllTransactions(pageable);
         return ResponseEntity.ok(transactions);
     }
@@ -47,9 +47,9 @@ public class InventoryTransactionController {
             @PathVariable Long variantId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-
+        
         Pageable pageable = PageRequest.of(page, size);
-        Page<InventoryTransactionResponse> transactions =
+        Page<InventoryTransactionResponse> transactions = 
                 inventoryTransactionService.getTransactionsByVariant(variantId, pageable);
         return ResponseEntity.ok(transactions);
     }
@@ -59,9 +59,9 @@ public class InventoryTransactionController {
             @PathVariable Long storeId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-
+        
         Pageable pageable = PageRequest.of(page, size);
-        Page<InventoryTransactionResponse> transactions =
+        Page<InventoryTransactionResponse> transactions = 
                 inventoryTransactionService.getTransactionsByStore(storeId, pageable);
         return ResponseEntity.ok(transactions);
     }

@@ -1,4 +1,3 @@
-
 package com.vn.backend.entity;
 
 import jakarta.persistence.*;
@@ -12,6 +11,7 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 public class Promotion {
+    //khuyến mai
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -22,14 +22,20 @@ public class Promotion {
     @Column(nullable = false)
     private String name;
 
-    @Column(columnDefinition = "TEXT")
-    private String description;
-
-    @Column(name = "discount_type", length = 20)
+    @Column(name = "discount_type", nullable = false, length = 20)
     private String discountType; // PERCENTAGE, FIXED_AMOUNT
 
-    @Column(name = "discount_value", precision = 15, scale = 2)
+    @Column(name = "discount_value", nullable = false, precision = 15, scale = 2)
     private BigDecimal discountValue;
+
+    @Column(name = "min_order_value", precision = 15, scale = 2)
+    private BigDecimal minOrderValue = BigDecimal.ZERO;
+
+    @Column(name = "max_discount_amount", precision = 15, scale = 2)
+    private BigDecimal maxDiscountAmount;
+
+    @Column(name = "usage_limit")
+    private Integer usageLimit;
 
     @Column(name = "start_date")
     private LocalDateTime startDate;
@@ -39,10 +45,4 @@ public class Promotion {
 
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
-
-    @Column(name = "created_at")
-    private LocalDateTime createdAt = LocalDateTime.now();
-
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
 }

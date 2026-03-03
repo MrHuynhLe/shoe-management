@@ -34,7 +34,7 @@ public class InventoryTransaction {
     @Column(name = "reference_code", length = 100)
     private String referenceCode;
 
-    @Column(name = "created_at")
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
     @Column(name = "created_by")

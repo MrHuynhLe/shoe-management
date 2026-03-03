@@ -12,12 +12,12 @@ import java.util.Optional;
 
 @Repository
 public interface ShippingProviderRepository extends JpaRepository<ShippingProvider, Long> {
-
+    
     @Query("SELECT s FROM ShippingProvider s WHERE s.isActive = true")
     Page<ShippingProvider> findAllActive(Pageable pageable);
-
+    
     @Query("SELECT s FROM ShippingProvider s WHERE s.isActive = true")
     List<ShippingProvider> findAllActive();
-
+    
     Optional<ShippingProvider> findByCode(String code);
 }

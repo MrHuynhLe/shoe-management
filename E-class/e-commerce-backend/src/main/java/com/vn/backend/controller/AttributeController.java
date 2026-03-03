@@ -1,37 +1,78 @@
 package com.vn.backend.controller;
 
+import com.vn.backend.dto.request.AttributeRequest;
+import com.vn.backend.dto.request.AttributeValueRequest;
 import com.vn.backend.dto.response.AttributeResponse;
 import com.vn.backend.service.AttributeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/v1/attributes")
-@CrossOrigin(origins = "http://localhost:5173")
+@RequestMapping("/attributes")
+@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
-@Validated
 public class AttributeController {
 
     private final AttributeService attributeService;
 
-    @GetMapping("")
-    public ResponseEntity<List<AttributeResponse>> getVariantOptions() {
-        List<AttributeResponse> data = attributeService.getAttributesForVariant();
+    // GET /attributes
+    @GetMapping
+    public ResponseEntity<List<AttributeResponse>> getAll() {
+        return ResponseEntity.ok(attributeService.getAllAttributes());
+    }
 
-        data.forEach(attr -> {
-            if (attr.getValues() == null || attr.getValues().isEmpty()) {
+    // GET /attributes/{id}
+    @GetMapping("/{id}")
+    public ResponseEntity<AttributeResponse> getById(@PathVariable Long id) {
+        return ResponseEntity.ok(attributeService.getAttributeById(id));
+    }
 
-                System.out.println("Warning: Attribute " + attr.getName() + " hasn't any values.");
-            }
-        });
+    // GET /attributes/code/{code}
+    @GetMapping("/code/{code}")
+    public ResponseEntity<AttributeResponse> getByCode(@PathVariable String code) {
+        return ResponseEntity.ok(attributeService.getAttributeByCode(code));
+    }
 
-        return ResponseEntity.ok(data);
+    // GET /attributes/search?name=...
+    @GetMapping("/search")
+    public ResponseEntity<List<AttributeResponse>> search(@RequestParam String name) {
+        return ResponseEntity.ok(attributeService.searchAttributes(name));
+    }
+
+    // POST /attributes
+    @PostMapping
+    public ResponseEntity<AttributeResponse> create(@RequestBody AttributeRequest request) {
+        return ResponseEntity.ok(attributeService.createAttribute(request));
+    }
+
+    // PUT /attributes/{id}
+    @PutMapping("/{id}")
+    public ResponseEntity<AttributeResponse> update(@PathVariable Long id,
+                                                    @RequestBody AttributeRequest request) {
+        return ResponseEntity.ok(attributeService.updateAttribute(id, request));
+    }
+
+    // DELETE /attributes/{id}
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        attributeService.deleteAttribute(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    // POST /attributes/{id}/values — thêm giá trị (VD: Size: 39, 40, 41; Color: Đỏ, Xanh)
+    @PostMapping("/{id}/values")
+    public ResponseEntity<AttributeResponse> addValue(@PathVariable Long id,
+                                                      @RequestBody AttributeValueRequest request) {
+        return ResponseEntity.ok(attributeService.addValue(id, request));
+    }
+
+    // DELETE /attributes/{id}/values/{valueId} — xóa giá trị
+    @DeleteMapping("/{id}/values/{valueId}")
+    public ResponseEntity<AttributeResponse> removeValue(@PathVariable Long id,
+                                                         @PathVariable Long valueId) {
+        return ResponseEntity.ok(attributeService.removeValue(id, valueId));
     }
 }

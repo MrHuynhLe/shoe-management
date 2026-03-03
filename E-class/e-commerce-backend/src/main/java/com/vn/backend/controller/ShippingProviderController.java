@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/v1/shipping-providers")
+@RequestMapping("/shipping-providers")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class ShippingProviderController {
@@ -28,12 +28,12 @@ public class ShippingProviderController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir) {
-
-        Sort sort = sortDir.equalsIgnoreCase("desc")
-                ? Sort.by(sortBy).descending()
+        
+        Sort sort = sortDir.equalsIgnoreCase("desc") 
+                ? Sort.by(sortBy).descending() 
                 : Sort.by(sortBy).ascending();
         Pageable pageable = PageRequest.of(page, size, sort);
-
+        
         Page<ShippingProviderResponse> providers = shippingProviderService.getAllShippingProviders(pageable);
         return ResponseEntity.ok(providers);
     }

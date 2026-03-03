@@ -6,11 +6,14 @@ import java.time.LocalDateTime;
 
 @Data
 public class PromotionRequest {
+    //dto
     private String code;
     private String name;
-    private String description;
-    private String discountType;
+    private String discountType; // PERCENTAGE, FIXED_AMOUNT
     private BigDecimal discountValue;
+    private BigDecimal minOrderValue;
+    private BigDecimal maxDiscountAmount;
+    private Integer usageLimit;
     private LocalDateTime startDate;
     private LocalDateTime endDate;
     private Boolean isActive = true;

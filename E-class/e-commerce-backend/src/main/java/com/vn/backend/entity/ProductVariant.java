@@ -1,16 +1,15 @@
 package com.vn.backend.entity;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
-import java.util.List;
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
-@Table(name = "product_variants", indexes = {@Index(name = "idx_product_variants_barcode", columnList = "barcode")
-}, uniqueConstraints = {@UniqueConstraint(name = "uq_product_variants_barcode", columnNames = {"barcode"})})
+@Table(name = "product_variants")
 @Getter @Setter
 public class ProductVariant {
 
@@ -18,36 +17,40 @@ public class ProductVariant {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @ManyToOne
+    @JoinColumn(name = "product_id", nullable = false)
+    private Product product;
+
+    @Column(unique = true, nullable = false, length = 100)
     private String code;
 
-    @Column(nullable = false, unique = true)
+    @Column(unique = true, length = 100)
     private String barcode;
 
-    @Column(nullable = false)
-    private BigDecimal sellingPrice;
-
-    @Column(nullable = false)
+    @Column(name = "cost_price", precision = 15, scale = 2)
     private BigDecimal costPrice;
 
-    @Column(name = "stock_quantity")
-    private Integer stockQuantity;
+    @Column(name = "selling_price", precision = 15, scale = 2)
+    private BigDecimal sellingPrice;
 
-    @Column(name = "is_active")
+    @Column(name = "stock_quantity", nullable = false)
+    private Integer stockQuantity = 0;
+
+    @Column(name = "bin_location", length = 50)
+    private String binLocation;
+
+    @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
     @Column(name = "deleted_at")
-    private OffsetDateTime deletedAt;
+    private LocalDateTime deletedAt;
 
-    @OneToMany(mappedBy = "productVariant", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-    private List<ProductImage> images;
-
-    @ManyToOne
-    @JoinColumn(name = "product_id")
-    @JsonIgnoreProperties("productVariants")
-    private Product product;
-
-    @OneToMany(mappedBy = "variant", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<VariantAttributeValue> variantAttributeValues;
+    @ManyToMany
+    @JoinTable(
+        name = "variant_attribute_values",
+        joinColumns = @JoinColumn(name = "variant_id"),
+        inverseJoinColumns = @JoinColumn(name = "attribute_value_id")
+    )
+    private Set<AttributeValue> attributeValues = new HashSet<>();
 }
 

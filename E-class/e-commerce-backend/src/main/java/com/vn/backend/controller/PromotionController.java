@@ -15,25 +15,25 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/v1/promotions")
+@RequestMapping("/promotions")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class PromotionController {
 
     private final PromotionService promotionService;
-
+//getall
     @GetMapping
     public ResponseEntity<Page<PromotionResponse>> getAllPromotions(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir) {
-
-        Sort sort = sortDir.equalsIgnoreCase("desc")
-                ? Sort.by(sortBy).descending()
+        
+        Sort sort = sortDir.equalsIgnoreCase("desc") 
+                ? Sort.by(sortBy).descending() 
                 : Sort.by(sortBy).ascending();
         Pageable pageable = PageRequest.of(page, size, sort);
-
+        
         Page<PromotionResponse> promotions = promotionService.getAllPromotions(pageable);
         return ResponseEntity.ok(promotions);
     }

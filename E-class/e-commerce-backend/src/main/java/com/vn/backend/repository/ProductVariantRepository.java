@@ -1,10 +1,7 @@
-
 package com.vn.backend.repository;
 
 import com.vn.backend.entity.ProductVariant;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -13,39 +10,16 @@ import java.util.Optional;
 @Repository
 public interface ProductVariantRepository extends JpaRepository<ProductVariant, Long> {
 
-    // 🔹 GET ALL (soft delete)
-    @Query("""
-        SELECT DISTINCT pv
-        FROM ProductVariant pv
-        LEFT JOIN FETCH pv.variantAttributeValues vav
-        LEFT JOIN FETCH vav.attributeValue av
-        LEFT JOIN FETCH av.attribute
-        WHERE pv.deletedAt IS NULL
-    """)
-    List<ProductVariant> findAllActiveWithAttributes();
+    List<ProductVariant> findByProductIdAndDeletedAtIsNull(Long productId);
 
-    // 🔹 GET BY PRODUCT
-    @Query("""
-        SELECT DISTINCT pv
-        FROM ProductVariant pv
-        LEFT JOIN FETCH pv.variantAttributeValues vav
-        LEFT JOIN FETCH vav.attributeValue av
-        LEFT JOIN FETCH av.attribute
-        WHERE pv.deletedAt IS NULL
-          AND pv.product.id = :productId
-    """)
-    List<ProductVariant> findByProductIdWithAttributes(@Param("productId") Long productId);
+    List<ProductVariant> findByDeletedAtIsNull();
 
-    @Query("""
-        SELECT pv
-        FROM ProductVariant pv
-        LEFT JOIN FETCH pv.variantAttributeValues vav
-        LEFT JOIN FETCH vav.attributeValue av
-        LEFT JOIN FETCH av.attribute
-        WHERE pv.deletedAt IS NULL
-          AND pv.id = :id
-    """)
-    Optional<ProductVariant> findActiveById(@Param("id") Long id);
+    Optional<ProductVariant> findByCodeAndDeletedAtIsNull(String code);
 
-    boolean existsByCodeAndDeletedAtIsNull(String code);
+    Optional<ProductVariant> findByBarcodeAndDeletedAtIsNull(String barcode);
+
+    boolean existsByCode(String code);
+
+    boolean existsByBarcode(String barcode);
 }
+

@@ -14,19 +14,20 @@ import java.util.Optional;
 @Repository
 public interface PromotionRepository extends JpaRepository<Promotion, Long> {
 
-    @Query("SELECT p FROM Promotion p WHERE p.deletedAt IS NULL")
-    Page<Promotion> findAllActive(Pageable pageable);
+    // Tất cả (có phân trang)
+    Page<Promotion> findAll(Pageable pageable);
 
-    @Query("SELECT p FROM Promotion p WHERE p.deletedAt IS NULL")
+    // Danh sách đang active
+    @Query("SELECT p FROM Promotion p WHERE p.isActive = true")
     List<Promotion> findAllActive();
 
-    @Query("SELECT p FROM Promotion p WHERE p.id = :id AND p.deletedAt IS NULL")
-    Optional<Promotion> findByIdActive(Long id);
-
-    @Query("SELECT p FROM Promotion p WHERE p.code = :code AND p.deletedAt IS NULL")
     Optional<Promotion> findByCode(String code);
 
-    @Query("SELECT p FROM Promotion p WHERE p.isActive = true AND p.deletedAt IS NULL " +
-            "AND p.startDate <= :now AND p.endDate >= :now")
-    List<Promotion> findActivePromotions(LocalDateTime now);
+    @Query("SELECT p FROM Promotion p WHERE p.code LIKE %:keyword% OR p.name LIKE %:keyword%")
+    List<Promotion> searchByKeyword(String keyword);
+
+    // Đang có hiệu lực theo ngày.
+    @Query("SELECT p FROM Promotion p WHERE p.isActive = true " +
+           "AND p.startDate <= :now AND p.endDate >= :now")
+    List<Promotion> findCurrentlyValid(LocalDateTime now);
 }
