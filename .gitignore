@@ -1,13 +1,39 @@
-# global ignores
-node_modules/
-dist/
-.env
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
 
-# frontend uploads
-public/uploads/
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
 
-# backend uploads
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+# user uploaded files
 E-class/e-commerce-backend/uploads/
-
-# backend static uploads
-E-class/e-commerce-backend/src/main/resources/static/
+E-class/e-commerce-backend/src/main/resources/static/image/
+uploads/
+public/uploads/
+storage/
