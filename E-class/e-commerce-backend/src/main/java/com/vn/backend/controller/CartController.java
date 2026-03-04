@@ -3,92 +3,83 @@ package com.vn.backend.controller;
 import com.vn.backend.dto.request.AddCartRequest;
 import com.vn.backend.dto.response.CartResponse;
 import com.vn.backend.dto.response.OrderResponse;
-import com.vn.backend.security.JwtUtil;
+import com.vn.backend.entity.User;
+import com.vn.backend.repository.UserRepository;
+import com.vn.backend.security.CustomUserDetails;
 import com.vn.backend.service.CartService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-
 @RestController
 @RequestMapping("/v1/cart")
+@CrossOrigin(origins = "http://localhost:5173")
 @RequiredArgsConstructor
 public class CartController {
 
     private final CartService cartService;
 
-    // ===== LẤY USER ID TỪ JWT =====
-    private Long getCurrentUserId() {
-        return Long.parseLong(
-                SecurityContextHolder.getContext()
-                        .getAuthentication()
-                        .getName()
+    @PostMapping("/items")
+    public ResponseEntity<CartResponse> addToCart(
+            @RequestBody AddCartRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        System.out.println("UserDetails: " + userDetails);
+        return ResponseEntity.ok(
+                cartService.addToCart(userDetails.getUserId(), request)
         );
     }
 
-    // ==============================
-    // ADD ITEM
-    // ==============================
-    @PostMapping("/items")
-    public ResponseEntity<CartResponse> addToCart(
-            @RequestBody AddCartRequest request
-    ) {
-        Long userId = getCurrentUserId();
-        return ResponseEntity.ok(cartService.addToCart(userId, request));
-    }
-
-    // ==============================
-    // GET MY CART
-    // ==============================
     @GetMapping
-    public ResponseEntity<CartResponse> getCart() {
-        Long userId = getCurrentUserId();
-        return ResponseEntity.ok(cartService.getActiveCart(userId));
+    public ResponseEntity<CartResponse> getCart(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ResponseEntity.ok(
+                cartService.getActiveCart(userDetails.getUserId())
+        );
     }
 
-    // ==============================
-    // UPDATE QUANTITY
-    // ==============================
     @PutMapping("/items/{cartItemId}")
     public ResponseEntity<CartResponse> updateQuantity(
             @PathVariable Long cartItemId,
-            @RequestParam int quantity
+            @RequestParam int quantity,
+            @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        Long userId = getCurrentUserId();
         return ResponseEntity.ok(
-                cartService.updateQuantity(userId, cartItemId, quantity)
+                cartService.updateQuantity(
+                        userDetails.getUserId(),
+                        cartItemId,
+                        quantity
+                )
         );
     }
 
-    // ==============================
-    // REMOVE ITEM
-    // ==============================
     @DeleteMapping("/items/{cartItemId}")
     public ResponseEntity<CartResponse> removeItem(
-            @PathVariable Long cartItemId
+            @PathVariable Long cartItemId,
+            @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        Long userId = getCurrentUserId();
         return ResponseEntity.ok(
-                cartService.removeItem(userId, cartItemId)
+                cartService.removeItem(userDetails.getUserId(), cartItemId)
         );
     }
 
-    // ==============================
-    // CLEAR CART
-    // ==============================
     @DeleteMapping
-    public ResponseEntity<Void> clearCart() {
-        Long userId = getCurrentUserId();
-        cartService.clearCart(userId);
+    public ResponseEntity<Void> clearCart(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        cartService.clearCart(userDetails.getUserId());
         return ResponseEntity.noContent().build();
     }
 
-    // ==============================
-    // CHECKOUT
-    // ==============================
     @PostMapping("/checkout")
-    public ResponseEntity<OrderResponse> checkout() {
-        Long userId = getCurrentUserId();
-        return ResponseEntity.ok(cartService.checkout(userId));
+    public ResponseEntity<OrderResponse> checkout(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ResponseEntity.ok(
+                cartService.checkout(userDetails.getUserId())
+        );
     }
 }

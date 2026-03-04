@@ -4,13 +4,9 @@ import com.vn.backend.dto.request.AddCartRequest;
 import com.vn.backend.dto.response.CartItemResponse;
 import com.vn.backend.dto.response.CartResponse;
 import com.vn.backend.dto.response.OrderResponse;
-import com.vn.backend.entity.Cart;
-import com.vn.backend.entity.CartItem;
-import com.vn.backend.entity.ProductVariant;
+import com.vn.backend.entity.*;
 import com.vn.backend.enums.CartStatus;
-import com.vn.backend.repository.CartItemRepository;
-import com.vn.backend.repository.CartRepository;
-import com.vn.backend.repository.ProductVariantRepository;
+import com.vn.backend.repository.*;
 import com.vn.backend.service.CartService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -30,13 +26,13 @@ public class CartServiceImpl implements CartService {
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
     private final ProductVariantRepository productVariantRepository;
+    private final CustomerRepository customerRepository;
+    private final UserRepository userRepository;
 
-    // =========================
-    // ADD TO CART
-    // =========================
+
     @Override
     public CartResponse addToCart(Long userId, AddCartRequest request) {
-
+        System.out.println("Variant ID: " + request.getProductVariantId());
         validateQuantity(request.getQuantity());
 
         Cart cart = getOrCreateActiveCart(userId);
@@ -77,25 +73,15 @@ public class CartServiceImpl implements CartService {
         cartItemRepository.save(item);
 
         return mapToCartResponse(cart);
+
     }
 
-    // =========================
-    // GET CART
-    // =========================
     @Override
-    @Transactional(readOnly = true)
     public CartResponse getActiveCart(Long userId) {
-
-        Cart cart = cartRepository
-                .findByCustomerIdAndStatus(userId, CartStatus.ACTIVE)
-                .orElseGet(() -> createNewCart(userId));
-
+        Cart cart = getOrCreateActiveCart(userId);
         return mapToCartResponse(cart);
     }
 
-    // =========================
-    // UPDATE QUANTITY
-    // =========================
     @Override
     public CartResponse updateQuantity(Long userId, Long cartItemId, int quantity) {
 
@@ -117,48 +103,45 @@ public class CartServiceImpl implements CartService {
         return mapToCartResponse(item.getCart());
     }
 
-    // =========================
-    // REMOVE ITEM
-    // =========================
+
     @Override
     public CartResponse removeItem(Long userId, Long cartItemId) {
 
         CartItem item = getCartItemOwnedByUser(userId, cartItemId);
-
         Cart cart = item.getCart();
+
         cartItemRepository.delete(item);
 
         return mapToCartResponse(cart);
     }
 
-    // =========================
-    // CLEAR CART
-    // =========================
+
     @Override
     public void clearCart(Long userId) {
 
+        Customer customer = resolveCustomer(userId);
+
         Cart cart = cartRepository
-                .findByCustomerIdAndStatus(userId, CartStatus.ACTIVE)
+                .findByCustomerIdAndStatus(customer.getId(), CartStatus.ACTIVE)
                 .orElseThrow(() -> new IllegalArgumentException("Active cart not found"));
 
         cartItemRepository.deleteAllByCartId(cart.getId());
     }
 
-    // =========================
-    // CHECKOUT
-    // =========================
+
     @Override
     public OrderResponse checkout(Long userId) {
 
+        Customer customer = resolveCustomer(userId);
+
         Cart cart = cartRepository
-                .findByCustomerIdAndStatus(userId, CartStatus.ACTIVE)
+                .findByCustomerIdAndStatus(customer.getId(), CartStatus.ACTIVE)
                 .orElseThrow(() -> new IllegalArgumentException("Nothing to checkout"));
 
         if (cart.getItems() == null || cart.getItems().isEmpty()) {
             throw new IllegalArgumentException("Cart is empty");
         }
 
-        // Validate stock again before checkout
         for (CartItem item : cart.getItems()) {
             if (item.getQuantity() > item.getProductVariant().getStockQuantity()) {
                 throw new IllegalArgumentException(
@@ -170,27 +153,38 @@ public class CartServiceImpl implements CartService {
         cart.setUpdatedAt(OffsetDateTime.now());
         cartRepository.save(cart);
 
-        // TODO: Create Order entity here
-
         return new OrderResponse();
     }
 
-    // =========================
-    // PRIVATE HELPERS
-    // =========================
+
 
     private Cart getOrCreateActiveCart(Long userId) {
+
+        Customer customer = resolveCustomer(userId);
+
         return cartRepository
-                .findByCustomerIdAndStatus(userId, CartStatus.ACTIVE)
-                .orElseGet(() -> createNewCart(userId));
+                .findByCustomerIdAndStatus(customer.getId(), CartStatus.ACTIVE)
+                .orElseGet(() -> createNewCart(customer));
     }
 
-    private Cart createNewCart(Long userId) {
+    private Cart createNewCart(Customer customer) {
+
         Cart cart = new Cart();
-        cart.setCustomerId(userId);
+        cart.setCustomer(customer);
         cart.setStatus(CartStatus.ACTIVE);
         cart.setCreatedAt(OffsetDateTime.now());
+
         return cartRepository.save(cart);
+    }
+
+    private Customer resolveCustomer(Long userId) {
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        return customerRepository
+                .findByUserProfileId(user.getUserProfile().getId())
+                .orElseThrow(() -> new IllegalArgumentException("Customer not found"));
     }
 
     private ProductVariant getVariantOrThrow(Long variantId) {
@@ -200,10 +194,12 @@ public class CartServiceImpl implements CartService {
 
     private CartItem getCartItemOwnedByUser(Long userId, Long cartItemId) {
 
+        Customer customer = resolveCustomer(userId);
+
         CartItem item = cartItemRepository.findById(cartItemId)
                 .orElseThrow(() -> new IllegalArgumentException("Cart item not found"));
 
-        if (!item.getCart().getCustomerId().equals(userId)) {
+        if (!item.getCart().getCustomer().getId().equals(customer.getId())) {
             throw new RuntimeException("Access denied");
         }
 
@@ -231,41 +227,38 @@ public class CartServiceImpl implements CartService {
 
         CartResponse resp = new CartResponse();
         resp.setCartId(cart.getId());
-        resp.setCustomerId(cart.getCustomerId());
-        resp.setStatus(cart.getStatus() != null ? cart.getStatus().name() : null);
+        resp.setCustomerId(cart.getCustomer().getId());
+        resp.setStatus(cart.getStatus().name());
 
         List<CartItemResponse> itemResponses = new ArrayList<>();
-
         BigDecimal totalAmount = BigDecimal.ZERO;
         int totalItems = 0;
 
-        if (cart.getItems() != null) {
+        List<CartItem> items = cartItemRepository.findByCartId(cart.getId());
 
-            for (CartItem item : cart.getItems()) {
+        for (CartItem item : items) {
 
-                ProductVariant variant = item.getProductVariant();
+            ProductVariant variant = item.getProductVariant();
 
-                CartItemResponse itemResp = new CartItemResponse();
+            CartItemResponse itemResp = new CartItemResponse();
+            itemResp.setCartItemId(item.getId());
+            itemResp.setVariantId(variant.getId());
+            itemResp.setProductName(variant.getProduct().getName());
+            itemResp.setVariantCode(variant.getCode());
+            itemResp.setPrice(variant.getSellingPrice());
+            itemResp.setQuantity(item.getQuantity());
+            itemResp.setStockRemaining(variant.getStockQuantity());
 
-                itemResp.setCartItemId(item.getId());
-                itemResp.setVariantId(variant.getId());
-                itemResp.setProductName(variant.getProduct().getName());
-                itemResp.setVariantCode(variant.getCode());
-                itemResp.setPrice(variant.getSellingPrice());
-                itemResp.setQuantity(item.getQuantity());
-                itemResp.setStockRemaining(variant.getStockQuantity());
+            BigDecimal subTotal =
+                    variant.getSellingPrice()
+                            .multiply(BigDecimal.valueOf(item.getQuantity()));
 
-                BigDecimal subTotal =
-                        variant.getSellingPrice()
-                                .multiply(BigDecimal.valueOf(item.getQuantity()));
+            itemResp.setSubTotal(subTotal);
 
-                itemResp.setSubTotal(subTotal);
+            totalAmount = totalAmount.add(subTotal);
+            totalItems += item.getQuantity();
 
-                totalAmount = totalAmount.add(subTotal);
-                totalItems += item.getQuantity();
-
-                itemResponses.add(itemResp);
-            }
+            itemResponses.add(itemResp);
         }
 
         resp.setItems(itemResponses);
