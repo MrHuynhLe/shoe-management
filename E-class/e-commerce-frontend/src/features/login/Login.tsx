@@ -1,24 +1,49 @@
 import { LockOutlined, UserOutlined } from '@ant-design/icons';
-import { Button, Card, Checkbox, Form, Input, Typography } from 'antd';
-import { Link, useNavigate } from 'react-router-dom';
+import { Button, Card, Checkbox, Form, Input, Typography, message } from 'antd';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import apiClient from '@/services/api'; 
 
 const { Title } = Typography;
 
 const Login = () => {
   const navigate = useNavigate();
-
-  const onFinish = (values: any) => {
+  const location = useLocation();
+  const from = location.state?.from?.pathname || '/';
+  const onFinish = async (values: any) => {
     console.log('Received values of form: ', values);
-    // --- Xử lý logic đăng nhập ở đây ---
-  
-    const userFromServer = {
-      username: values.username,
-      permission: values.username === 'admin' ? 'ADMIN' : 'USER',
-    };
-    if (userFromServer.permission === 'ADMIN') {
-      navigate('/admin');
-    } else {
-      navigate('/');
+    try {
+      const response = await apiClient.post('/v1/auth/login', {
+        username: values.username,
+        password: values.password,
+      });
+
+      if (response.status === 200) {
+        const data = response.data;
+        localStorage.setItem('token', data.token);
+        localStorage.setItem(
+          'user',
+          JSON.stringify({
+            userId: data.userId,
+            username: data.username,
+            role: data.role
+          })
+        );
+
+        message.success('Đăng nhập thành công!');
+
+        if (data.role === 'ADMIN') {
+          navigate('/admin');
+        } else {
+          // Chuyển hướng người dùng trở lại trang họ đang cố gắng truy cập
+          navigate(from, { replace: true });
+        }
+      }
+    } catch (error: any) {
+      if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+        message.error('Tên đăng nhập hoặc mật khẩu không đúng!');
+      } else {
+        message.error('Đã có lỗi xảy ra. Vui lòng thử lại.');
+      }
     }
   };
 

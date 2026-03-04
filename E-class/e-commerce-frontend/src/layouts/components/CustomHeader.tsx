@@ -1,4 +1,4 @@
-import { Badge, Layout, Menu, Space, Input, Dropdown, Row, Col, ConfigProvider } from 'antd';
+import { Badge, Layout, Menu, Space, Input, Dropdown, Row, Col, ConfigProvider, message, Avatar } from 'antd';
 import {
   HomeOutlined,
   ShoppingCartOutlined,
@@ -7,6 +7,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/services/useAuth';
 import logo from '@/assets/logo-shoe-shop.png';
 
 const { Header } = Layout;
@@ -14,18 +15,28 @@ const { Header } = Layout;
 const CustomHeader = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
 
   const handleUserMenuClick = ({ key }: { key: string }) => {
     if (key === 'logout') {
-      console.log('Đăng xuất');
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      message.success('Đăng xuất thành công!');
+      window.location.href = '/';
     }
   };
-  const userMenuItems = [
+
+  const userMenuItems = isAuthenticated ? [
     {
       key: 'profile',
       label: <Link to="/account">Quản lý thông tin cá nhân</Link>,
     },
     { key: 'logout', label: 'Đăng xuất' },
+  ] : [
+    {
+      key: 'login',
+      label: <Link to="/account">Đăng nhập / Đăng ký</Link>,
+    }
   ];
 
   return (
@@ -83,14 +94,18 @@ const CustomHeader = () => {
                 <ShoppingCartOutlined style={{ fontSize: 24 }} />
               </Badge>
             </Link>
-            <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} placement="bottomRight" >
+            <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} placement="bottomRight">
               <a
                 onClick={(e) => e.preventDefault()}
                 style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#0052D9', transition: 'transform 0.2s' }}
                 onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.15)'}
                 onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
               >
-                <UserOutlined style={{ fontSize: 24 }} />
+                {isAuthenticated && user ? (
+                  <Avatar style={{ backgroundColor: '#0052D9' }}>{user.username.charAt(0).toUpperCase()}</Avatar>
+                ) : (
+                  <UserOutlined style={{ fontSize: 24 }} />
+                )}
               </a>
             </Dropdown>
           </Space>

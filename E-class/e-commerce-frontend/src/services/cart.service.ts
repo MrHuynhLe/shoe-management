@@ -1,23 +1,35 @@
 import { axiosClient } from './axiosClient';
 
 export interface AddToCartDTO {
-  variantId: number;
+  productVariantId: number;
   quantity: number;
 }
 
 export const cartService = {
-  getCart: (customerId: number) => axiosClient.get(`/v1/cart/${customerId}`),
 
-  addToCart: (data: AddToCartDTO) => axiosClient.post('/v1/cart/items', data),
+  getCart: () => {
+    return axiosClient.get('/v1/cart');
+  },
 
-  updateItemQuantity: (cartItemId: number, quantity: number) =>
-    axiosClient.put(`/v1/cart/items/${cartItemId}`, null, {
-      params: { quantity },
-    }),
 
-  removeItem: (cartItemId: number) => axiosClient.delete(`/v1/cart/items/${cartItemId}`),
+  addToCart: (data: AddToCartDTO) => {
+    return axiosClient.post('/v1/cart/items', data);
+  },
 
-  clearCart: (customerId: number) => axiosClient.delete(`/v1/cart/${customerId}`),
+  updateItemQuantity: (cartItemId: number, quantity: number) => {
+    return axiosClient.put(`/v1/cart/items/${cartItemId}`, null, { params: { quantity } });
+  },
 
-  checkout: (customerId: number) => axiosClient.post(`/v1/cart/checkout/${customerId}`),
+
+  removeItem: (cartItemId: number) => {
+    return axiosClient.delete(`/v1/cart/items/${cartItemId}`);
+  },
+
+  clearCart: () => {
+    return axiosClient.delete('/v1/cart');
+  },
+
+  checkout: () => {
+    return axiosClient.post('/v1/cart/checkout');
+  },
 };

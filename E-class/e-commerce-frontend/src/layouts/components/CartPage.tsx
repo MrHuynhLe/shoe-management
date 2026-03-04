@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Table,
   Button,
@@ -11,57 +11,94 @@ import {
   Image,
   Tooltip,
   Divider,
+  message,
+  Spin,
 } from 'antd';
 import { DeleteOutlined, EyeOutlined } from '@ant-design/icons';
 import type { TableRowSelection } from 'antd/es/table/interface';
+import { cartService } from '@/services/cart.service';
+import { useNavigate } from 'react-router-dom';
 
 const { Title, Text } = Typography;
 
-const initialData = [
-  {
-    key: '1',
-    image: 'https://via.placeholder.com/80',
-    name: "Nike Air Force 1 '07",
-    price: 2790000,
-    quantity: 1,
-  },
-  {
-    key: '2',
-    image: 'https://via.placeholder.com/80',
-    name: 'Adidas Ultraboost 22',
-    price: 4500000,
-    quantity: 1,
-  },
-  {
-    key: '3',
-    image: 'https://via.placeholder.com/80',
-    name: 'Puma Suede Classic',
-    price: 1800000,
-    quantity: 2,
-  },
-];
+interface CartItem {
+  key: React.Key;
+  id: number;
+  image: string;
+  name: string;
+  price: number;
+  quantity: number;
+  total: number;
+  variantId: number;
+}
 
 const CartPage = () => {
-  const [cartItems, setCartItems] = useState(
-    initialData.map((item) => ({ ...item, total: item.price * item.quantity }))
-  );
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
-  const handleQuantityChange = (key: React.Key, value: number | null) => {
-    if (value === null || value < 1) return;
-    const newCartItems = cartItems.map((item) => {
-      if (item.key === key) {
-        return { ...item, quantity: value, total: item.price * value };
+  const fetchCart = async () => {
+    try {
+      setLoading(true);
+      const response = await cartService.getCart();
+  
+      const items = response.data.items.map((item: any) => { 
+        const cartItemId = item.id; 
+             return {
+          key: cartItemId,
+          id: cartItemId,
+          image: (Array.isArray(item.variant.productImages) && item.variant.productImages.length > 0) ? `http://localhost:8080/api${item.variant.productImages[0].imageUrl}` : 'https://via.placeholder.com/80',
+          name: `${item.variant.product.name} - [${item.variant.code}] - ${item.variant.variantAttributes.COLOR} / ${item.variant.variantAttributes.SIZE}`,
+          price: item.price,
+          quantity: item.quantity,
+          total: item.price * item.quantity,
+          variantId: item.variant.id,
+        };
+      });
+      setCartItems(items);
+    } catch (error: any) {
+      console.error('Failed to fetch cart:', error);
+      if (error.response && error.response.status === 401) {
+        message.error('Vui lòng đăng nhập để xem giỏ hàng!');
+        navigate('/account');
+    
+      } else if (error.response && error.response.status === 403) {
+        setCartItems([]);
+      } else {
+        message.error('Không thể tải giỏ hàng. Vui lòng thử lại!');
       }
-      return item;
-    });
-    setCartItems(newCartItems);
+    } finally {
+      setLoading(false);
+    }
+    
   };
 
-  const handleRemoveItem = (key: React.Key) => {
-    const newCartItems = cartItems.filter((item) => item.key !== key);
-    setCartItems(newCartItems);
-    setSelectedRowKeys(selectedRowKeys.filter(k => k !== key));
+  useEffect(() => {
+    fetchCart();
+  }, []);
+
+  const handleQuantityChange = async (cartItemId: number, quantity: number | null) => {
+    if (quantity === null || quantity < 1) return;
+    try {
+      await cartService.updateItemQuantity(cartItemId, quantity);
+      message.success('Cập nhật số lượng thành công!');
+      fetchCart();
+    } catch (error) {
+      message.error('Cập nhật số lượng thất bại!');
+      console.error('Failed to update quantity:', error);
+    }
+  };
+
+  const handleRemoveItem = async (cartItemId: number) => {
+    try {
+      await cartService.removeItem(cartItemId);
+      message.success('Đã xóa sản phẩm khỏi giỏ hàng!');
+      fetchCart();
+      setSelectedRowKeys(selectedRowKeys.filter(k => k !== cartItemId));
+    } catch (error) {
+      message.error('Xóa sản phẩm thất bại!');
+    }
   };
 
   const onSelectChange = (newSelectedRowKeys: React.Key[]) => {
@@ -78,7 +115,7 @@ const CartPage = () => {
       title: 'Sản phẩm',
       dataIndex: 'name',
       key: 'name',
-      render: (_: any, record: any) => (
+      render: (_: any, record: CartItem) => (
         <Space>
           <Image width={80} src={record.image} preview={false} />
           <Text strong>{record.name}</Text>
@@ -95,11 +132,11 @@ const CartPage = () => {
       title: 'Số lượng',
       dataIndex: 'quantity',
       key: 'quantity',
-      render: (quantity: number, record: any) => (
+      render: (quantity: number, record: CartItem) => (
         <InputNumber
           min={1}
           value={quantity}
-          onChange={(value) => handleQuantityChange(record.key, value)}
+          onChange={(value) => handleQuantityChange(record.id, value)}
         />
       ),
     },
@@ -116,7 +153,7 @@ const CartPage = () => {
     {
       title: 'Hành động',
       key: 'action',
-      render: (_: any, record: any) => (
+      render: (_: any, record: CartItem) => (
         <Space size="middle">
           <Tooltip title="Xem chi tiết">
             <Button icon={<EyeOutlined />} shape="circle" />
@@ -126,7 +163,7 @@ const CartPage = () => {
               icon={<DeleteOutlined />}
               shape="circle"
               danger
-              onClick={() => handleRemoveItem(record.key)}
+              onClick={() => handleRemoveItem(record.id)}
             />
           </Tooltip>
         </Space>
@@ -135,7 +172,17 @@ const CartPage = () => {
   ];
 
   const selectedItems = cartItems.filter((item) => selectedRowKeys.includes(item.key));
-  const subtotal = selectedItems.reduce((acc, item) => acc + item.total, 0);
+  const subtotal = cartItems.reduce((acc, item) => acc + item.total, 0);
+
+  const handleCheckout = async () => {
+    try {
+      const response = await cartService.checkout();
+      message.success('Đặt hàng thành công! Đang chuyển hướng...');
+      navigate(`/checkout-success/${response.data.id}`);
+    } catch (error) {
+      message.error('Đặt hàng thất bại. Vui lòng thử lại.');
+    }
+  };
 
   return (
     <div style={{ padding: '24px' }}>
@@ -148,12 +195,14 @@ const CartPage = () => {
             bordered={false}
             style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
           >
-            <Table
-              rowSelection={rowSelection}
-              columns={columns}
-              dataSource={cartItems}
-              pagination={false}
-            />
+            <Spin spinning={loading}>
+              <Table
+                rowSelection={rowSelection}
+                columns={columns}
+                dataSource={cartItems}
+                pagination={false}
+              />
+            </Spin>
           </Card>
         </Col>
         <Col xs={24} lg={8}>
@@ -164,12 +213,12 @@ const CartPage = () => {
           >
             <Title level={4}>Tóm tắt đơn hàng</Title>
             <Divider />
-            <Row justify="space-between">
-              <Text>Tạm tính ({selectedItems.length} sản phẩm)</Text>
+            <Row justify="space-between" key="subtotal-row">
+              <Text>Tạm tính ({cartItems.length} sản phẩm)</Text>
               <Text strong>{subtotal.toLocaleString('vi-VN')} ₫</Text>
             </Row>
             <Divider />
-            <Row justify="space-between">
+            <Row justify="space-between" key="total-row">
               <Text strong>Tổng cộng</Text>
               <Text strong style={{ color: '#c81d1d', fontSize: '1.2rem' }}>
                 {subtotal.toLocaleString('vi-VN')} ₫
@@ -182,6 +231,7 @@ const CartPage = () => {
               size="large"
               style={{ marginTop: '24px' }}
               disabled={selectedItems.length === 0}
+              onClick={handleCheckout}
             >
               Tiến hành thanh toán
             </Button>
