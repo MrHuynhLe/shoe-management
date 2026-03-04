@@ -1,97 +1,66 @@
-import { createBrowserRouter } from 'react-router-dom'
-import MainLayout from '@/layouts/MainLayout'
-import AdminLayout from '@/layouts/AdminLayout'
-import Home from '@/features/home/Home'
-import ProductPage from '@/features/product/ProductPage'
-import ProductDetailPage from '@/features/product/ProductDetailPage'
-import CartPage from '@/features/cart/CartPage'
-import AccountPage from '@/layouts/Account'
-import MyOrdersPage from '@/features/cart/MyOrdersPage'
-import Login from '@/features/login/Login'
-import DashboardPage from '@/layouts/Dashboard'
-import UserManagementPage from '@/features/admin/UserManagement'
-import ProductManagementPage from '@/features/admin/ProductManagement'
-import RegisterPage from '@/features/login/RegisterPage'
-import CustomerManagementPage from '@/features/admin/CustomerManagement'
-import EmployeeManagementPage from '@/features/admin/EmployeeManagement'
-import InventoryManagementPage from '@/features/admin/InventoryManagement'
-import OrderManagementPage from '@/features/admin/OrderManagement'
-import RevenueStatisticPage from '@/features/admin/RevenueStatistic'
+import { createBrowserRouter } from "react-router-dom";
+import MainLayout from "@/layouts/MainLayout";
+import AdminLayout from "@/layouts/AdminLayout";
+import Home from "@/features/home/Home";
+import ProductPage from "@/features/product/ProductPage";
+import ProductDetailPage from "@/features/product/ProductDetailPage";
+import CartPage from "@/features/cart/CartPage";
+import AccountPage from "@/layouts/Account";
+import MyOrdersPage from "@/features/cart/MyOrdersPage";
+import Login from "@/features/login/Login";
+import DashboardPage from "@/layouts/Dashboard";
+import UserManagementPage from "@/features/admin/UserManagement";
+import ProductManagementPage from "@/features/admin/ProductManagement";
+import RegisterPage from "@/features/login/RegisterPage";
+import CustomerManagementPage from "@/features/admin/CustomerManagement";
+import EmployeeManagementPage from "@/features/admin/EmployeeManagement";
+import InventoryManagementPage from "@/features/admin/InventoryManagement";
+import OrderManagementPage from "@/features/admin/OrderManagement";
+import RevenueStatisticPage from "@/features/admin/RevenueStatistic";
+import BrandManagementPage from "@/features/admin/BrandManagement";
+import CategoryManagementPage from "@/features/admin/CategoryManagement";
+import ColorManagementPage from "@/features/admin/ColorManagement";
+import SizeManagementPage from "@/features/admin/SizeManagement";
+import MaterialManagementPage from "@/features/admin/MaterialManagement";
 
 export const router = createBrowserRouter([
   {
     element: <MainLayout />,
     children: [
-      {
-        index: true,
-        element: <Home />
-      },
-      {
-        path: 'products',
-        element: <ProductPage />
-      },
-      {
-        path: 'products/:id',
-        element: <ProductDetailPage />
-      },
-      {
-        path: 'cart',
-        element: <CartPage />
-      },
-      {
-        path: 'account',
-        element: <AccountPage />
-      },
-      {
-        path: 'my-orders',
-        element: <MyOrdersPage />
-      }
-    ]
+      { index: true, element: <Home /> },
+      { path: "products", element: <ProductPage /> },
+      { path: "products/:id", element: <ProductDetailPage /> },
+      { path: "cart", element: <CartPage /> },
+      { path: "account", element: <AccountPage /> },
+      { path: "my-orders", element: <MyOrdersPage /> },
+    ],
   },
   {
-    path: '/admin',
+    path: "/admin",
     element: <AdminLayout />,
     children: [
+      { index: true, element: <DashboardPage /> },
+      { path: "users", element: <UserManagementPage /> },
+      { path: "products", element: <ProductManagementPage /> },
+      { path: "brands", element: <BrandManagementPage /> },
+      { path: "categories", element: <CategoryManagementPage /> },
+
       {
-        index: true,
-        element: <DashboardPage />
+        path: "attributes",
+        children: [
+          { path: "colors", element: <ColorManagementPage /> },
+          { path: "sizes", element: <SizeManagementPage /> },
+           { path: "materials", element: <MaterialManagementPage /> },
+        ],
       },
-      {
-        path: 'users',
-        element: <UserManagementPage />
-      },
-      {
-        path: 'products',
-        element: <ProductManagementPage />
-      },
-      {
-        path: 'employees',
-        element: <EmployeeManagementPage />
-      },
-      {
-        path: 'customers',
-        element: <CustomerManagementPage />
-      },
-      {
-        path: 'inventory',
-        element: <InventoryManagementPage />
-      },
-      {
-        path: 'orders',
-        element: <OrderManagementPage />
-      },
-      {
-        path: 'revenue',
-        element: <RevenueStatisticPage />
-      }
-    ]
+
+      { path: "employees", element: <EmployeeManagementPage /> },
+      { path: "customers", element: <CustomerManagementPage /> },
+      { path: "inventory", element: <InventoryManagementPage /> },
+      { path: "orders", element: <OrderManagementPage /> },
+      { path: "revenue", element: <RevenueStatisticPage /> },
+    ],
   },
-  {
-    path: '/login',
-    element: <Login />
-  },
-  {
-    path: '/register',
-    element: <RegisterPage />
-  }
-])
+  { path: "/login", element: <Login /> },
+  { path: "/register", element: <RegisterPage /> },
+]);
