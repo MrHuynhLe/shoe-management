@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Table,
   Typography,
@@ -20,46 +20,12 @@ import {
   ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import type { TableRowSelection } from 'antd/es/table/interface';
+import { orderService } from '@/services/order.service';
+import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
 const { confirm } = Modal;
 
-const mockOrders = [
-  {
-    id: 'SSO-8A4B1C',
-    date: '2024-02-28',
-    status: 'Chờ thanh toán',
-    total: 4530000,
-    items: [
-      { name: 'Adidas Ultraboost 22', quantity: 1, price: 4500000, imageUrl: 'https://assets.adidas.com/images/h_840,f_auto,q_auto,fl_lossy,c_fill,g_auto/c5b321a9596d46449536ae320126f0f7_9366/Giay_Ultraboost_22_DJen_GZ0127_01_standard.jpg' },
-    ],
-  },
-  {
-    id: 'SSO-9D7E2F',
-    date: '2024-02-27',
-    status: 'Đang giao hàng',
-    total: 3029000,
-    items: [
-      { name: 'Nike Air Force 1 \'07', quantity: 1, price: 2999000, imageUrl: 'https://static.nike.com/a/images/t_PDP_1728_v1/f_auto,q_auto:eco/b7d9211c-26e7-431a-ac24-b0540fb3c00f/air-force-1-07-shoes-WrLlWX.png' },
-    ],
-  },
-  {
-    id: 'SSO-3G6H5I',
-    date: '2024-02-25',
-    status: 'Đã hoàn thành',
-    total: 7499000,
-    items: [
-      { name: 'Nike Air Jordan 1', quantity: 1, price: 7499000, imageUrl: 'https://static.nike.com/a/images/t_PDP_1728_v1/f_auto,q_auto:eco/e125b578-4173-401a-ab13-f066de77d325/air-jordan-1-mid-shoes-86f1ZW.png' },
-    ],
-  },
-  {
-    id: 'SSO-4J8K9L',
-    date: '2024-02-29',
-    status: 'Chờ thanh toán',
-    total: 1800000,
-    items: [{ name: 'Puma Suede Classic', quantity: 1, price: 1800000, imageUrl: 'https://images.puma.com/image/upload/f_auto,q_auto,b_rgb:fafafa,w_600,h_600/global/374915/01/sv01/fnd/PNA/fmt/png/Suede-Classic-XXI-Men\'s-Sneakers' }],
-  },
-];
 
 const getStatusTag = (status: string) => {
   switch (status) {
@@ -67,6 +33,8 @@ const getStatusTag = (status: string) => {
       return <Tag color="blue">{status}</Tag>;
     case 'Đang giao hàng':
       return <Tag color="cyan">{status}</Tag>;
+    case 'PENDING':
+      return <Tag color="orange">Chờ xử lý</Tag>;
     case 'Đã hoàn thành':
       return <Tag color="green">{status}</Tag>;
     case 'Đã hủy':
@@ -77,10 +45,39 @@ const getStatusTag = (status: string) => {
 };
 
 const MyOrdersPage = () => {
-  const [orders, setOrders] = useState(mockOrders);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      const response = await orderService.getMyOrders();
+      const mappedOrders = response.data.content.map((order: any) => ({
+        id: order.code,
+        date: dayjs(order.createdAt).format('DD/MM/YYYY HH:mm'),
+        status: order.status === 'PENDING' ? 'Chờ thanh toán' : order.status,
+        total: order.totalAmount,
+        items: order.items.map((item: any) => ({
+          name: item.productName,
+          quantity: item.quantity,
+          price: item.price,
+          imageUrl: item.imageUrl
+        }))
+      }));
+      setOrders(mappedOrders);
+    } catch (error) {
+      console.error("Failed to fetch orders:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchOrders();
+  }, []);
 
   const handleOpenPaymentModal = (order: any) => {
     setSelectedOrder(order);
@@ -217,6 +214,7 @@ const MyOrdersPage = () => {
                 columns={columns}
                 dataSource={orders}
                 rowKey="id"
+                loading={loading}
                 expandable={{ expandedRowRender }}
               />
             </Card>

@@ -60,13 +60,10 @@ public class ProductImageServiceImpl implements ProductImageService {
                     .orElseThrow(() -> new RuntimeException("Variant không tồn tại"));
         }
 
-        // 🔥 LOGIC PRIMARY
         if (Boolean.TRUE.equals(request.getIsPrimary())) {
             if (variant != null) {
-                // ảnh variant
                 productImageRepository.resetPrimaryVariantImage(variant.getId());
             } else {
-                // ảnh product
                 productImageRepository.resetPrimaryProductImage(product.getId());
             }
         }

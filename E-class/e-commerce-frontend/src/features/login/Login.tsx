@@ -1,7 +1,7 @@
 import { LockOutlined, UserOutlined } from '@ant-design/icons';
 import { Button, Card, Checkbox, Form, Input, Typography, message } from 'antd';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import apiClient from '@/services/api'; 
+import { axiosClient } from '@/services/axiosClient';
 
 const { Title } = Typography;
 
@@ -12,7 +12,7 @@ const Login = () => {
   const onFinish = async (values: any) => {
     console.log('Received values of form: ', values);
     try {
-      const response = await apiClient.post('/v1/auth/login', {
+      const response = await axiosClient.post('/v1/auth/login', {
         username: values.username,
         password: values.password,
       });
@@ -34,7 +34,6 @@ const Login = () => {
         if (data.role === 'ADMIN') {
           navigate('/admin');
         } else {
-          // Chuyển hướng người dùng trở lại trang họ đang cố gắng truy cập
           navigate(from, { replace: true });
         }
       }

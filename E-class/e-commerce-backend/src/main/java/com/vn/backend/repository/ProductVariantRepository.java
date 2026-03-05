@@ -15,7 +15,6 @@ import java.util.Optional;
 @Repository
 public interface ProductVariantRepository extends JpaRepository<ProductVariant, Long> {
 
-    // 🔹 GET ALL (soft delete)
     @Query("""
         SELECT DISTINCT pv
         FROM ProductVariant pv
@@ -26,7 +25,6 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     """)
     List<ProductVariant> findAllActiveWithAttributes();
 
-    // 🔹 GET BY PRODUCT
     @Query("""
         SELECT DISTINCT pv
         FROM ProductVariant pv

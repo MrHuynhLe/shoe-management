@@ -112,26 +112,21 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
     }
   }, [open, productId, addVariantForm]);
 
-  // Helper to get all existing and currently-in-form combinations
-  const getExistingAndFormCombinations = (excludeIndex?: number) => {
-    const combinations = new Set<string>(); // Using a Set to store unique combinations
 
-    // Helper to create a sorted, stable key from attribute values
+  const getExistingAndFormCombinations = (excludeIndex?: number) => {
+    const combinations = new Set<string>(); 
     const createCombinationKey = (attributes: Record<string, string>) => {
       return Object.keys(attributes).sort().map(key => `${key}:${attributes[key]}`).join('|');
     };
-
-    // 1. Add combinations from variants already saved in the backend
     if (product?.variants) {
       product.variants.forEach(v => {
         combinations.add(createCombinationKey(v.attributes));
       });
     }
 
-    // 2. Add combinations from other variants currently in the form
     const currentFormVariants = addVariantForm.getFieldsValue().variants || [];
     currentFormVariants.forEach((v: any, index: number) => {
-      // Check if the variant has attributes and is not the one to be excluded
+  
       if ((excludeIndex === undefined || index !== excludeIndex) && v && v.attributes) {
         const hasAllAttributes = dynamicAttributes.every(attr => v.attributes[attr.code]);
         if (hasAllAttributes) {
@@ -185,10 +180,8 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
     try {
       setLoading(true);
 
-      // Map form data to the DTO structure expected by the backend
       const variantsToSubmit = values.variants.map((variant: any) => {
         const attributeValueIds: number[] = [];
-        // Find the ID for each selected attribute value
         for (const attr of dynamicAttributes) {
           const selectedValue = variant.attributes[attr.code];
           const attrValue = attr.values.find((v: any) => v.value === selectedValue);
@@ -202,7 +195,7 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
           costPrice: variant.costPrice,
           sellingPrice: variant.sellingPrice,
           stockQuantity: variant.stockQuantity || 0,
-          imageUrl: variant.imageUrl || null, // Assuming imageUrl is handled by upload
+          imageUrl: variant.imageUrl || null, 
           attributeValueIds: attributeValueIds,
         };
       });
@@ -228,7 +221,6 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
 
   const generateSku = (attributes: Record<string, string> = {}) => {
     const productCode = product?.code || 'PRODUCT';
-    // Create a SKU part from each attribute, sorted by attribute code for consistency
     const attributeParts = dynamicAttributes
       .sort((a, b) => a.code.localeCompare(b.code))
       .map(attr => {
@@ -263,8 +255,6 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
 
     const newVariantsToAdd: any[] = [];
     let duplicateCount = 0;
-
-    // A recursive function to generate all combinations
     const generateCombinations = (attrIndex: number, currentCombination: any) => {
       if (attrIndex === dynamicAttributes.length) {
         const combinationKey = createCombinationKey(currentCombination);

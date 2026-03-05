@@ -3,15 +3,11 @@ package com.vn.backend.controller;
 import com.vn.backend.dto.request.AddCartRequest;
 import com.vn.backend.dto.response.CartResponse;
 import com.vn.backend.dto.response.OrderResponse;
-import com.vn.backend.entity.User;
-import com.vn.backend.repository.UserRepository;
 import com.vn.backend.security.CustomUserDetails;
 import com.vn.backend.service.CartService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/v1/cart")
@@ -72,14 +68,5 @@ public class CartController {
     ) {
         cartService.clearCart(userDetails.getUserId());
         return ResponseEntity.noContent().build();
-    }
-
-    @PostMapping("/checkout")
-    public ResponseEntity<OrderResponse> checkout(
-            @AuthenticationPrincipal CustomUserDetails userDetails
-    ) {
-        return ResponseEntity.ok(
-                cartService.checkout(userDetails.getUserId())
-        );
     }
 }

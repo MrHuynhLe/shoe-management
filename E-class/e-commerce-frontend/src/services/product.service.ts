@@ -1,33 +1,29 @@
-import axios from "axios";
-
-const api = axios.create({
-  baseURL: "http://localhost:8080/api",
-});
+import { axiosClient } from "./axiosClient";
 
 export const productService = {
   getProducts: (page = 0, size = 12) =>
-    api.get("/v1/products", {
+    axiosClient.get("/v1/products", {
       params: { page, size },
     }),
 
   getProductById: (productId: number) =>
-    api.get(`/v1/products/${productId}`),
+    axiosClient.get(`/v1/products/${productId}`),
 
-  getBrands: () => api.get('/v1/brands'),
-  getCategories: () => api.get('/v1/categories'),
-  getOrigins: () => api.get('/v1/origins'),
-  getSuppliers: () => api.get('/v1/suppliers'),
-  getAttributes: () => api.get('/v1/attributes'),
+  getBrands: () => axiosClient.get('/v1/brands'),
+  getCategories: () => axiosClient.get('/v1/categories'),
+  getOrigins: () => axiosClient.get('/v1/origins'),
+  getSuppliers: () => axiosClient.get('/v1/suppliers'),
+  getAttributes: () => axiosClient.get('/v1/attributes'),
 
   createProduct: (productData: FormData) =>
-    api.post("/v1/products", productData, {
+    axiosClient.post("/v1/products", productData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     }),
 
   uploadImage: (formData: FormData) =>
-    api.post("/v1/products/upload-image", formData, {
+    axiosClient.post("/v1/products/upload-image", formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -35,7 +31,7 @@ export const productService = {
 
 
   bulkCreateVariantsOnly: (payload: { productId: number | null; variants: any[] }) => {
-    return api.post('/v1/variants/bulk', payload, {
+    return axiosClient.post('/v1/variants/bulk', payload, {
       headers: {
         'Content-Type': 'application/json', 
       },
@@ -56,7 +52,7 @@ export const productService = {
       }
     });
 
-    return api.post('/v1/variants/bulk', formData, {
+    return axiosClient.post('/v1/variants/bulk', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },

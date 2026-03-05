@@ -10,6 +10,7 @@ import {
   SolutionOutlined,
   LineChartOutlined,
   BellOutlined,
+  TagsOutlined,
 } from "@ant-design/icons";
 import { Dropdown, Space, Avatar, Badge, ConfigProvider } from "antd";
 import antdViVN from "antd/locale/vi_VN";
@@ -148,6 +149,23 @@ const AdminLayout = () => {
             path: "/admin/customers",
             name: "Quản lý khách hàng",
             icon: <UserOutlined />,
+          },
+          {
+            key: "/admin/discounts",
+            name: "Khuyến mãi",
+            icon: <TagsOutlined />,
+            children: [
+              {
+                key: "/admin/discounts/promotions",
+                path: "/admin/discounts/promotions",
+                name: "Chương trình khuyến mãi",
+              },
+              {
+                key: "/admin/discounts/coupons",
+                path: "/admin/discounts/coupons",
+                name: "Mã giảm giá (Coupon)",
+              },
+            ],
           },
           {
             key: "/admin/revenue",

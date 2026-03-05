@@ -25,13 +25,12 @@ public class BrandController {
 
     private final BrandRepository brandRepository;
     private final BrandService brandService;
-    // GET all active
+ 
     @GetMapping
     public List<Brand> getAll() {
         return brandRepository.findByDeletedAtIsNullAndIsActiveTrue();
     }
 
-    // POST create
     @PostMapping
     public Brand create(@RequestBody @Valid Brand brand) {
         brand.setId(null);

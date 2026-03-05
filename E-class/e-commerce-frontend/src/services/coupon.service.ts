@@ -1,0 +1,24 @@
+import { axiosClient } from "./axiosClient";
+
+export interface CouponRequest {
+  code: string;
+  discountType: 'PERCENTAGE' | 'FIXED_AMOUNT';
+  discountValue: number;
+  usageLimit?: number;
+  isActive?: boolean;
+}
+
+export const couponService = {
+  getAll: (params: any) => {
+    return axiosClient.get("/v1/coupons", { params });
+  },
+  create: (data: CouponRequest) => {
+    return axiosClient.post("/v1/coupons", data);
+  },
+  update: (id: number, data: CouponRequest) => {
+    return axiosClient.put(`/v1/coupons/${id}`, data);
+  },
+  delete: (id: number) => {
+    return axiosClient.delete(`/v1/coupons/${id}`);
+  },
+};

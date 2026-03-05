@@ -1,17 +1,26 @@
 package com.vn.backend.dto.request;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 @Data
 public class PromotionRequest {
+    @NotBlank
     private String code;
+    @NotBlank
     private String name;
-    private String description;
+    @NotBlank
     private String discountType;
+    @NotNull
     private BigDecimal discountValue;
-    private LocalDateTime startDate;
-    private LocalDateTime endDate;
-    private Boolean isActive = true;
+    private BigDecimal minOrderValue;
+    private BigDecimal maxDiscountAmount;
+    private Integer usageLimit;
+    private OffsetDateTime startDate;
+    private OffsetDateTime endDate;
+    private Boolean isActive;
 }

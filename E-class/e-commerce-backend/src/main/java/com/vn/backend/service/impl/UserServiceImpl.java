@@ -43,7 +43,6 @@ public class UserServiceImpl implements UserService {
     private final EmployeeRepository employeeRepository;
     private final RoleRepository roleRepository;
 
-    // Get all
     @Override
     public List<UserResponse> getAllUsers() {
         return userRepository.findAllUserDTO();
@@ -69,7 +68,6 @@ public class UserServiceImpl implements UserService {
     @Override
     public void createUser(UserCreateRequest req) {
 
-        // 1. VALIDATE
         if (profileRepository.existsByPhone(req.getPhone()))
             throw new RuntimeException("Số điện thoại đã tồn tại");
 
@@ -85,7 +83,6 @@ public class UserServiceImpl implements UserService {
         Role role = roleRepository.findById(req.getRoleId())
                 .orElseThrow(() -> new RuntimeException("Role không tồn tại"));
 
-        // 2. USER PROFILE (TRUNG TÂM)
         UserProfile profile = new UserProfile();
         profile.setFullName(req.getFullName());
         profile.setPhone(req.getPhone());
@@ -94,20 +91,16 @@ public class UserServiceImpl implements UserService {
         profile.setIsActive(true);
 
         profileRepository.save(profile);
-
-        // 3. USER
         User user = new User();
         user.setUsername(req.getUsername());
         user.setEmail(req.getEmail());
-        user.setPasswordHash(req.getPassword()); // TODO encode sau
+        user.setPasswordHash(req.getPassword()); 
         user.setIsActive(true);
         user.setRole(role);
         user.setUserProfile(profile);
 
         userRepository.save(user);
 
-
-        // 4. EMPLOYEE
         Employee employee = new Employee();
         employee.setUserProfile(profile);
         employee.setCode(generateEmployeeCode());
@@ -164,7 +157,6 @@ public class UserServiceImpl implements UserService {
     @Override
     public void updateUser(Long id, UpdateUserRequest request) {
 
-        // 1️⃣ Lấy User (fetch profile + role)
         User user = userRepository.findDetailById(id)
                 .orElseThrow(() -> new RuntimeException("USER_NOT_FOUND"));
 
@@ -174,7 +166,6 @@ public class UserServiceImpl implements UserService {
                 .findByUserProfile(profile)
                 .orElseThrow(() -> new RuntimeException("EMPLOYEE_NOT_FOUND"));
 
-        // ===== UPDATE USER =====
         if (request.getEmail() != null) {
             if (userRepository.existsByEmail(request.getEmail())
                     && !user.getEmail().equals(request.getEmail())) {
@@ -191,10 +182,9 @@ public class UserServiceImpl implements UserService {
                     .orElseThrow(() -> new RuntimeException("ROLE_NOT_FOUND"));
 
             user.setRole(role);
-            employee.setRole(role); // đồng bộ role
+            employee.setRole(role); 
         }
 
-        // ===== UPDATE PROFILE =====
         if (request.getFullName() != null) {
             profile.setFullName(request.getFullName());
         }
@@ -216,7 +206,7 @@ public class UserServiceImpl implements UserService {
             profile.setBirthday(request.getBirthday());
         }
 
-        // ===== UPDATE EMPLOYEE =====
+
         if (request.getSalary() != null) {
             if (request.getSalary() < 0)
                 throw new RuntimeException("Lương không hợp lệ");
@@ -224,7 +214,6 @@ public class UserServiceImpl implements UserService {
             employee.setSalary(request.getSalary());
         }
 
-        // Save
         userRepository.save(user);
     }
 
@@ -258,7 +247,7 @@ public class UserServiceImpl implements UserService {
 
         return res;
     }
-    // Mã NV Tự sinh
+
     private String generateEmployeeCode() {
 
         Employee lastEmployee = employeeRepository.findTopByOrderByIdDesc();

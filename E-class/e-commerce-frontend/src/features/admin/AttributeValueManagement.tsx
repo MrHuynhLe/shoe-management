@@ -32,8 +32,8 @@ const { Title } = Typography;
 type Mode = "create" | "edit";
 
 type Props = {
-  code: string; // COLOR | SIZE | MATERIAL ...
-  title: string; // "Màu sắc" | "Kích cỡ" | ...
+  code: string;
+  title: string; 
 };
 
 const AttributeValueManagement = ({ code, title }: Props) => {
@@ -66,7 +66,7 @@ const AttributeValueManagement = ({ code, title }: Props) => {
 
   useEffect(() => {
     fetchAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [code]);
 
   const openCreate = () => {
@@ -109,7 +109,7 @@ const AttributeValueManagement = ({ code, title }: Props) => {
         await attributeValueService.update(editing.id, payload);
       }
 
-      await fetchAll(); // ✅ đảm bảo load lại trước
+      await fetchAll(); 
       message.success(
         mode === "create"
           ? `Thêm ${titleLower} thành công`

@@ -19,20 +19,19 @@ public class ColorController {
 
     private final ColorService colorService;
 
-    // GET ALL
+   
     @GetMapping
     public ResponseEntity<List<ColorResponse>> getAll() {
         return ResponseEntity.ok(colorService.getAll());
     }
 
-    // POST CREATE
+   
     @PostMapping
     public ResponseEntity<ColorResponse> create(@Valid @RequestBody ColorRequest request) {
         ColorResponse created = colorService.create(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
-    // PUT UPDATE
     @PutMapping("/{id}")
     public ResponseEntity<ColorResponse> update(
             @PathVariable Long id,
@@ -41,7 +40,7 @@ public class ColorController {
         return ResponseEntity.ok(colorService.update(id, request));
     }
 
-    // DELETE
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         colorService.delete(id);

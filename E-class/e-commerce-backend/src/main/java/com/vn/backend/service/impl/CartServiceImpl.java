@@ -3,7 +3,6 @@ package com.vn.backend.service.impl;
 import com.vn.backend.dto.request.AddCartRequest;
 import com.vn.backend.dto.response.CartItemResponse;
 import com.vn.backend.dto.response.CartResponse;
-import com.vn.backend.dto.response.OrderResponse;
 import com.vn.backend.entity.*;
 import com.vn.backend.enums.CartStatus;
 import com.vn.backend.repository.*;
@@ -100,6 +99,8 @@ public class CartServiceImpl implements CartService {
         item.setQuantity(quantity);
         item.setUpdatedAt(OffsetDateTime.now());
 
+        cartItemRepository.save(item);
+
         return mapToCartResponse(item.getCart());
     }
 
@@ -127,36 +128,6 @@ public class CartServiceImpl implements CartService {
 
         cartItemRepository.deleteAllByCartId(cart.getId());
     }
-
-
-    @Override
-    public OrderResponse checkout(Long userId) {
-
-        Customer customer = resolveCustomer(userId);
-
-        Cart cart = cartRepository
-                .findByCustomerIdAndStatus(customer.getId(), CartStatus.ACTIVE)
-                .orElseThrow(() -> new IllegalArgumentException("Nothing to checkout"));
-
-        if (cart.getItems() == null || cart.getItems().isEmpty()) {
-            throw new IllegalArgumentException("Cart is empty");
-        }
-
-        for (CartItem item : cart.getItems()) {
-            if (item.getQuantity() > item.getProductVariant().getStockQuantity()) {
-                throw new IllegalArgumentException(
-                        "Product " + item.getProductVariant().getCode() + " is out of stock");
-            }
-        }
-
-        cart.setStatus(CartStatus.ORDERED);
-        cart.setUpdatedAt(OffsetDateTime.now());
-        cartRepository.save(cart);
-
-        return new OrderResponse();
-    }
-
-
 
     private Cart getOrCreateActiveCart(Long userId) {
 

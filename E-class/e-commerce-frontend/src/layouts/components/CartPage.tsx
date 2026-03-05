@@ -38,47 +38,49 @@ const CartPage = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  const fetchCart = async () => {
-    try {
-      setLoading(true);
-      const response = await cartService.getCart();
-  
-      const items = response.data.items.map((item: any) => { 
-        const cartItemId = item.id; 
-             return {
-          key: cartItemId,
-          id: cartItemId,
-          image: (Array.isArray(item.variant.productImages) && item.variant.productImages.length > 0) ? `http://localhost:8080/api${item.variant.productImages[0].imageUrl}` : 'https://via.placeholder.com/80',
-          name: `${item.variant.product.name} - [${item.variant.code}] - ${item.variant.variantAttributes.COLOR} / ${item.variant.variantAttributes.SIZE}`,
-          price: item.price,
-          quantity: item.quantity,
-          total: item.price * item.quantity,
-          variantId: item.variant.id,
-        };
-      });
-      setCartItems(items);
-    } catch (error: any) {
-      console.error('Failed to fetch cart:', error);
-      if (error.response && error.response.status === 401) {
-        message.error('Vui lòng đăng nhập để xem giỏ hàng!');
-        navigate('/account');
-    
-      } else if (error.response && error.response.status === 403) {
-        setCartItems([]);
-      } else {
-        message.error('Không thể tải giỏ hàng. Vui lòng thử lại!');
-      }
-    } finally {
-      setLoading(false);
+const fetchCart = async () => {
+  try {
+    setLoading(true);
+
+    const response = await cartService.getCart();
+  console.log("API CART:", response.data);
+  const items = response.data.items.map((item: any) => ({
+  key: item.cartItemId,
+  id: item.cartItemId,
+  image: item.imageUrl
+    ? `http://localhost:8080/api${item.imageUrl}`
+    : "https://via.placeholder.com/80",
+  name: `${item.productName} - ${item.variantCode}`,
+  price: item.price,
+  quantity: item.quantity,
+  total: item.subTotal,
+  variantId: item.variantId,
+}));
+
+    setCartItems(items);
+  } catch (error: any) {
+    console.error("Failed to fetch cart:", error);
+
+    if (error.response?.status === 401) {
+      message.error("Vui lòng đăng nhập để xem giỏ hàng!");
+      navigate("/account");
+    } else if (error.response?.status === 403) {
+      setCartItems([]);
+    } else {
+      message.error("Không thể tải giỏ hàng. Vui lòng thử lại!");
     }
-    
-  };
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     fetchCart();
   }, []);
 
   const handleQuantityChange = async (cartItemId: number, quantity: number | null) => {
+      console.log("cartItemId:", cartItemId);
+  console.log("quantity:", quantity);
     if (quantity === null || quantity < 1) return;
     try {
       await cartService.updateItemQuantity(cartItemId, quantity);
@@ -136,7 +138,12 @@ const CartPage = () => {
         <InputNumber
           min={1}
           value={quantity}
-          onChange={(value) => handleQuantityChange(record.id, value)}
+          
+          onChange={
+            (value) => {
+              console.log("record:", record);
+  console.log("cartItemId:", record.id);
+  handleQuantityChange(record.id, value)}}
         />
       ),
     },
@@ -172,16 +179,15 @@ const CartPage = () => {
   ];
 
   const selectedItems = cartItems.filter((item) => selectedRowKeys.includes(item.key));
-  const subtotal = cartItems.reduce((acc, item) => acc + item.total, 0);
+  const subtotal = selectedItems.reduce((acc, item) => acc + item.total, 0);
 
-  const handleCheckout = async () => {
-    try {
-      const response = await cartService.checkout();
-      message.success('Đặt hàng thành công! Đang chuyển hướng...');
-      navigate(`/checkout-success/${response.data.id}`);
-    } catch (error) {
-      message.error('Đặt hàng thất bại. Vui lòng thử lại.');
+  const handleCheckout = () => {
+    if (selectedItems.length === 0) {
+      message.warning('Vui lòng chọn sản phẩm để thanh toán.');
+      return;
     }
+    // Chuyển hướng đến trang thanh toán với các sản phẩm đã chọn
+    navigate('/checkout', { state: { items: selectedItems, subtotal } });
   };
 
   return (
@@ -214,7 +220,7 @@ const CartPage = () => {
             <Title level={4}>Tóm tắt đơn hàng</Title>
             <Divider />
             <Row justify="space-between" key="subtotal-row">
-              <Text>Tạm tính ({cartItems.length} sản phẩm)</Text>
+              <Text>Tạm tính ({selectedItems.length} sản phẩm)</Text>
               <Text strong>{subtotal.toLocaleString('vi-VN')} ₫</Text>
             </Row>
             <Divider />

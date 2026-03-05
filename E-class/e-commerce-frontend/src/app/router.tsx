@@ -4,7 +4,7 @@ import AdminLayout from "@/layouts/AdminLayout";
 import Home from "@/features/home/Home";
 import ProductPage from "@/features/product/ProductPage";
 import ProductDetailPage from "@/features/product/ProductDetailPage";
-import CartPage from "@/features/cart/CartPage";
+import CartPage from "@/layouts/components/CartPage";
 import AccountPage from "@/layouts/Account";
 import MyOrdersPage from "@/features/cart/MyOrdersPage";
 import Login from "@/features/login/Login";
@@ -22,7 +22,10 @@ import CategoryManagementPage from "@/features/admin/CategoryManagement";
 import ColorManagementPage from "@/features/admin/ColorManagement";
 import SizeManagementPage from "@/features/admin/SizeManagement";
 import MaterialManagementPage from "@/features/admin/MaterialManagement";
+import PromotionManagementPage from "@/features/admin/PromotionManagement";
+import CouponManagementPage from "@/features/admin/CouponManagement";
 
+import CheckoutPage from "@/layouts/components/CheckoutPage";
 export const router = createBrowserRouter([
   {
     element: <MainLayout />,
@@ -33,6 +36,7 @@ export const router = createBrowserRouter([
       { path: "cart", element: <CartPage /> },
       { path: "account", element: <AccountPage /> },
       { path: "my-orders", element: <MyOrdersPage /> },
+      { path: "checkout", element: <CheckoutPage /> },
     ],
   },
   {
@@ -44,6 +48,13 @@ export const router = createBrowserRouter([
       { path: "products", element: <ProductManagementPage /> },
       { path: "brands", element: <BrandManagementPage /> },
       { path: "categories", element: <CategoryManagementPage /> },
+      {
+        path: "discounts",
+        children: [
+          { path: "promotions", element: <PromotionManagementPage /> },
+          { path: "coupons", element: <CouponManagementPage /> },
+        ],
+      },
 
       {
         path: "attributes",

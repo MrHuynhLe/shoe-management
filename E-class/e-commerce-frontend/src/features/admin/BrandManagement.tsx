@@ -85,7 +85,6 @@ export default function BrandManagementPage() {
           onChange={async (checked) => {
             try {
               await brandService.update(row.id, { isActive: checked });
-              // ⚠️ nếu backend GET /v1/brands chỉ trả active => tắt cái là biến mất (bình thường)
               message.success("Cập nhật trạng thái thành công");
               load();
             } catch {

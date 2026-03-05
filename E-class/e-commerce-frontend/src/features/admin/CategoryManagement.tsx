@@ -23,7 +23,7 @@ export default function CategoryManagementPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await axiosClient.get("/v1/categories"); // API bạn đã có
+      const res = await axiosClient.get("/v1/categories"); 
       setData(res.data);
     } catch (e: any) {
       message.error("Không tải được danh sách danh mục");

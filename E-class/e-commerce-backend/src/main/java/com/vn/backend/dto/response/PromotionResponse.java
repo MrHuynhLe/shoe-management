@@ -3,17 +3,20 @@ package com.vn.backend.dto.response;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 @Data
 public class PromotionResponse {
     private Long id;
     private String code;
     private String name;
-    private String description;
     private String discountType;
     private BigDecimal discountValue;
-    private LocalDateTime startDate;
-    private LocalDateTime endDate;
+    private BigDecimal minOrderValue;
+    private BigDecimal maxDiscountAmount;
+    private Integer usageLimit;
+    private OffsetDateTime startDate;
+    private OffsetDateTime endDate;
     private Boolean isActive;
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
 }

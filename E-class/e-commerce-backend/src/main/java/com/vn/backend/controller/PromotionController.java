@@ -16,8 +16,8 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/v1/promotions")
+@CrossOrigin(origins = "http://localhost:5173")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class PromotionController {
 
     private final PromotionService promotionService;

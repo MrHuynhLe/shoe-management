@@ -27,7 +27,7 @@ public class AttributeValue {
     private Boolean isActive = true;
     @PrePersist
     public void prePersist() {
-        if (isActive == null) isActive = true; // ✅ chặn NULL khi insert
+        if (isActive == null) isActive = true; 
     }
 
 }

@@ -16,8 +16,8 @@ const EditVariantModal: React.FC<EditVariantModalProps> = ({ open, variant, onCa
   if (!variant) return;
 
   form.setFieldsValue({
-    selling_price: variant.selling_price,
-    is_active: variant.is_active,
+    selling_price: variant.sellingPrice,
+    is_active: variant.isActive,
   });
 }, [open, variant, form]);
 

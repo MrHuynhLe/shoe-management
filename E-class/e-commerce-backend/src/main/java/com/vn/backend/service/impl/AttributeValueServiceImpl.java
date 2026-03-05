@@ -45,7 +45,7 @@ public class AttributeValueServiceImpl implements AttributeValueService {
                 AttributeValue.builder()
                         .attribute(attribute)
                         .value(value)
-                        .isActive(true) // ✅ bắt buộc để khỏi NULL
+                        .isActive(true) 
                         .build()
         );
 
@@ -60,7 +60,7 @@ public class AttributeValueServiceImpl implements AttributeValueService {
         AttributeValue av = attributeValueRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy id=" + id));
 
-        // check trùng trong cùng attribute
+
         if (attributeValueRepository.existsByAttribute_IdAndValueIgnoreCase(av.getAttribute().getId(), value)
                 && !av.getValue().equalsIgnoreCase(value)) {
             throw new RuntimeException("Giá trị đã tồn tại");

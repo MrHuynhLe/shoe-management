@@ -1,17 +1,20 @@
-
 package com.vn.backend.entity;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
+
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 @Entity
 @Table(name = "promotions")
 @Getter
 @Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Promotion {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -22,27 +25,44 @@ public class Promotion {
     @Column(nullable = false)
     private String name;
 
-    @Column(columnDefinition = "TEXT")
-    private String description;
+    @Column(name = "discount_type", nullable = false, length = 20)
+    private String discountType; // 'PERCENTAGE' or 'FIXED_AMOUNT'
 
-    @Column(name = "discount_type", length = 20)
-    private String discountType; // PERCENTAGE, FIXED_AMOUNT
-
-    @Column(name = "discount_value", precision = 15, scale = 2)
+    @Column(name = "discount_value", nullable = false, precision = 15, scale = 2)
     private BigDecimal discountValue;
 
+    @Column(name = "min_order_value", precision = 15, scale = 2)
+    private BigDecimal minOrderValue;
+
+    @Column(name = "max_discount_amount", precision = 15, scale = 2)
+    private BigDecimal maxDiscountAmount;
+
+    @Column(name = "usage_limit")
+    private Integer usageLimit;
+
     @Column(name = "start_date")
-    private LocalDateTime startDate;
+    private OffsetDateTime startDate;
 
     @Column(name = "end_date")
-    private LocalDateTime endDate;
+    private OffsetDateTime endDate;
 
-    @Column(name = "is_active", nullable = false)
+    @Column(name = "is_active")
     private Boolean isActive = true;
 
-    @Column(name = "created_at")
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @Column(name = "created_at", updatable = false)
+    private OffsetDateTime createdAt;
 
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
+    @Column(name = "updated_at")
+    private OffsetDateTime updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = OffsetDateTime.now();
+        this.updatedAt = OffsetDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.updatedAt = OffsetDateTime.now();
+    }
 }

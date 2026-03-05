@@ -31,8 +31,6 @@ const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
 
 const UserManagementPage = () => {
-  // ✅ BỎ collapse button dưới sidebar => không cần state collapsed nữa
-  // const [collapsed, setCollapsed] = useState(false);
 
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
@@ -54,7 +52,7 @@ const UserManagementPage = () => {
 
   const [form] = Form.useForm();
 
-  // ===== Fetch roles =====
+
   const fetchRoles = async () => {
     try {
       const res = await userService.getRoles();
@@ -64,7 +62,6 @@ const UserManagementPage = () => {
     }
   };
 
-  // ===== Fetch users =====
   const fetchUsers = async (keyword?: string) => {
     try {
       setLoading(true);
@@ -84,7 +81,6 @@ const UserManagementPage = () => {
     fetchRoles();
   }, []);
 
-  // debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
       setPage(0);
@@ -92,15 +88,14 @@ const UserManagementPage = () => {
     }, 350);
 
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [searchText]);
 
   useEffect(() => {
     fetchUsers(searchText?.trim() ? searchText.trim() : undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [page, size]);
 
-  // lọc role client-side
   const filteredUsers = useMemo(() => {
     if (!roleFilter) return users;
 
@@ -297,7 +292,6 @@ const UserManagementPage = () => {
     <Layout style={{ minHeight: "100vh" }}>
       <Layout>
         <Content style={{ padding: 18, background: "#f5f7fb" }}>
-          {/* ===== Toolbar ===== */}
           <div
             style={{
               background: "#fff",
@@ -336,7 +330,6 @@ const UserManagementPage = () => {
               </Button>
             </Space>
 
-            {/* ===== Filter row ===== */}
             <div style={{ marginTop: 14 }}>
               <Text strong>Tìm kiếm:</Text>
               <div
@@ -379,7 +372,6 @@ const UserManagementPage = () => {
             </div>
           </div>
 
-          {/* ===== Table ===== */}
           <div
             style={{
               background: "#fff",
@@ -406,7 +398,6 @@ const UserManagementPage = () => {
             />
           </div>
 
-          {/* ===== Modal Create/Update ===== */}
           <Modal
             title={editingUser ? "Cập nhật người dùng" : "Thêm người dùng"}
             open={openModal}
@@ -486,7 +477,6 @@ const UserManagementPage = () => {
                   inputMode="numeric"
                   placeholder="VD: 0912345678"
                   onChange={(e) => {
-                    // chỉ cho nhập số
                     const v = e.target.value.replace(/\D/g, "");
                     form.setFieldValue("phone", v);
                   }}
@@ -533,7 +523,6 @@ const UserManagementPage = () => {
             </Form>
           </Modal>
 
-          {/* ===== Modal Detail ===== */}
           <Modal
             title={null}
             open={openDetail}
@@ -551,7 +540,6 @@ const UserManagementPage = () => {
           >
             {detailData && (
               <div>
-                {/* Header card */}
                 <div
                   style={{
                     display: "flex",
@@ -603,7 +591,6 @@ const UserManagementPage = () => {
 
                 <Divider style={{ margin: "14px 0" }} />
 
-                {/* Detail content */}
                 <Descriptions
                   bordered
                   size="middle"

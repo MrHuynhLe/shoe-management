@@ -23,7 +23,7 @@ public class InventoryTransaction {
     private Store store;
 
     @Column(name = "transaction_type", nullable = false, length = 10)
-    private String transactionType; // IN, OUT
+    private String transactionType; 
 
     @Column(nullable = false)
     private Integer quantity;

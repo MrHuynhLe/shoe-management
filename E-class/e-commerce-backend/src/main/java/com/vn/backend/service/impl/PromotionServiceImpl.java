@@ -11,7 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -54,9 +54,11 @@ public class PromotionServiceImpl implements PromotionService {
         Promotion promotion = new Promotion();
         promotion.setCode(request.getCode());
         promotion.setName(request.getName());
-        promotion.setDescription(request.getDescription());
         promotion.setDiscountType(request.getDiscountType());
         promotion.setDiscountValue(request.getDiscountValue());
+        promotion.setMinOrderValue(request.getMinOrderValue());
+        promotion.setMaxDiscountAmount(request.getMaxDiscountAmount());
+        promotion.setUsageLimit(request.getUsageLimit());
         promotion.setStartDate(request.getStartDate());
         promotion.setEndDate(request.getEndDate());
         promotion.setIsActive(request.getIsActive());
@@ -73,9 +75,11 @@ public class PromotionServiceImpl implements PromotionService {
 
         promotion.setCode(request.getCode());
         promotion.setName(request.getName());
-        promotion.setDescription(request.getDescription());
         promotion.setDiscountType(request.getDiscountType());
         promotion.setDiscountValue(request.getDiscountValue());
+        promotion.setMinOrderValue(request.getMinOrderValue());
+        promotion.setMaxDiscountAmount(request.getMaxDiscountAmount());
+        promotion.setUsageLimit(request.getUsageLimit());
         promotion.setStartDate(request.getStartDate());
         promotion.setEndDate(request.getEndDate());
         promotion.setIsActive(request.getIsActive());
@@ -90,13 +94,13 @@ public class PromotionServiceImpl implements PromotionService {
         Promotion promotion = promotionRepository.findByIdActive(id)
                 .orElseThrow(() -> new RuntimeException("Promotion not found with id: " + id));
 
-        promotion.setDeletedAt(LocalDateTime.now());
+        promotion.setIsActive(false);
         promotionRepository.save(promotion);
     }
 
     @Override
     public List<PromotionResponse> getCurrentActivePromotions() {
-        return promotionRepository.findActivePromotions(LocalDateTime.now()).stream()
+        return promotionRepository.findActivePromotions(OffsetDateTime.now()).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -106,9 +110,11 @@ public class PromotionServiceImpl implements PromotionService {
         response.setId(promotion.getId());
         response.setCode(promotion.getCode());
         response.setName(promotion.getName());
-        response.setDescription(promotion.getDescription());
         response.setDiscountType(promotion.getDiscountType());
         response.setDiscountValue(promotion.getDiscountValue());
+        response.setMinOrderValue(promotion.getMinOrderValue());
+        response.setMaxDiscountAmount(promotion.getMaxDiscountAmount());
+        response.setUsageLimit(promotion.getUsageLimit());
         response.setStartDate(promotion.getStartDate());
         response.setEndDate(promotion.getEndDate());
         response.setIsActive(promotion.getIsActive());

@@ -16,8 +16,8 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/v1/shipping-providers")
+@CrossOrigin(origins = "http://localhost:5173")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class ShippingProviderController {
 
     private final ShippingProviderService shippingProviderService;

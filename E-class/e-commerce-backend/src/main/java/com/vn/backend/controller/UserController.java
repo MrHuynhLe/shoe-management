@@ -23,9 +23,7 @@ public class UserController {
 
     private final UserService userService;
 
-    // ✅ LIST
 
-    // phân trang
     @GetMapping
     public ResponseEntity<PageResponse<UserResponse>> getUsers(
             @RequestParam(defaultValue = "0") int page,
@@ -36,7 +34,7 @@ public class UserController {
                 userService.getUsersPage(page, size, keyword)
         );
     }
-    // ✅ CREATE
+
     @PostMapping
     public ResponseEntity<Void> createUser(
             @RequestBody @Valid UserCreateRequest request
@@ -46,7 +44,7 @@ public class UserController {
         return ResponseEntity.ok().build();
     }
 
-    // ✅ UPDATE STATUS
+   
     @PatchMapping("/{id}/status")
     public ResponseEntity<Void> updateStatus(
             @PathVariable Long id,
@@ -56,7 +54,6 @@ public class UserController {
         return ResponseEntity.ok().build();
     }
 
-    // ✅ DELETE (SOFT)
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
 
@@ -64,7 +61,7 @@ public class UserController {
 
         return ResponseEntity.noContent().build();
     }
-    // reset ID delete
+
     @PatchMapping("/{id}/restore")
     public ResponseEntity<?> restoreUser(@PathVariable Long id) {
 
@@ -77,13 +74,13 @@ public class UserController {
                 )
         );
     }
-    //detail
+
     @GetMapping("/{id}")
     public ResponseEntity<UserDetailResponse> getUserById(@PathVariable Long id) {
         return ResponseEntity.ok(userService.getUserById(id));
     }
 
-    // update
+
     @PutMapping("/{id}")
     public ResponseEntity<String> updateUser(
             @PathVariable Long id,

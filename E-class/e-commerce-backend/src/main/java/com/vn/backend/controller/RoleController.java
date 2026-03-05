@@ -7,14 +7,14 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/v1/roles") // 🔥 giống version của user
+@RequestMapping("/v1/roles")
 @CrossOrigin(origins = "http://localhost:5173")
 @RequiredArgsConstructor
 public class RoleController {
 
     private final RoleService roleService;
 
-    // 🔥 API frontend cần nhất
+
     @GetMapping
     public List<Role> getAllRoles() {
         return roleService.getAllRoles();

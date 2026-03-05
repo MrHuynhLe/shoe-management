@@ -10,7 +10,7 @@ import java.util.List;
 
 @Repository
 public interface AttributeValueRepository extends JpaRepository<AttributeValue, Long> {
-    // ✅ Lấy danh sách theo code (SIZE/COLOR/MATERIAL) và chỉ lấy active
+
     @Query("""
         select av
         from AttributeValue av
