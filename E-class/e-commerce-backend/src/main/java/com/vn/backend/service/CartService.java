@@ -7,10 +7,16 @@ import com.vn.backend.dto.response.OrderResponse;
 
 
 public interface CartService {
-    CartResponse addToCart(AddCartRequest request);
-    CartResponse getActiveCart(Long customerId);
-    CartResponse updateQuantity(Long cartItemId, int quantity);
-    CartResponse removeItem(Long cartItemId);
-    void clearCart(Long customerId);
-    OrderResponse checkout(Long customerId);
+
+    CartResponse addToCart(Long userId, AddCartRequest request);
+
+    CartResponse getActiveCart(Long userId);
+
+    CartResponse updateQuantity(Long userId, Long cartItemId, int quantity);
+
+    CartResponse removeItem(Long userId, Long cartItemId);
+
+    void clearCart(Long userId);
+
+    OrderResponse checkout(Long userId);
 }

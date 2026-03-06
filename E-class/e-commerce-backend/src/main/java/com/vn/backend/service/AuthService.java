@@ -1,48 +1,45 @@
 package com.vn.backend.service;
 
-import com.vn.backend.common.AppException;
+import com.vn.backend.security.JwtUtil;
 import com.vn.backend.dto.request.LoginRequest;
 import com.vn.backend.dto.response.LoginResponse;
 import com.vn.backend.entity.User;
-import com.vn.backend.repository.PermissionRepository;
 import com.vn.backend.repository.UserRepository;
-import com.vn.backend.security.JwtService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
     private final UserRepository userRepository;
-    private final PermissionRepository permissionRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtService jwtService;
+    private final JwtUtil jwtUtil;
 
-    public LoginResponse login(LoginRequest req) {
-        User user = userRepository.findByUsernameOrEmail(req.usernameOrEmail())
-                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Sai tài khoản"));
+    public LoginResponse login(LoginRequest request) {
+
+        User user = userRepository.findByUsername(request.getUsername())
+                .orElseThrow(() -> new RuntimeException("Username not found"));
 
         if (Boolean.FALSE.equals(user.getIsActive())) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Tài khoản đã bị khóa");
+            throw new RuntimeException("Account is disabled");
         }
 
-        if (user.getPasswordHash() == null || !passwordEncoder.matches(req.password(), user.getPasswordHash())) {
-            throw new AppException(HttpStatus.UNAUTHORIZED, "Sai mật khẩu");
+        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            throw new RuntimeException("Wrong password");
         }
 
-        if (user.getRole() == null) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Tài khoản chưa được gán role");
-        }
+        String roleCode = user.getRole().getCode();
 
-        String roleCode = user.getRole().getCode(); // ADMIN/SALE...
-        List<String> perms = permissionRepository.findPermissionCodesByUserId(user.getId());
+        String token = jwtUtil.generateToken(user.getUsername(), roleCode);
+        System.out.println(passwordEncoder.encode("123456"));
+        return new LoginResponse(
+                token,
+                user.getId(),
+                user.getUsername(),
+                roleCode
+        );
 
-        String token = jwtService.generateToken(user.getId(), roleCode, perms);
-        return new LoginResponse(token, roleCode, perms);
     }
 }

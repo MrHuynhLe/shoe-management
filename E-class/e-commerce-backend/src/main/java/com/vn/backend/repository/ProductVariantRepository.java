@@ -2,7 +2,9 @@
 package com.vn.backend.repository;
 
 import com.vn.backend.entity.ProductVariant;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -48,4 +50,7 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     Optional<ProductVariant> findActiveById(@Param("id") Long id);
 
     boolean existsByCodeAndDeletedAtIsNull(String code);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select v from ProductVariant v where v.id = :id and v.deletedAt is null")
+    Optional<ProductVariant> findByIdForUpdate(Long id);
 }

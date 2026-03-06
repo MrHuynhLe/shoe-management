@@ -3,50 +3,83 @@ package com.vn.backend.controller;
 import com.vn.backend.dto.request.AddCartRequest;
 import com.vn.backend.dto.response.CartResponse;
 import com.vn.backend.dto.response.OrderResponse;
+import com.vn.backend.entity.User;
+import com.vn.backend.repository.UserRepository;
+import com.vn.backend.security.CustomUserDetails;
 import com.vn.backend.service.CartService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-
 @RestController
-@RequestMapping("/v1/carts")
+@RequestMapping("/v1/cart")
 @CrossOrigin(origins = "http://localhost:5173")
 @RequiredArgsConstructor
 public class CartController {
 
     private final CartService cartService;
 
-    @PostMapping("/add")
-    public ResponseEntity<CartResponse> addToCart(@RequestBody AddCartRequest request) {
-        return ResponseEntity.ok(cartService.addToCart(request));
+    @PostMapping("/items")
+    public ResponseEntity<CartResponse> addToCart(
+            @RequestBody AddCartRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        System.out.println("UserDetails: " + userDetails);
+        return ResponseEntity.ok(
+                cartService.addToCart(userDetails.getUserId(), request)
+        );
     }
 
-    @GetMapping("/active/{customerId}")
-    public ResponseEntity<CartResponse> getActiveCart(@PathVariable Long customerId) {
-        return ResponseEntity.ok(cartService.getActiveCart(customerId));
+    @GetMapping
+    public ResponseEntity<CartResponse> getCart(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ResponseEntity.ok(
+                cartService.getActiveCart(userDetails.getUserId())
+        );
     }
 
-    @PutMapping("/item/{cartItemId}")
+    @PutMapping("/items/{cartItemId}")
     public ResponseEntity<CartResponse> updateQuantity(
             @PathVariable Long cartItemId,
-            @RequestParam int quantity
+            @RequestParam int quantity,
+            @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        return ResponseEntity.ok(cartService.updateQuantity(cartItemId, quantity));
+        return ResponseEntity.ok(
+                cartService.updateQuantity(
+                        userDetails.getUserId(),
+                        cartItemId,
+                        quantity
+                )
+        );
     }
 
-    @DeleteMapping("/item/{cartItemId}")
-    public ResponseEntity<CartResponse> removeItem(@PathVariable Long cartItemId) {
-        return ResponseEntity.ok(cartService.removeItem(cartItemId));
+    @DeleteMapping("/items/{cartItemId}")
+    public ResponseEntity<CartResponse> removeItem(
+            @PathVariable Long cartItemId,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ResponseEntity.ok(
+                cartService.removeItem(userDetails.getUserId(), cartItemId)
+        );
     }
 
-    @DeleteMapping("/clear/{customerId}")
-    public ResponseEntity<Void> clearCart(@PathVariable Long customerId) {
-        cartService.clearCart(customerId);
+    @DeleteMapping
+    public ResponseEntity<Void> clearCart(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        cartService.clearCart(userDetails.getUserId());
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/checkout/{customerId}")
-    public ResponseEntity<OrderResponse> checkout(@PathVariable Long customerId) {
-        return ResponseEntity.ok(cartService.checkout(customerId));
+    @PostMapping("/checkout")
+    public ResponseEntity<OrderResponse> checkout(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ResponseEntity.ok(
+                cartService.checkout(userDetails.getUserId())
+        );
     }
 }

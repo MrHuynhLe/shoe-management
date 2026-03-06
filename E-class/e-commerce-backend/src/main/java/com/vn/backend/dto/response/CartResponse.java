@@ -16,18 +16,15 @@ import java.util.List;
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class CartResponse {
+
     private Long cartId;
     private Long customerId;
     private String status;
 
-    @Builder.Default
-    private BigDecimal subtotal = BigDecimal.ZERO;
+    private List<CartItemResponse> items;
 
-    @Builder.Default
-    private BigDecimal total = BigDecimal.ZERO;
-
-    @Builder.Default
-    private List<CartItemResponse> items = new ArrayList<>();
+    private BigDecimal totalAmount;
+    private Integer totalItems;
 
 
 }

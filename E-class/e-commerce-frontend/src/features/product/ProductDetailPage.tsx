@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Row, Col, Image, Typography, Button, Space, Tag, Divider, Spin, notification, InputNumber, Card, Tooltip, Form, Input, Rate, List, Avatar, Collapse } from 'antd';
 import { ShoppingCartOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { productService } from '@/services/product.service';
+import { cartService } from '@/services/cart.service';
+import { useAuth } from '@/services/useAuth';
 import { ProductDetail, Variant } from '../admin/VariantDetailModal';
 import { Link } from 'react-router-dom';
 import { PageResponse, ProductList } from './product.model';
@@ -13,6 +15,7 @@ const IMAGE_BASE_URL = 'http://localhost:8080/api';
 const ProductDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string>('');
@@ -29,6 +32,9 @@ const ProductDetailPage = () => {
         .then(response => {
           const productData = response.data;
           setProduct(productData);
+          if (productData.images && productData.images.length > 0) {
+            setSelectedImage(`${IMAGE_BASE_URL}${productData.images[0]}`);
+          }
         })
         .catch(error => {
           console.error("Failed to fetch product details:", error);
@@ -69,27 +75,33 @@ const ProductDetailPage = () => {
   useEffect(() => {
     if (!product) return;
 
-    let newImageList: string[] = [];
-
     if (selectedVariant && selectedVariant.images && selectedVariant.images.length > 0) {
-      newImageList = selectedVariant.images;
+      setSelectedImage(`${IMAGE_BASE_URL}${selectedVariant.images[0]}`);
+      return;
     }
 
-    else if (selectedColor) {
+    if (selectedColor) {
       const variantsOfColor = product.variants.filter(v => v.attributes.COLOR === selectedColor);
-      newImageList = variantsOfColor.flatMap(v => v.images || []);
+      const colorImages = variantsOfColor.flatMap(v => v.images || []);
+      if (colorImages.length > 0) {
+        setSelectedImage(`${IMAGE_BASE_URL}${colorImages[0]}`);
+        return;
+      }
     }
-
-    if (newImageList.length === 0) {
-      newImageList = product.images || [];
-    }
-    setSelectedImage(newImageList.length > 0 ? `${IMAGE_BASE_URL}${newImageList[0]}` : '');
+ 
   }, [product, selectedColor, selectedVariant]);
 
   const availableSizesForSelectedColor = selectedColor ? variantsByColor[selectedColor]?.filter(v => v.stockQuantity > 0).map(v => v.attributes.SIZE) : allSizes;
   const availableColorsForSelectedSize = selectedSize ? variantsBySize[selectedSize]?.filter(v => v.stockQuantity > 0).map(v => v.attributes.COLOR) : allColors;
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
+    if (!isAuthenticated) {
+      notification.warning({
+        message: 'Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng!',
+      });
+      navigate('/account');
+      return;
+    }
     if (!selectedVariant) {
       notification.warning({
         message: 'Chưa chọn phiên bản',
@@ -104,16 +116,19 @@ const ProductDetailPage = () => {
       });
       return;
     }
-    console.log('Adding to cart:', {
-      variantId: selectedVariant.id,
-      quantity: quantity,
-      productName: product?.name,
-      variantInfo: selectedVariant,
-    });
-    notification.success({
-      message: 'Thêm vào giỏ hàng thành công!',
-      description: `${product?.name} - Size: ${selectedSize} - Màu: ${selectedColor} (x${quantity})`,
-    });
+    try {
+      await cartService.addToCart({
+        productVariantId: selectedVariant.id,
+        quantity: quantity,
+      });
+      notification.success({
+        message: 'Thêm vào giỏ hàng thành công!',
+        description: `${product?.name} - Size: ${selectedSize} - Màu: ${selectedColor} (x${quantity})`,
+      });
+    } catch (error) {
+      console.error("Failed to add to cart:", error);
+      notification.error({ message: 'Lỗi', description: 'Thêm vào giỏ hàng thất bại. Vui lòng thử lại.' });
+    }
   };
 
   const imageListToDisplay = useMemo(() => {
@@ -157,13 +172,12 @@ const ProductDetailPage = () => {
     return false;
   };
 
-  const handleSelectSize = (size: string) => {
-    setSelectedSize(size === selectedSize ? null : size);
-    setQuantity(1);
-  };
-
-  const handleSelectColor = (color: string) => {
-    setSelectedColor(color === selectedColor ? null : color);
+  const handleSelectAttribute = (type: 'size' | 'color', value: string) => {
+    if (type === 'size') {
+      setSelectedSize(prev => (prev === value ? null : value));
+    } else {
+      setSelectedColor(prev => (prev === value ? null : value));
+    }
     setQuantity(1);
   };
 
@@ -233,7 +247,7 @@ const ProductDetailPage = () => {
                   <Button
                     key={size}
                     type={selectedSize === size ? 'primary' : 'default'}
-                    onClick={() => handleSelectSize(size)}
+                    onClick={() => handleSelectAttribute('size', size)}
                     disabled={isSizeDisabled(size)}
                   >
                     {size}
@@ -249,7 +263,7 @@ const ProductDetailPage = () => {
                   <Button
                     key={color}
                     type={selectedColor === color ? 'primary' : 'default'}
-                    onClick={() => handleSelectColor(color)}
+                    onClick={() => handleSelectAttribute('color', color)}
                     disabled={isColorDisabled(color)}
                   >
                     {color}
