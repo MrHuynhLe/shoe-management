@@ -1,10 +1,10 @@
 import { axiosClient } from "./axiosClient";
 
 export const productService = {
-  getProducts: (page = 0, size = 12) =>
-    axiosClient.get("/v1/products", {
-      params: { page, size },
-    }),
+
+  getProducts: (params?: any) => {
+    return axiosClient.get("/v1/products", { params });
+  },
 
   getProductById: (productId: number) =>
     axiosClient.get(`/v1/products/${productId}`),

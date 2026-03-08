@@ -18,7 +18,9 @@ import {
 } from 'antd';
 import { ArrowLeftOutlined, CreditCardOutlined, TruckOutlined } from '@ant-design/icons';
 import { orderService } from '@/services/order.service';
+import { useAuth } from '@/services/useAuth';
 import { discountService } from '@/services/discount.service';
+import { userService } from '@/services/userService';
 
 const { Title, Text } = Typography;
 
@@ -30,6 +32,7 @@ const CheckoutPage = () => {
   const [voucherCode, setVoucherCode] = useState('');
   const [discount, setDiscount] = useState(0);
   const [appliedVoucher, setAppliedVoucher] = useState<string | null>(null);
+  const { isAuthenticated } = useAuth();
 
   const { items, subtotal } = location.state || { items: [], subtotal: 0 };
 
@@ -43,6 +46,22 @@ const CheckoutPage = () => {
       navigate('/cart', { replace: true });
     }
   }, [items, navigate]);
+  useEffect(() => {
+    if (isAuthenticated) {
+      userService.getProfile()
+        .then(response => {
+          const profile = response.data;
+          if (profile) {
+            form.setFieldsValue({
+              customerName: profile.fullName,
+              phone: profile.phone,
+              address: profile.address,
+            });
+          }
+        })
+        .catch(err => console.error("Không thể tải thông tin người dùng:", err));
+    }
+  }, [isAuthenticated, form]);
 
   const handleApplyVoucher = async () => {
     if (!voucherCode) {
@@ -82,9 +101,9 @@ const CheckoutPage = () => {
 
     try {
       const response = await orderService.placeOrder(orderData);
-      
-      message.success('Đặt hàng thành công! Bạn sẽ được chuyển đến trang đơn hàng.');
-      navigate('/my-orders', { replace: true });
+
+      message.success('Đặt hàng thành công!');
+      navigate('/cart', { replace: true });
 
     } catch (error: any) {
       message.error('Đặt hàng thất bại. Vui lòng thử lại.');
@@ -145,14 +164,14 @@ const CheckoutPage = () => {
               )}
             </Card>
             <Card title="3. Phương thức thanh toán" bordered={false} style={{ marginTop: 24, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
-              <Form.Item name="paymentMethod" initialValue="COD" rules={[{ required: true, message: 'Vui lòng chọn phương thức thanh toán!' }]}>
+              <Form.Item name="paymentMethod" initialValue="CASH" rules={[{ required: true, message: 'Vui lòng chọn phương thức thanh toán!' }]}>
                 <Radio.Group style={{ width: '100%' }}>
                   <Space direction="vertical" style={{ width: '100%' }}>
-                    <Radio value="COD" style={{ border: '1px solid #d9d9d9', padding: '16px', borderRadius: '8px', width: '100%' }}>
+                    <Radio value="CASH" style={{ border: '1px solid #d9d9d9', padding: '16px', borderRadius: '8px', width: '100%' }}>
                       <TruckOutlined style={{ marginRight: 8 }} />
                       Thanh toán khi nhận hàng (COD)
                     </Radio>
-                    <Radio value="BANK_TRANSFER" style={{ border: '1px solid #d9d9d9', padding: '16px', borderRadius: '8px', width: '100%' }}>
+                    <Radio value="BANK" style={{ border: '1px solid #d9d9d9', padding: '16px', borderRadius: '8px', width: '100%' }}>
                       <CreditCardOutlined style={{ marginRight: 8 }} />
                       Chuyển khoản ngân hàng
                     </Radio>

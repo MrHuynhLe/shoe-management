@@ -1,6 +1,7 @@
 package com.vn.backend.controller;
 
 import com.vn.backend.dto.request.PlaceOrderRequest;
+import com.vn.backend.dto.response.OrderDetailResponse;
 import com.vn.backend.dto.response.OrderResponse;
 import com.vn.backend.security.CustomUserDetails;
 import com.vn.backend.service.OrderService;
@@ -33,6 +34,12 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getMyOrders(userDetails.getUserId(), pageable));
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<OrderDetailResponse> getOrderDetails(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(orderService.getOrderDetailsById(id, userDetails.getUserId()));
+    }
     @GetMapping
     public ResponseEntity<Page<OrderResponse>> getAllOrders(Pageable pageable) {
         return ResponseEntity.ok(orderService.getAllOrders(pageable));

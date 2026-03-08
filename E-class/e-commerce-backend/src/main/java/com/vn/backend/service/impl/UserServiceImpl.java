@@ -234,16 +234,7 @@ public class UserServiceImpl implements UserService {
             res.setRoleId(user.getRole().getId());
         }
 
-        UserProfile profile = user.getUserProfile();
-        if (profile != null) {
-            res.setFullName(profile.getFullName());
-            res.setPhone(profile.getPhone());
-            res.setAddress(profile.getAddress());
-            res.setBirthday(profile.getBirthday());
-
-            employeeRepository.findByUserProfile(profile)
-                    .ifPresent(emp -> res.setSalary(emp.getSalary()));
-        }
+        res.setUserProfile(user.getUserProfile());
 
         return res;
     }

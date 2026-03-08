@@ -10,6 +10,7 @@ import com.vn.backend.repository.ProductVariantRepository;
 import com.vn.backend.service.ProductImageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -48,6 +49,7 @@ public class ProductImageServiceImpl implements ProductImageService {
     }
 
     @Override
+    @Transactional
     public void create(ProductImageCreateRequest request) {
 
         Product product = productRepository.findById(request.getProductId())

@@ -4,6 +4,7 @@ package com.vn.backend.dto.response;
 import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Data
@@ -16,6 +17,7 @@ public class OrderResponse {
     private BigDecimal discountAmount;
     private BigDecimal totalAmount;
     private String status;
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
     private List<OrderItemResponse> items;
+    private CustomerResponse customer;
 }

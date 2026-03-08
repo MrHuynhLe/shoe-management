@@ -36,9 +36,7 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(auth -> auth
-               
-                        .requestMatchers("/v1/auth/**").permitAll()
-                        .requestMatchers("/uploads/**", "/image/**").permitAll()
+                        .requestMatchers("/v1/auth/**", "/uploads/**", "/image/**").permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/v1/products/**",
                                 "/v1/brands",
@@ -52,17 +50,13 @@ public class SecurityConfig {
                                 "/v1/shipping-providers/active",
                                 "/v1/promotions/current"
                         ).permitAll()
-
-                   
                         .requestMatchers("/v1/cart/**").hasAnyRole("CUSTOMER", "ADMIN")
                         .requestMatchers("/v1/discounts/validate").hasAnyRole("CUSTOMER", "ADMIN")
-                
                         .requestMatchers(HttpMethod.POST, "/v1/orders").hasAnyRole("CUSTOMER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/v1/orders/my-orders").hasAnyRole("CUSTOMER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/v1/orders").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/v1/orders/**").hasRole("ADMIN")
-
-                 
+                        .requestMatchers(HttpMethod.GET, "/v1/users/me").authenticated()
                         .requestMatchers(
                                 "/v1/admin/**",
                                 "/v1/users/**", "/v1/roles/**",
@@ -74,7 +68,6 @@ public class SecurityConfig {
                                 "/v1/shipments/**", "/v1/shipping-providers/**",
                                 "/v1/inventory-transactions/**"
                         ).hasRole("ADMIN")
-
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);

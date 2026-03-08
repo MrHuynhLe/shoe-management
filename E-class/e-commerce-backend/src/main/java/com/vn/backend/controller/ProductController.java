@@ -26,10 +26,11 @@ public class ProductController {
     @GetMapping
     public ResponseEntity<PageResponse<ProductListResponse>> getProducts(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "12") int size
+            @RequestParam(defaultValue = "12") int size,
+            @RequestParam(required = false) Long categoryId
     ) {
         return ResponseEntity.ok(
-                productService.getProductList(page, size)
+                productService.getProductList(page, size, categoryId)
         );
     }
 

@@ -49,7 +49,7 @@ const ProductManagementPage = () => {
   const fetchProducts = () => {
     setLoading(true);
     productService
-      .getProducts(0, 10)
+      .getProducts({ page: 0, size: 10 })
       .then((res) => {
         const formattedData: ProductForTable[] = res.data.content.map((p: ProductList) => ({
           ...p,

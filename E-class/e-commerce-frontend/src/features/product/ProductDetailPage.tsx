@@ -316,7 +316,7 @@ const SuggestedProducts = ({ currentProductId }: { currentProductId: number }) =
 
   useEffect(() => {
     setLoading(true);
-    productService.getProducts(0, 4)
+    productService.getProducts({ page: 0, size: 4 })
       .then(res => {
         const filteredProducts = {
           ...res.data,

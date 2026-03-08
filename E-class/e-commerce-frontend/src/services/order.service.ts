@@ -23,4 +23,6 @@ export const orderService = {
   getMyOrders: (params?: any) => {
     return axiosClient.get("/v1/orders/my-orders", { params });
   },
+ 
+  getOrderDetails: (orderId: number, config?: any) => axiosClient.get(`/v1/orders/${orderId}`, config),
 };

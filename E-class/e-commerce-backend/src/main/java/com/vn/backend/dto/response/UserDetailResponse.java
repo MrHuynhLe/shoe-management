@@ -1,5 +1,6 @@
 package com.vn.backend.dto.response;
 
+import com.vn.backend.entity.UserProfile;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -10,12 +11,8 @@ public class UserDetailResponse {
 
     private Long id;
     private String username;
-    private String fullName;
     private String email;
-    private String phone;
-    private String address;
-    private LocalDate birthday;
-    private Double salary;
     private Long roleId;
     private Boolean isActive;
+    private UserProfile userProfile;
 }

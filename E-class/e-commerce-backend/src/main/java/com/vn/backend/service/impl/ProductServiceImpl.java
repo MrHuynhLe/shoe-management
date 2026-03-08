@@ -41,12 +41,12 @@
 
 
         @Override
-        public PageResponse<ProductListResponse> getProductList(int page, int size) {
+        public PageResponse<ProductListResponse> getProductList(int page, int size, Long categoryId) {
 
             Pageable pageable = PageRequest.of(page, size);
 
             Page<ProductListResponse> pageData =
-                    productRepository.findProductList(pageable);
+                    productRepository.findProductList(pageable, categoryId);
 
             return PageMapper.toPageResponse(pageData, dto -> dto);
         }

@@ -35,7 +35,8 @@ LEFT JOIN p.category c
 LEFT JOIN p.variants v ON (v.isActive = true AND v.deletedAt IS NULL)
 LEFT JOIN ProductImage img ON (img.product.id = p.id AND img.isPrimary = true)
 WHERE p.isActive = true
-  AND p.deletedAt IS NULL
+  AND p.deletedAt IS NULL 
+  AND (:categoryId IS NULL OR c.id = :categoryId)
 GROUP BY
     p.id, p.code, p.name, b.name, o.name, c.name, p.isActive, p.deletedAt
 ORDER BY p.id DESC
@@ -43,11 +44,13 @@ ORDER BY p.id DESC
             countQuery = """
 SELECT COUNT(p.id)
 FROM Product p
+LEFT JOIN p.category c
 WHERE p.isActive = true
   AND p.deletedAt IS NULL
+  AND (:categoryId IS NULL OR c.id = :categoryId)
 """
     )
-    Page<ProductListResponse> findProductList(Pageable pageable);
+    Page<ProductListResponse> findProductList(Pageable pageable, @Param("categoryId") Long categoryId);
 
     @Query("""
     SELECT DISTINCT p

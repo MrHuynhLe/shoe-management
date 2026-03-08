@@ -210,6 +210,11 @@ public class CartServiceImpl implements CartService {
         for (CartItem item : items) {
 
             ProductVariant variant = item.getProductVariant();
+            String imageUrl = variant.getImages().stream()
+                    .filter(img -> Boolean.TRUE.equals(img.getIsPrimary()))
+                    .findFirst()
+                    .or(() -> variant.getImages().stream().findFirst())
+                    .map(ProductImage::getImageUrl).orElse(null);
 
             CartItemResponse itemResp = new CartItemResponse();
             itemResp.setCartItemId(item.getId());
@@ -219,6 +224,7 @@ public class CartServiceImpl implements CartService {
             itemResp.setPrice(variant.getSellingPrice());
             itemResp.setQuantity(item.getQuantity());
             itemResp.setStockRemaining(variant.getStockQuantity());
+            itemResp.setImageUrl(imageUrl);
 
             BigDecimal subTotal =
                     variant.getSellingPrice()

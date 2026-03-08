@@ -7,10 +7,13 @@ import com.vn.backend.dto.request.UserCreateRequest;
 import com.vn.backend.dto.response.PageResponse;
 import com.vn.backend.dto.response.UserDetailResponse;
 import com.vn.backend.dto.response.UserResponse;
+import com.vn.backend.entity.UserProfile;
+import com.vn.backend.security.CustomUserDetails;
 import com.vn.backend.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -35,12 +38,18 @@ public class UserController {
         );
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<UserProfile> getMyProfile(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        UserDetailResponse userDetail = userService.getUserById(userDetails.getUserId());
+        return ResponseEntity.ok(userDetail.getUserProfile());
+    }
+
     @PostMapping
     public ResponseEntity<Void> createUser(
             @RequestBody @Valid UserCreateRequest request
     ) {
         userService.createUser(request);
-        System.out.println("Thêm thaành công ");
+        System.out.println("Thêm thành công ");
         return ResponseEntity.ok().build();
     }
 

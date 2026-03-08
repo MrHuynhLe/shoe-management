@@ -13,7 +13,7 @@ import java.util.List;
 
 public interface ProductService {
 
-    PageResponse<ProductListResponse> getProductList(int page, int size);
+    PageResponse<ProductListResponse> getProductList(int page, int size, Long categoryId);
     ProductDetailResponse getProductDetail(Long id);
     Product createWithImages(
             ProductCreateRequest request,

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Table,
   Button,
@@ -12,12 +12,15 @@ import {
   Tooltip,
   Divider,
   message,
-  Spin,
+  Spin, // eslint-disable-next-line prettier/prettier
+  Tabs
 } from 'antd';
 import { DeleteOutlined, EyeOutlined } from '@ant-design/icons';
 import type { TableRowSelection } from 'antd/es/table/interface';
 import { cartService } from '@/services/cart.service';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { orderService } from '@/services/order.service';
+import MyOrdersPage from './MyOrdersPage';
 
 const { Title, Text } = Typography;
 
@@ -35,12 +38,18 @@ interface CartItem {
 const CartPage = () => {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingCart, setLoadingCart] = useState(true);
+  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [allOrders, setAllOrders] = useState<any[]>([]);
+  const [ordersFetched, setOrdersFetched] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const activeTab = useMemo(() => new URLSearchParams(location.search).get('tab') || 'cart', [location.search]); // eslint-disable-line
 
 const fetchCart = async () => {
   try {
-    setLoading(true);
+    setLoadingCart(true);
 
     const response = await cartService.getCart();
   console.log("API CART:", response.data);
@@ -70,13 +79,39 @@ const fetchCart = async () => {
       message.error("Không thể tải giỏ hàng. Vui lòng thử lại!");
     }
   } finally {
-    setLoading(false);
+    setLoadingCart(false);
   }
 };
 
+  const fetchOrders = async () => {
+    try {
+      setLoadingOrders(true);
+      const response = await orderService.getMyOrders();
+      setAllOrders(response.data.content.map((order: any) => ({ 
+        ...order, 
+        orderDate: order.createdAt, 
+        key: order.id 
+      })));
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+         message.error('Vui lòng đăng nhập để xem đơn hàng!');
+
+      } else {
+        message.error('Không thể tải danh sách đơn hàng.');
+      }
+    } finally {
+      setLoadingOrders(false);
+    }
+  };
+
   useEffect(() => {
-    fetchCart();
-  }, []);
+    if (activeTab === 'cart') {
+      fetchCart();
+    } else if (['pending', 'shipping', 'completed', 'cancelled'].includes(activeTab) && !ordersFetched) {
+      fetchOrders();
+      setOrdersFetched(true);
+    }
+  }, [activeTab, ordersFetched]);
 
   const handleQuantityChange = async (cartItemId: number, quantity: number | null) => {
       console.log("cartItemId:", cartItemId);
@@ -186,64 +221,103 @@ const fetchCart = async () => {
       message.warning('Vui lòng chọn sản phẩm để thanh toán.');
       return;
     }
-    // Chuyển hướng đến trang thanh toán với các sản phẩm đã chọn
+
     navigate('/checkout', { state: { items: selectedItems, subtotal } });
   };
+
+  const handleTabChange = (key: string) => {
+    navigate(`/cart?tab=${key}`);
+  };
+
+  const filterOrdersByStatus = (status: string) => {
+    return allOrders.filter(order => order.status === status);
+  };
+
+
+  const tabItems = [
+    {
+      key: 'cart',
+      label: `Giỏ hàng của bạn (${cartItems.length})`,
+      children: (
+        <Row gutter={[24, 24]}>
+          <Col xs={24} lg={16}>
+            <Card
+              bordered={false}
+              style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+            >
+              <Spin spinning={loadingCart}>
+                <Table
+                  rowSelection={rowSelection}
+                  columns={columns}
+                  dataSource={cartItems}
+                  pagination={false}
+                />
+              </Spin>
+            </Card>
+          </Col>
+          <Col xs={24} lg={8}>
+            <Card
+              hoverable
+              bordered={false}
+              style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)', position: 'sticky', top: 24 }}
+            >
+              <Title level={4}>Tóm tắt đơn hàng</Title>
+              <Divider />
+              <Row justify="space-between" key="subtotal-row">
+                <Text>Tạm tính ({selectedItems.length} sản phẩm)</Text>
+                <Text strong>{subtotal.toLocaleString('vi-VN')} ₫</Text>
+              </Row>
+              <Divider />
+              <Row justify="space-between" key="total-row">
+                <Text strong>Tổng cộng</Text>
+                <Text strong style={{ color: '#c81d1d', fontSize: '1.2rem' }}>
+                  {subtotal.toLocaleString('vi-VN')} ₫
+                </Text>
+              </Row>
+              <Button
+                type="primary"
+                danger
+                block
+                size="large"
+                style={{ marginTop: '24px' }}
+                disabled={selectedItems.length === 0}
+                onClick={handleCheckout}
+              >
+                Tiến hành thanh toán
+              </Button>
+            </Card>
+          </Col>
+        </Row>
+      )
+    },
+    {
+      key: 'pending',
+      label: 'Chờ xác nhận',
+      children: <MyOrdersPage orders={filterOrdersByStatus('PENDING')} loading={loadingOrders} />
+    },
+    {
+      key: 'shipping',
+      label: 'Đang giao',
+      children: <MyOrdersPage orders={filterOrdersByStatus('SHIPPING')} loading={loadingOrders} />
+    },
+    {
+      key: 'completed',
+      label: 'Hoàn thành',
+      children: <MyOrdersPage orders={filterOrdersByStatus('COMPLETED')} loading={loadingOrders} />
+    },
+    {
+      key: 'cancelled',
+      label: 'Đã hủy',
+      children: <MyOrdersPage orders={filterOrdersByStatus('CANCELLED')} loading={loadingOrders} />
+    }
+  ];
 
   return (
     <div style={{ padding: '24px' }}>
       <Title level={2} style={{ marginBottom: '24px' }}>
-        Giỏ hàng của bạn
+        Quản lý giỏ hàng & Đơn hàng
       </Title>
-      <Row gutter={[24, 24]}>
-        <Col xs={24} lg={16}>
-          <Card
-            bordered={false}
-            style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
-          >
-            <Spin spinning={loading}>
-              <Table
-                rowSelection={rowSelection}
-                columns={columns}
-                dataSource={cartItems}
-                pagination={false}
-              />
-            </Spin>
-          </Card>
-        </Col>
-        <Col xs={24} lg={8}>
-          <Card
-            hoverable
-            bordered={false}
-            style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
-          >
-            <Title level={4}>Tóm tắt đơn hàng</Title>
-            <Divider />
-            <Row justify="space-between" key="subtotal-row">
-              <Text>Tạm tính ({selectedItems.length} sản phẩm)</Text>
-              <Text strong>{subtotal.toLocaleString('vi-VN')} ₫</Text>
-            </Row>
-            <Divider />
-            <Row justify="space-between" key="total-row">
-              <Text strong>Tổng cộng</Text>
-              <Text strong style={{ color: '#c81d1d', fontSize: '1.2rem' }}>
-                {subtotal.toLocaleString('vi-VN')} ₫
-              </Text>
-            </Row>
-            <Button
-              type="primary"
-              danger
-              block
-              size="large"
-              style={{ marginTop: '24px' }}
-              disabled={selectedItems.length === 0}
-              onClick={handleCheckout}
-            >
-              Tiến hành thanh toán
-            </Button>
-          </Card>
-        </Col>
-      </Row>
+      <Tabs activeKey={activeTab} items={tabItems} onChange={handleTabChange} />
     </div>
   );
 };

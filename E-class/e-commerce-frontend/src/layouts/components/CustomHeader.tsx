@@ -80,12 +80,6 @@ const CustomHeader = () => {
         <Col flex={1} style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
           <Space size={24} align="center">
             <Input.Search placeholder="Tìm kiếm..." style={{ width: 300, paddingTop: '16px', color: '#0052D9' }} />
-            <Link to="/my-orders" style={{ color: '#0052D9', display: 'inline-block', transition: 'transform 0.2s' }}
-              onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.15)'}
-              onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-            >
-              <SolutionOutlined style={{ fontSize: 24 }} />
-            </Link>
             <Link to="/cart" style={{ color: '#0052D9', display: 'inline-block', transition: 'transform 0.2s' }}
               onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.15)'}
               onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}

@@ -2,7 +2,10 @@ package com.vn.backend.service.impl;
 
 import com.vn.backend.dto.request.PlaceOrderRequest;
 import com.vn.backend.dto.request.ValidateDiscountRequest;
+import com.vn.backend.dto.response.CustomerResponse;
+import com.vn.backend.dto.response.UserProfileResponse;
 import com.vn.backend.dto.response.OrderResponse;
+import com.vn.backend.dto.response.OrderDetailResponse;
 import com.vn.backend.dto.response.ValidateDiscountResponse;
 import com.vn.backend.entity.*;
 import com.vn.backend.exception.InvalidRequestException;
@@ -13,6 +16,7 @@ import com.vn.backend.security.CustomUserDetails;
 import com.vn.backend.service.DiscountService;
 import com.vn.backend.service.OrderService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -40,6 +44,7 @@ public class OrderServiceImpl implements OrderService {
     private final CartItemRepository cartItemRepository;
     private final DiscountService discountService;
     private final PaymentMethodRepository paymentMethodRepository;
+    private final PaymentRepository paymentRepository;
     private final EmployeeRepository employeeRepository;
 
     @Override
@@ -68,7 +73,7 @@ public class OrderServiceImpl implements OrderService {
             OrderItem orderItem = OrderItem.builder()
                     .productVariant(variant)
                     .quantity(itemRequest.getQuantity())
-                    .costPriceAtPurchase(variant.getCostPrice()) 
+                    .costPriceAtPurchase(variant.getCostPrice())
                     .priceAtPurchase(variant.getSellingPrice())
                     .build();
             orderItems.add(orderItem);
@@ -111,7 +116,16 @@ public class OrderServiceImpl implements OrderService {
         order.setItems(orderItems);
 
         Order savedOrder = orderRepository.save(order);
+        PaymentMethod paymentMethod = paymentMethodRepository.findByCode(request.getPaymentMethodCode())
+                .orElseThrow(() -> new ResourceNotFoundException("Phương thức thanh toán không hợp lệ: " + request.getPaymentMethodCode()));
 
+        Payment payment = Payment.builder()
+                .order(savedOrder)
+                .paymentMethod(paymentMethod)
+                .amount(savedOrder.getTotalAmount())
+                .status("PENDING") 
+                .build();
+        paymentRepository.save(payment);
 
         for (OrderItem item : savedOrder.getItems()) {
             ProductVariant variant = item.getProductVariant();
@@ -125,12 +139,63 @@ public class OrderServiceImpl implements OrderService {
                 .id(savedOrder.getId())
                 .code(savedOrder.getCode())
                 .totalAmount(savedOrder.getTotalAmount())
-                .status(savedOrder.getStatus())
-                .createdAt(savedOrder.getCreatedAt() != null ? savedOrder.getCreatedAt().toLocalDateTime() : null)
+                .status(savedOrder.getStatus()) 
                 .build();
     }
 
     @Override
+    public OrderDetailResponse getOrderDetailsById(Long orderId, Long userId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với ID: " + orderId));
+        User currentUser = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + userId));
+        boolean isOwner = order.getCustomer().getUserProfile().getId().equals(currentUser.getUserProfile().getId());
+        boolean isAdmin = currentUser.getRole().getCode().equals("ADMIN");
+
+        if (!isOwner && !isAdmin) {
+            throw new AccessDeniedException("Bạn không có quyền xem chi tiết đơn hàng này.");
+        }
+        List<OrderItemResponse> itemResponses = order.getItems().stream()
+                .map(this::convertToOrderItemResponse)
+                .collect(Collectors.toList());
+
+        UserProfile profile = order.getCustomer().getUserProfile();
+        String customerName = profile != null ? profile.getFullName() : "Khách lẻ";
+        String phone = profile != null ? profile.getPhone() : "N/A";
+        String address = profile != null ? profile.getAddress() : "N/A";
+
+        String paymentMethodName = paymentRepository.findByOrder_Id(order.getId()).stream()
+                .findFirst()
+                .map(p -> p.getPaymentMethod().getName())
+                .orElse("Chưa xác định");
+
+        return new OrderDetailResponse(
+                order.getId(),
+                order.getCode(),
+                order.getCreatedAt(), 
+                order.getStatus(),
+                customerName,
+                phone,
+                address,
+                paymentMethodName,
+                order.getTotalAmount(),
+                new BigDecimal("30000"),
+                itemResponses
+        );
+    }
+
+    private OrderItemResponse convertToOrderItemResponse(OrderItem item) {
+        ProductVariant variant = item.getProductVariant();
+        String imageUrl = variant.getImages().stream()
+                .filter(ProductImage::getIsPrimary)
+                .findFirst()
+                .or(() -> variant.getImages().stream().findFirst())
+                .map(ProductImage::getImageUrl).orElse(null);
+
+        return new OrderItemResponse(variant.getProduct().getId(), variant.getProduct().getName(), variant.getCode(), imageUrl, item.getQuantity(), item.getPriceAtPurchase(), item.getPriceAtPurchase().multiply(BigDecimal.valueOf(item.getQuantity())));
+    }
+    @Override
+    @Transactional(readOnly = true)
     public Page<OrderResponse> getMyOrders(Long userId, Pageable pageable) {
         Customer customer = resolveCustomer(userId);
         return orderRepository.findByCustomer_IdOrderByCreatedAtDesc(customer.getId(), pageable)
@@ -138,6 +203,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<OrderResponse> getAllOrders(Pageable pageable) {
         return orderRepository.findAll(pageable)
                 .map(this::mapToOrderResponse);
@@ -156,16 +222,29 @@ public class OrderServiceImpl implements OrderService {
 
     private OrderResponse mapToOrderResponse(Order order) {
         List<OrderItemResponse> itemResponses = order.getItems().stream()
-                .map(item -> OrderItemResponse.builder()
-                        .id(item.getId())
-                        .productName(item.getProductVariant().getProduct().getName() + " - " + item.getProductVariant().getCode())
-                        .quantity(item.getQuantity())
-                        .price(item.getPriceAtPurchase())
-                        .costPrice(item.getCostPriceAtPurchase())
-                  
-                        .imageUrl("https://via.placeholder.com/80") 
-                        .build())
+                .map(item -> {
+                    ProductVariant variant = item.getProductVariant();
+                    String imageUrl = variant.getImages().stream()
+                            .findFirst()
+                            .map(ProductImage::getImageUrl).orElse(null);
+
+                    return new OrderItemResponse(
+                            variant.getProduct().getId(), variant.getProduct().getName(),
+                            variant.getCode(), imageUrl, item.getQuantity(),
+                            item.getPriceAtPurchase(),
+                            item.getPriceAtPurchase().multiply(BigDecimal.valueOf(item.getQuantity())));
+                })
                 .collect(Collectors.toList());
+
+        CustomerResponse customerResponse = null;
+        if (order.getCustomer() != null) {
+            UserProfile userProfile = order.getCustomer().getUserProfile();
+            UserProfileResponse userProfileResponse = null;
+            if (userProfile != null) {
+                userProfileResponse = new UserProfileResponse(userProfile.getId(), userProfile.getFullName(), userProfile.getPhone(), userProfile.getAddress());
+            }
+            customerResponse = new CustomerResponse(order.getCustomer().getId(), userProfileResponse);
+        }
 
         return OrderResponse.builder()
                 .id(order.getId())
@@ -173,7 +252,8 @@ public class OrderServiceImpl implements OrderService {
                 .discountAmount(order.getDiscountAmount())
                 .totalAmount(order.getTotalAmount())
                 .status(order.getStatus())
-                .createdAt(order.getCreatedAt() != null ? order.getCreatedAt().toLocalDateTime() : null)
+                .createdAt(order.getCreatedAt()) 
+                .customer(customerResponse) 
                 .items(itemResponses)
                 .build();
     }
