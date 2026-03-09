@@ -220,6 +220,32 @@ public class OrderServiceImpl implements OrderService {
         return mapToOrderResponse(updatedOrder);
     }
 
+    @Override
+    @Transactional
+    public void cancelOrder(Long orderId, Long userId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với ID: " + orderId));
+
+        Customer customer = resolveCustomer(userId);
+        if (!order.getCustomer().getId().equals(customer.getId())) {
+            throw new AccessDeniedException("Bạn không có quyền hủy đơn hàng này.");
+        }
+
+        if (!"PENDING".equals(order.getStatus())) {
+            throw new InvalidRequestException("Chỉ có thể hủy đơn hàng ở trạng thái 'Chờ xác nhận'.");
+        }
+
+        order.setStatus("CANCELLED");
+
+        // Hoàn trả số lượng sản phẩm vào kho
+        for (OrderItem item : order.getItems()) {
+            ProductVariant variant = item.getProductVariant();
+            variant.setStockQuantity(variant.getStockQuantity() + item.getQuantity());
+            productVariantRepository.save(variant);
+        }
+
+        orderRepository.save(order);
+    }
     private OrderResponse mapToOrderResponse(Order order) {
         List<OrderItemResponse> itemResponses = order.getItems().stream()
                 .map(item -> {

@@ -2,12 +2,14 @@ import { LockOutlined, UserOutlined } from '@ant-design/icons';
 import { Button, Card, Checkbox, Form, Input, Typography, message } from 'antd';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { axiosClient } from '@/services/axiosClient';
+import { useAuth } from '@/services/AuthContext';
 
 const { Title } = Typography;
 
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { login } = useAuth();
   const from = location.state?.from?.pathname || '/';
   const onFinish = async (values: any) => {
     console.log('Received values of form: ', values);
@@ -19,16 +21,13 @@ const Login = () => {
 
       if (response.status === 200) {
         const data = response.data;
-        localStorage.setItem('token', data.token);
-        localStorage.setItem(
-          'user',
-          JSON.stringify({
-            userId: data.userId,
-            username: data.username,
-            role: data.role
-          })
-        );
-
+        const user = {
+          userId: data.userId,
+          username: data.username,
+          role: data.role
+        };
+        
+        login(data.token, user);
         message.success('Đăng nhập thành công!');
 
         if (data.role === 'ADMIN') {

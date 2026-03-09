@@ -14,19 +14,13 @@ import java.util.Optional;
 @Repository
 public interface PromotionRepository extends JpaRepository<Promotion, Long> {
 
-    @Query("SELECT p FROM Promotion p WHERE p.isActive = true")
-    Page<Promotion> findAllActive(Pageable pageable);
-
-    @Query("SELECT p FROM Promotion p WHERE p.isActive = true")
-    List<Promotion> findAllActive();
-
-    @Query("SELECT p FROM Promotion p WHERE p.id = :id AND p.isActive = true")
-    Optional<Promotion> findByIdActive(Long id);
-
     @Query("SELECT p FROM Promotion p WHERE p.code = :code AND p.isActive = true")
     Optional<Promotion> findByCode(String code);
 
-    @Query("SELECT p FROM Promotion p WHERE p.isActive = true " +
-            "AND p.startDate <= :now AND p.endDate >= :now")
-    List<Promotion> findActivePromotions(OffsetDateTime now);
+    @Query("""
+        SELECT p FROM Promotion p WHERE p.isActive = true
+        AND (p.startDate IS NULL OR p.startDate <= :now)
+        AND (p.endDate IS NULL OR p.endDate >= :now)
+    """)
+    Page<Promotion> findActivePromotions(OffsetDateTime now, Pageable pageable);
 }

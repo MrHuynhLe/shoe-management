@@ -1,4 +1,4 @@
-import { Badge, Layout, Menu, Space, Input, Dropdown, Row, Col, ConfigProvider, message, Avatar } from 'antd';
+import { Badge, Layout, Menu, Space, Input, Dropdown, Row, Col, ConfigProvider, message, Avatar, Popconfirm } from 'antd';
 import {
   HomeOutlined,
   ShoppingCartOutlined,
@@ -7,7 +7,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/services/useAuth';
+import { useAuth } from '@/services/AuthContext';
 import logo from '@/assets/logo-shoe-shop.png';
 
 const { Header } = Layout;
@@ -15,14 +15,13 @@ const { Header } = Layout;
 const CustomHeader = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, logout, orderCount } = useAuth();
 
   const handleUserMenuClick = ({ key }: { key: string }) => {
     if (key === 'logout') {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      logout();
       message.success('Đăng xuất thành công!');
-      window.location.href = '/';
+      navigate('/');
     }
   };
 
@@ -31,7 +30,17 @@ const CustomHeader = () => {
       key: 'profile',
       label: <Link to="/account">Quản lý thông tin cá nhân</Link>,
     },
-    { key: 'logout', label: 'Đăng xuất' },
+    {
+      key: 'logout',
+      label: (
+        <Popconfirm
+          title="Bạn có chắc chắn muốn đăng xuất?"
+          onConfirm={() => handleUserMenuClick({ key: 'logout' })}
+          okText="Đồng ý"
+          cancelText="Không"
+        ><span style={{ display: 'block', width: '100%' }}>Đăng xuất</span></Popconfirm>
+      )
+    },
   ] : [
     {
       key: 'login',
@@ -84,11 +93,14 @@ const CustomHeader = () => {
               onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.15)'}
               onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
             >
-              <Badge count={3} size="small">
+              <Badge count={orderCount} size="small">
                 <ShoppingCartOutlined style={{ fontSize: 24 }} />
               </Badge>
             </Link>
-            <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} placement="bottomRight">
+            <Dropdown menu={{
+              items: userMenuItems,
+              onClick: ({ key }) => key !== 'logout' && handleUserMenuClick({ key })
+            }} placement="bottomRight">
               <a
                 onClick={(e) => e.preventDefault()}
                 style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#0052D9', transition: 'transform 0.2s' }}

@@ -1,28 +1,38 @@
-import { axiosClient } from "./axiosClient";
+import { axiosClient } from './axiosClient';
 
-// A DTO for placing an order
+interface ShippingInfo {
+  customerName: string;
+  phone: string;
+  address: string;
+  note?: string;
+}
+
+interface OrderItem {
+  variantId: number;
+  quantity: number;
+}
+
 interface PlaceOrderDTO {
-  shippingInfo: {
-    customerName: string;
-    phone: string;
-    address: string;
-    note?: string;
-  };
-  paymentMethodCode: string; // e.g., 'COD', 'BANK_TRANSFER'
-  items: {
-    variantId: number;
-    quantity: number;
-  }[];
+  shippingInfo: ShippingInfo;
+  paymentMethodCode: string;
+  items: OrderItem[];
   voucherCode?: string | null;
 }
 
 export const orderService = {
   placeOrder: (orderData: PlaceOrderDTO) => {
-    return axiosClient.post("/v1/orders", orderData);
+    return axiosClient.post('/v1/orders', orderData);
   },
+
   getMyOrders: (params?: any) => {
-    return axiosClient.get("/v1/orders/my-orders", { params });
+    return axiosClient.get('/v1/orders/my-orders', { params });
   },
- 
-  getOrderDetails: (orderId: number, config?: any) => axiosClient.get(`/v1/orders/${orderId}`, config),
+
+  getOrderDetails: (orderId: number, config?: any) => {
+    return axiosClient.get(`/v1/orders/${orderId}`, config);
+  },
+
+  cancelOrder: (orderId: number) => {
+    return axiosClient.put(`/v1/orders/${orderId}/cancel`);
+  },
 };

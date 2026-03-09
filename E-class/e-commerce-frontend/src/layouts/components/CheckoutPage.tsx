@@ -15,12 +15,16 @@ import {
   message,
   Spin,
   Space,
+  Select,
 } from 'antd';
+import { Popconfirm } from 'antd';
 import { ArrowLeftOutlined, CreditCardOutlined, TruckOutlined } from '@ant-design/icons';
 import { orderService } from '@/services/order.service';
-import { useAuth } from '@/services/useAuth';
+import { useAuth } from '@/services/AuthContext';
 import { discountService } from '@/services/discount.service';
 import { userService } from '@/services/userService';
+import { promotionService } from '@/services/promotion.service';
+import { couponService } from '@/services/coupon.service';
 
 const { Title, Text } = Typography;
 
@@ -32,6 +36,7 @@ const CheckoutPage = () => {
   const [voucherCode, setVoucherCode] = useState('');
   const [discount, setDiscount] = useState(0);
   const [appliedVoucher, setAppliedVoucher] = useState<string | null>(null);
+  const [availableVouchers, setAvailableVouchers] = useState<any[]>([]);
   const { isAuthenticated } = useAuth();
 
   const { items, subtotal } = location.state || { items: [], subtotal: 0 };
@@ -62,6 +67,32 @@ const CheckoutPage = () => {
         .catch(err => console.error("Không thể tải thông tin người dùng:", err));
     }
   }, [isAuthenticated, form]);
+
+  useEffect(() => {
+    const fetchAvailableVouchers = async () => {
+      try {
+        const response = await promotionService.getPublicPromotions({ page: 0, size: 50 });
+        const promotions = response.data.content.map((p: any) => ({ ...p, type: 'PROMOTION' })) || [];
+        setAvailableVouchers(prev => [...prev, ...promotions]);
+      } catch (error) {
+        console.error("Không thể tải danh sách khuyến mãi:", error);
+      }
+    };
+
+    const fetchMyCoupons = async () => {
+      if (isAuthenticated) {
+        try {
+          const response = await couponService.getMyCoupons();
+          const coupons = response.data.map((c: any) => ({ ...c, name: `Mã giảm giá cá nhân`, type: 'COUPON' })) || [];
+          setAvailableVouchers(prev => [...prev, ...coupons]);
+        } catch (error) {
+          console.error("Không thể tải danh sách coupon:", error);
+        }
+      }
+    };
+    fetchAvailableVouchers();
+    fetchMyCoupons();
+  }, []);
 
   const handleApplyVoucher = async () => {
     if (!voucherCode) {
@@ -143,23 +174,31 @@ const CheckoutPage = () => {
               </Form.Item>
             </Card>
             <Card title="2. Mã giảm giá" bordered={false} style={{ marginTop: 24, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
-              <Space.Compact style={{ width: '100%' }}>
-                <Input
-                  placeholder="Nhập mã giảm giá"
-                  value={voucherCode}
-                  onChange={(e) => setVoucherCode(e.target.value)}
-                  disabled={!!appliedVoucher}
-                />
-                <Button type="primary" onClick={handleApplyVoucher} disabled={!!appliedVoucher}>
-                  Áp dụng
-                </Button>
-              </Space.Compact>
+              <Select
+                showSearch
+                allowClear
+                style={{ width: '100%' }}
+                placeholder="Chọn hoặc nhập mã giảm giá"
+                value={appliedVoucher}
+                onSelect={(value) => { setVoucherCode(value); }}
+                onSearch={(value) => { setVoucherCode(value); }}
+                onChange={(value) => { if (!value) { setVoucherCode(''); setDiscount(0); setAppliedVoucher(null); } }}
+                filterOption={(input, option) =>
+                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                }
+                options={availableVouchers.map(v => ({
+                  label: v.type === 'PROMOTION'
+                    ? `${v.name} (${v.code})`
+                    : `${v.name}: ${v.code}`,
+                  value: v.code,
+                }))}
+              />
+              <Button type="primary" onClick={handleApplyVoucher} disabled={!!appliedVoucher} style={{ marginTop: 12 }}>
+                Áp dụng mã
+              </Button>
               {appliedVoucher && (
                 <div style={{ marginTop: '12px' }}>
                   <Text type="success">Đã áp dụng mã: <strong>{appliedVoucher}</strong></Text>
-                  <Button type="link" danger onClick={() => {
-                    setVoucherCode(''); setDiscount(0); setAppliedVoucher(null);
-                  }}>Xóa</Button>
                 </div>
               )}
             </Card>
@@ -222,17 +261,24 @@ const CheckoutPage = () => {
                   <Title level={4} style={{ margin: 0 }}>Tổng cộng</Title>
                   <Title level={4} style={{ margin: 0, color: '#c81d1d' }}>{total.toLocaleString('vi-VN')} ₫</Title>
                 </Row>
-                <Button
-                  type="primary"
-                  danger
-                  block
-                  size="large"
-                  htmlType="submit"
-                  loading={loading}
-                  style={{ marginTop: '24px' }}
+                <Popconfirm
+                  title="Xác nhận đặt hàng?"
+                  description="Vui lòng kiểm tra lại thông tin giao hàng và sản phẩm trước khi xác nhận."
+                  onConfirm={() => form.submit()}
+                  okText="Xác nhận"
+                  cancelText="Xem lại"
                 >
-                  {loading ? 'Đang xử lý...' : 'Hoàn tất đặt hàng'}
-                </Button>
+                  <Button
+                    type="primary"
+                    danger
+                    block
+                    size="large"
+                    loading={loading}
+                    style={{ marginTop: '24px' }}
+                  >
+                    {loading ? 'Đang xử lý...' : 'Hoàn tất đặt hàng'}
+                  </Button>
+                </Popconfirm>
               </Spin>
             </Card>
           </Col>

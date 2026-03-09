@@ -6,15 +6,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-
 public interface PromotionService {
-    Page<PromotionResponse> getAllPromotions(Pageable pageable);
-    List<PromotionResponse> getAllActivePromotions();
-    PromotionResponse getPromotionById(Long id);
-    PromotionResponse getPromotionByCode(String code);
-    PromotionResponse createPromotion(PromotionRequest request);
-    PromotionResponse updatePromotion(Long id, PromotionRequest request);
-    void deletePromotion(Long id);
-    List<PromotionResponse> getCurrentActivePromotions();
+    Page<PromotionResponse> getAll(Pageable pageable);
+    Page<PromotionResponse> getPublicActivePromotions(Pageable pageable);
+    PromotionResponse getById(Long id);
+    PromotionResponse create(PromotionRequest request);
+    PromotionResponse update(Long id, PromotionRequest request);
+    void delete(Long id);
 }

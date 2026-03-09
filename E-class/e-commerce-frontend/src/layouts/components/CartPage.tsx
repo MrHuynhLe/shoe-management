@@ -11,7 +11,8 @@ import {
   Image,
   Tooltip,
   Divider,
-  message,
+  message, // eslint-disable-next-line prettier/prettier
+  Popconfirm,
   Spin, // eslint-disable-next-line prettier/prettier
   Tabs
 } from 'antd';
@@ -107,11 +108,11 @@ const fetchCart = async () => {
   useEffect(() => {
     if (activeTab === 'cart') {
       fetchCart();
-    } else if (['pending', 'shipping', 'completed', 'cancelled'].includes(activeTab) && !ordersFetched) {
+    } else if (['pending', 'shipping', 'completed', 'cancelled'].includes(activeTab) && !ordersFetched) { // Chỉ fetch orders lần đầu
       fetchOrders();
       setOrdersFetched(true);
     }
-  }, [activeTab, ordersFetched]);
+  }, [activeTab]); // Bỏ ordersFetched khỏi dependency array
 
   const handleQuantityChange = async (cartItemId: number, quantity: number | null) => {
       console.log("cartItemId:", cartItemId);
@@ -200,14 +201,17 @@ const fetchCart = async () => {
           <Tooltip title="Xem chi tiết">
             <Button icon={<EyeOutlined />} shape="circle" />
           </Tooltip>
-          <Tooltip title="Xóa khỏi giỏ">
-            <Button
-              icon={<DeleteOutlined />}
-              shape="circle"
-              danger
-              onClick={() => handleRemoveItem(record.id)}
-            />
-          </Tooltip>
+          <Popconfirm
+            title="Xóa sản phẩm?"
+            description="Bạn có chắc muốn xóa sản phẩm này khỏi giỏ hàng?"
+            onConfirm={() => handleRemoveItem(record.id)}
+            okText="Đồng ý"
+            cancelText="Không"
+          >
+            <Tooltip title="Xóa khỏi giỏ">
+              <Button icon={<DeleteOutlined />} shape="circle" danger />
+            </Tooltip>
+          </Popconfirm>
         </Space>
       ),
     },
@@ -292,23 +296,23 @@ const fetchCart = async () => {
     },
     {
       key: 'pending',
-      label: 'Chờ xác nhận',
-      children: <MyOrdersPage orders={filterOrdersByStatus('PENDING')} loading={loadingOrders} />
+      label: `Chờ xác nhận (${filterOrdersByStatus('PENDING').length})`,
+      children: <MyOrdersPage orders={filterOrdersByStatus('PENDING')} loading={loadingOrders} onUpdate={fetchOrders} />
     },
     {
       key: 'shipping',
-      label: 'Đang giao',
-      children: <MyOrdersPage orders={filterOrdersByStatus('SHIPPING')} loading={loadingOrders} />
+      label: `Đang giao (${filterOrdersByStatus('SHIPPING').length})`,
+      children: <MyOrdersPage orders={filterOrdersByStatus('SHIPPING')} loading={loadingOrders} onUpdate={fetchOrders} />
     },
     {
       key: 'completed',
-      label: 'Hoàn thành',
-      children: <MyOrdersPage orders={filterOrdersByStatus('COMPLETED')} loading={loadingOrders} />
+      label: `Hoàn thành (${filterOrdersByStatus('COMPLETED').length})`,
+      children: <MyOrdersPage orders={filterOrdersByStatus('COMPLETED')} loading={loadingOrders} onUpdate={fetchOrders} />
     },
     {
       key: 'cancelled',
-      label: 'Đã hủy',
-      children: <MyOrdersPage orders={filterOrdersByStatus('CANCELLED')} loading={loadingOrders} />
+      label: `Đã hủy (${filterOrdersByStatus('CANCELLED').length})`,
+      children: <MyOrdersPage orders={filterOrdersByStatus('CANCELLED')} loading={loadingOrders} onUpdate={fetchOrders} />
     }
   ];
 

@@ -51,4 +51,12 @@ public class OrderController {
             @RequestParam String status) {
         return ResponseEntity.ok(orderService.updateOrderStatus(id, status));
     }
+
+    @PutMapping("/{id}/cancel")
+    public ResponseEntity<Void> cancelOrder(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        orderService.cancelOrder(id, userDetails.getUserId());
+        return ResponseEntity.ok().build();
+    }
 }

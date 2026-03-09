@@ -1,4 +1,4 @@
-import { Button, Input, Space, Table, Tag, Typography, Tooltip, Modal, notification, Image } from 'antd';
+import { Button, Input, Space, Table, Tag, Typography, Tooltip, Modal, notification, Image, Popconfirm } from 'antd';
 import { PlusOutlined, EyeOutlined, DeleteOutlined, InboxOutlined } from '@ant-design/icons';
 import { useEffect, useState, Key } from 'react';
 import { productService } from '@/services/product.service';
@@ -288,7 +288,15 @@ const ProductManagementPage = () => {
               />
             </Tooltip>
           )}
-          <Tooltip title="Xóa"><Button icon={<DeleteOutlined />} danger /></Tooltip>
+          <Popconfirm
+            title="Xóa sản phẩm?"
+            description="Hành động này không thể hoàn tác. Bạn có chắc chắn?"
+            onConfirm={() => notification.info({ message: 'Chức năng đang phát triển' })}
+            okText="Đồng ý"
+            cancelText="Không"
+          >
+            <Tooltip title="Xóa"><Button icon={<DeleteOutlined />} danger /></Tooltip>
+          </Popconfirm>
         </Space>
       ),
     },

@@ -4,6 +4,7 @@ import com.vn.backend.dto.request.PromotionRequest;
 import com.vn.backend.dto.response.PromotionResponse;
 import com.vn.backend.entity.Promotion;
 import com.vn.backend.repository.PromotionRepository;
+import com.vn.backend.exception.ResourceNotFoundException;
 import com.vn.backend.service.PromotionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -12,8 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -22,46 +21,29 @@ public class PromotionServiceImpl implements PromotionService {
     private final PromotionRepository promotionRepository;
 
     @Override
-    public Page<PromotionResponse> getAllPromotions(Pageable pageable) {
-        return promotionRepository.findAllActive(pageable)
+    public Page<PromotionResponse> getAll(Pageable pageable) {
+        return promotionRepository.findAll(pageable)
                 .map(this::mapToResponse);
     }
 
     @Override
-    public List<PromotionResponse> getAllActivePromotions() {
-        return promotionRepository.findAllActive().stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
+    public Page<PromotionResponse> getPublicActivePromotions(Pageable pageable) {
+        return promotionRepository.findActivePromotions(OffsetDateTime.now(), pageable)
+                .map(this::mapToResponse);
     }
 
     @Override
-    public PromotionResponse getPromotionById(Long id) {
-        Promotion promotion = promotionRepository.findByIdActive(id)
-                .orElseThrow(() -> new RuntimeException("Promotion not found with id: " + id));
-        return mapToResponse(promotion);
-    }
-
-    @Override
-    public PromotionResponse getPromotionByCode(String code) {
-        Promotion promotion = promotionRepository.findByCode(code)
-                .orElseThrow(() -> new RuntimeException("Promotion not found with code: " + code));
+    public PromotionResponse getById(Long id) {
+        Promotion promotion = promotionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Promotion not found with id: " + id));
         return mapToResponse(promotion);
     }
 
     @Override
     @Transactional
-    public PromotionResponse createPromotion(PromotionRequest request) {
+    public PromotionResponse create(PromotionRequest request) {
         Promotion promotion = new Promotion();
-        promotion.setCode(request.getCode());
-        promotion.setName(request.getName());
-        promotion.setDiscountType(request.getDiscountType());
-        promotion.setDiscountValue(request.getDiscountValue());
-        promotion.setMinOrderValue(request.getMinOrderValue());
-        promotion.setMaxDiscountAmount(request.getMaxDiscountAmount());
-        promotion.setUsageLimit(request.getUsageLimit());
-        promotion.setStartDate(request.getStartDate());
-        promotion.setEndDate(request.getEndDate());
-        promotion.setIsActive(request.getIsActive());
+        mapRequestToEntity(request, promotion);
 
         Promotion savedPromotion = promotionRepository.save(promotion);
         return mapToResponse(savedPromotion);
@@ -69,20 +51,10 @@ public class PromotionServiceImpl implements PromotionService {
 
     @Override
     @Transactional
-    public PromotionResponse updatePromotion(Long id, PromotionRequest request) {
-        Promotion promotion = promotionRepository.findByIdActive(id)
-                .orElseThrow(() -> new RuntimeException("Promotion not found with id: " + id));
-
-        promotion.setCode(request.getCode());
-        promotion.setName(request.getName());
-        promotion.setDiscountType(request.getDiscountType());
-        promotion.setDiscountValue(request.getDiscountValue());
-        promotion.setMinOrderValue(request.getMinOrderValue());
-        promotion.setMaxDiscountAmount(request.getMaxDiscountAmount());
-        promotion.setUsageLimit(request.getUsageLimit());
-        promotion.setStartDate(request.getStartDate());
-        promotion.setEndDate(request.getEndDate());
-        promotion.setIsActive(request.getIsActive());
+    public PromotionResponse update(Long id, PromotionRequest request) {
+        Promotion promotion = promotionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Promotion not found with id: " + id));
+        mapRequestToEntity(request, promotion);
 
         Promotion updatedPromotion = promotionRepository.save(promotion);
         return mapToResponse(updatedPromotion);
@@ -90,19 +62,12 @@ public class PromotionServiceImpl implements PromotionService {
 
     @Override
     @Transactional
-    public void deletePromotion(Long id) {
-        Promotion promotion = promotionRepository.findByIdActive(id)
-                .orElseThrow(() -> new RuntimeException("Promotion not found with id: " + id));
+    public void delete(Long id) {
+        Promotion promotion = promotionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Promotion not found with id: " + id));
 
         promotion.setIsActive(false);
         promotionRepository.save(promotion);
-    }
-
-    @Override
-    public List<PromotionResponse> getCurrentActivePromotions() {
-        return promotionRepository.findActivePromotions(OffsetDateTime.now()).stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
     }
 
     private PromotionResponse mapToResponse(Promotion promotion) {
@@ -120,5 +85,18 @@ public class PromotionServiceImpl implements PromotionService {
         response.setIsActive(promotion.getIsActive());
         response.setCreatedAt(promotion.getCreatedAt());
         return response;
+    }
+
+    private void mapRequestToEntity(PromotionRequest request, Promotion promotion) {
+        promotion.setCode(request.getCode());
+        promotion.setName(request.getName());
+        promotion.setDiscountType(request.getDiscountType());
+        promotion.setDiscountValue(request.getDiscountValue());
+        promotion.setMinOrderValue(request.getMinOrderValue());
+        promotion.setMaxDiscountAmount(request.getMaxDiscountAmount());
+        promotion.setUsageLimit(request.getUsageLimit());
+        promotion.setStartDate(request.getStartDate());
+        promotion.setEndDate(request.getEndDate());
+        promotion.setIsActive(request.getIsActive() != null ? request.getIsActive() : true);
     }
 }

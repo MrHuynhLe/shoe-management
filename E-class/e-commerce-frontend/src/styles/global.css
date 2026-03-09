@@ -10,11 +10,7 @@
 }
 body {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  background-color: #f0f2f5;
-}
-body {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  background-color: #f0f2f5;
+  background: linear-gradient(180deg, #f0f8ff 0%, #ffffff 50%);
 }
 footer p {
   cursor: pointer;

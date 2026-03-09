@@ -1,7 +1,10 @@
 import { useState } from 'react';
-import { Table, Tag, Typography, Card, Button, Space, Spin } from 'antd';
+import { Table, Tag, Typography, Card, Button, Space, Spin, Popconfirm, message, Tooltip } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import OrderDetailModal from './OrderDetailModal';
+import { orderService } from '@/services/order.service';
+import { DeleteOutlined } from '@ant-design/icons';
+import { useAuth } from '@/services/AuthContext';
 
 const { Title, Text } = Typography;
 
@@ -14,14 +17,26 @@ interface Order {
   status: string;
 }
 
-const MyOrdersPage = ({ orders, loading }: { orders: Order[], loading: boolean }) => {
+const MyOrdersPage = ({ orders, loading, onUpdate }: { orders: Order[], loading: boolean, onUpdate: () => void }) => {
   const navigate = useNavigate();
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const { fetchOrderCount } = useAuth();
 
   const handleViewDetails = (orderId: number) => {
     setSelectedOrderId(orderId);
     setIsModalVisible(true);
+  };
+
+  const handleCancelOrder = async (orderId: number) => {
+    try {
+      await orderService.cancelOrder(orderId);
+      message.success('Hủy đơn hàng thành công!');
+      onUpdate(); 
+      fetchOrderCount(); 
+    } catch (error: any) {
+      message.error(error.response?.data?.message || 'Hủy đơn hàng thất bại.');
+    }
   };
   
   const getStatusTag = (status: string) => {
@@ -77,6 +92,19 @@ const MyOrdersPage = ({ orders, loading }: { orders: Order[], loading: boolean }
           <Button type="primary" onClick={() => handleViewDetails(record.id)}>
             Xem chi tiết
           </Button>
+          {record.status === 'PENDING' && (
+            <Popconfirm
+              title="Bạn chắc chắn muốn hủy đơn hàng này?"
+              description="Hành động này không thể hoàn tác."
+              onConfirm={() => handleCancelOrder(record.id)}
+              okText="Đồng ý"
+              cancelText="Không"
+            >
+              <Tooltip title="Hủy đơn hàng">
+                <Button icon={<DeleteOutlined />} danger />
+              </Tooltip>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },

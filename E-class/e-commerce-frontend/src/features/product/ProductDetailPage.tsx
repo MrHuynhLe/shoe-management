@@ -4,7 +4,7 @@ import { Row, Col, Image, Typography, Button, Space, Tag, Divider, Spin, notific
 import { ShoppingCartOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { productService } from '@/services/product.service';
 import { cartService } from '@/services/cart.service';
-import { useAuth } from '@/services/useAuth';
+import { useAuth } from '@/services/AuthContext';
 import { ProductDetail, Variant } from '../admin/VariantDetailModal';
 import { Link } from 'react-router-dom';
 import { PageResponse, ProductList } from './product.model';

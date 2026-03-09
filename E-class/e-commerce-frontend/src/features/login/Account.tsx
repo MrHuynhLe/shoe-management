@@ -1,7 +1,7 @@
 import { Card, Tabs } from 'antd';
 import LoginForm from './Login';
 import RegisterForm from './RegisterForm';
-import { useAuth } from '@/services/useAuth';
+import { useAuth } from '@/services/AuthContext';
 const AccountPage = () => {
   const { isAuthenticated } = useAuth();
 
