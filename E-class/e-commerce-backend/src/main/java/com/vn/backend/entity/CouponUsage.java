@@ -23,18 +23,22 @@ public class CouponUsage {
     private Coupon coupon;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "customer_id")
+    @JoinColumn(name = "promotion_id")
+    private Promotion promotion;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_id", nullable = false)
     private Customer customer;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "order_id")
+    @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 
-    @Column(name = "created_at", updatable = false)
-    private OffsetDateTime createdAt;
+    @Column(name = "used_at", updatable = false)
+    private OffsetDateTime usedAt;
 
     @PrePersist
-    protected void onCreate() {
-        this.createdAt = OffsetDateTime.now();
+    protected void onPrePersist() {
+        usedAt = OffsetDateTime.now();
     }
 }

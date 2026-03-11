@@ -98,12 +98,6 @@ public class SecurityConfig {
                                 "/v1/colors/**")
                         .hasRole("ADMIN")
 
-                        .requestMatchers("/v1/promotions/**")
-                        .hasRole("ADMIN")
-
-                        .requestMatchers("/v1/coupons/**")
-                        .hasRole("ADMIN")
-
                         .requestMatchers("/v1/payments/**",
                                 "/v1/payment-methods/**")
                         .hasRole("ADMIN")
@@ -118,7 +112,10 @@ public class SecurityConfig {
                         .requestMatchers("/v1/orders/**")
                         .hasRole("ADMIN")
 
-
+                        .requestMatchers("/v1/promotions/**")
+                        .hasRole("ADMIN")
+                        .requestMatchers("/v1/coupons/**")
+                        .hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
 

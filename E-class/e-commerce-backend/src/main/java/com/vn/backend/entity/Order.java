@@ -33,13 +33,16 @@ public class Order {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employee_id")
     @ToString.Exclude
-    private Employee employee; // For POS orders
+    private Employee employee; 
 
     @Column(name = "total_amount", precision = 15, scale = 2)
     private BigDecimal totalAmount = BigDecimal.ZERO;
 
     @Column(name = "discount_amount", precision = 15, scale = 2, nullable = false)
-    private BigDecimal discountAmount = BigDecimal.ZERO; // Số tiền được giảm
+    private BigDecimal discountAmount = BigDecimal.ZERO; 
+
+    @Column(name = "voucher_code", length = 50)
+    private String voucherCode; 
 
     @Column(name = "status", length = 50)
     private String status;
@@ -49,6 +52,9 @@ public class Order {
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items = new ArrayList<>();
+
+    @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    private OrderShippingDetails shippingDetails;
 
     @PrePersist
     protected void onCreate() { this.createdAt = OffsetDateTime.now(); }

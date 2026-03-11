@@ -15,6 +15,8 @@ interface Order {
   orderDate: string;
   totalAmount: number;
   status: string;
+  discountAmount?: number;
+  voucherCode?: string;
 }
 
 const MyOrdersPage = ({ orders, loading, onUpdate }: { orders: Order[], loading: boolean, onUpdate: () => void }) => {
@@ -77,6 +79,22 @@ const MyOrdersPage = ({ orders, loading, onUpdate }: { orders: Order[], loading:
       dataIndex: 'totalAmount',
       key: 'totalAmount',
       render: (amount: number) => <Text strong style={{ color: '#c81d1d' }}>{amount.toLocaleString('vi-VN')} ₫</Text>,
+    },
+    {
+      title: 'Giảm giá',
+      dataIndex: 'discountAmount',
+      key: 'discountAmount',
+      render: (discount: number, record: Order) => {
+        if (!discount || discount === 0) {
+          return <Text type="secondary">Không có</Text>;
+        }
+        return (
+          <Space direction="vertical" size={0}>
+            <Text type="success" strong>-{discount.toLocaleString('vi-VN')} ₫</Text>
+            {record.voucherCode && <Tag color="green">{record.voucherCode}</Tag>}
+          </Space>
+        );
+      },
     },
     {
       title: 'Trạng thái',

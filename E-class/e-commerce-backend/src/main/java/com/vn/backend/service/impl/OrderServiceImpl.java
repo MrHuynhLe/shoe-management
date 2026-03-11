@@ -2,6 +2,7 @@ package com.vn.backend.service.impl;
 
 import com.vn.backend.dto.request.PlaceOrderRequest;
 import com.vn.backend.dto.request.ValidateDiscountRequest;
+import com.vn.backend.dto.request.OrderItemRequest;
 import com.vn.backend.dto.response.CustomerResponse;
 import com.vn.backend.dto.response.UserProfileResponse;
 import com.vn.backend.dto.response.OrderResponse;
@@ -26,10 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -45,6 +43,8 @@ public class OrderServiceImpl implements OrderService {
     private final DiscountService discountService;
     private final PaymentMethodRepository paymentMethodRepository;
     private final PaymentRepository paymentRepository;
+    private final CouponUsageRepository couponUsageRepository;
+    private final PromotionRepository promotionRepository;
     private final EmployeeRepository employeeRepository;
 
     @Override
@@ -54,11 +54,11 @@ public class OrderServiceImpl implements OrderService {
 
         BigDecimal subTotal = BigDecimal.ZERO;
         List<OrderItem> orderItems = new ArrayList<>();
-        List<Long> requestedVariantIds = request.getItems().stream().map(PlaceOrderRequest.OrderItemRequest::getVariantId).toList();
+        List<Long> requestedVariantIds = request.getItems().stream().map(OrderItemRequest::getVariantId).toList();
         Map<Long, ProductVariant> variantsMap = productVariantRepository.findAllById(requestedVariantIds)
                 .stream().collect(Collectors.toMap(ProductVariant::getId, v -> v));
 
-        for (PlaceOrderRequest.OrderItemRequest itemRequest : request.getItems()) {
+        for (OrderItemRequest itemRequest : request.getItems()) {
             ProductVariant variant = variantsMap.get(itemRequest.getVariantId());
             if (variant == null) {
                 throw new ResourceNotFoundException("Product variant not found with id: " + itemRequest.getVariantId());
@@ -80,6 +80,8 @@ public class OrderServiceImpl implements OrderService {
         }
 
         BigDecimal discountAmount = BigDecimal.ZERO;
+        Promotion appliedPromotion = null;
+        Coupon appliedCoupon = null;
         if (StringUtils.hasText(request.getVoucherCode())) {
             ValidateDiscountRequest discountRequest = new ValidateDiscountRequest();
             discountRequest.setCode(request.getVoucherCode());
@@ -90,6 +92,12 @@ public class OrderServiceImpl implements OrderService {
 
             ValidateDiscountResponse discountResponse = discountService.validateDiscount(discountRequest, userDetails);
             discountAmount = discountResponse.getDiscountAmount();
+            Optional<Promotion> promotionOpt = promotionRepository.findByCode(request.getVoucherCode());
+            if (promotionOpt.isPresent()) {
+                appliedPromotion = promotionOpt.get();
+            } else {
+                appliedCoupon = discountService.findCouponByCode(request.getVoucherCode());
+            }
         }
 
 
@@ -108,7 +116,15 @@ public class OrderServiceImpl implements OrderService {
                 .status("PENDING")
                 .discountAmount(discountAmount)
                 .totalAmount(totalAmount)
+                .voucherCode(request.getVoucherCode()) 
                 .build();
+        OrderShippingDetails shippingDetails = new OrderShippingDetails();
+        shippingDetails.setOrder(order);
+        shippingDetails.setShippingName(request.getShippingInfo().getCustomerName());
+        shippingDetails.setShippingPhone(request.getShippingInfo().getPhone());
+        shippingDetails.setShippingAddress(request.getShippingInfo().getAddress());
+        shippingDetails.setShippingNote(request.getShippingInfo().getNote());
+        order.setShippingDetails(shippingDetails);
 
         for (OrderItem item : orderItems) {
             item.setOrder(order);
@@ -116,6 +132,19 @@ public class OrderServiceImpl implements OrderService {
         order.setItems(orderItems);
 
         Order savedOrder = orderRepository.save(order);
+
+        if (appliedPromotion != null || appliedCoupon != null) {
+            CouponUsage usage = CouponUsage.builder()
+                    .customer(customer)
+                    .order(savedOrder)
+                    .promotion(appliedPromotion)
+                    .coupon(appliedCoupon)
+                    .build();
+            couponUsageRepository.save(usage);
+        }
+
+
+
         PaymentMethod paymentMethod = paymentMethodRepository.findByCode(request.getPaymentMethodCode())
                 .orElseThrow(() -> new ResourceNotFoundException("Phương thức thanh toán không hợp lệ: " + request.getPaymentMethodCode()));
 
@@ -139,6 +168,7 @@ public class OrderServiceImpl implements OrderService {
                 .id(savedOrder.getId())
                 .code(savedOrder.getCode())
                 .totalAmount(savedOrder.getTotalAmount())
+                .voucherCode(savedOrder.getVoucherCode()) 
                 .status(savedOrder.getStatus()) 
                 .build();
     }
@@ -159,10 +189,10 @@ public class OrderServiceImpl implements OrderService {
                 .map(this::convertToOrderItemResponse)
                 .collect(Collectors.toList());
 
-        UserProfile profile = order.getCustomer().getUserProfile();
-        String customerName = profile != null ? profile.getFullName() : "Khách lẻ";
-        String phone = profile != null ? profile.getPhone() : "N/A";
-        String address = profile != null ? profile.getAddress() : "N/A";
+        OrderShippingDetails shippingDetails = order.getShippingDetails();
+        String customerName = shippingDetails != null ? shippingDetails.getShippingName() : "N/A";
+        String phone = shippingDetails != null ? shippingDetails.getShippingPhone() : "N/A";
+        String address = shippingDetails != null ? shippingDetails.getShippingAddress() : "N/A";
 
         String paymentMethodName = paymentRepository.findByOrder_Id(order.getId()).stream()
                 .findFirst()
@@ -179,6 +209,8 @@ public class OrderServiceImpl implements OrderService {
                 address,
                 paymentMethodName,
                 order.getTotalAmount(),
+                order.getVoucherCode(), 
+                order.getDiscountAmount(),
                 new BigDecimal("30000"),
                 itemResponses
         );
@@ -237,12 +269,13 @@ public class OrderServiceImpl implements OrderService {
 
         order.setStatus("CANCELLED");
 
-        // Hoàn trả số lượng sản phẩm vào kho
         for (OrderItem item : order.getItems()) {
             ProductVariant variant = item.getProductVariant();
             variant.setStockQuantity(variant.getStockQuantity() + item.getQuantity());
             productVariantRepository.save(variant);
         }
+
+        couponUsageRepository.deleteByOrder_Id(order.getId());
 
         orderRepository.save(order);
     }
@@ -277,6 +310,7 @@ public class OrderServiceImpl implements OrderService {
                 .code(order.getCode())
                 .discountAmount(order.getDiscountAmount())
                 .totalAmount(order.getTotalAmount())
+                .voucherCode(order.getVoucherCode()) 
                 .status(order.getStatus())
                 .createdAt(order.getCreatedAt()) 
                 .customer(customerResponse) 

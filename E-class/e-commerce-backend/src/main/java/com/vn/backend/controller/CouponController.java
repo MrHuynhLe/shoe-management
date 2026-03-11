@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/coupons")
+@RequestMapping("/v1/coupons")
 @CrossOrigin(origins = "http://localhost:5173")
 @RequiredArgsConstructor
 public class CouponController {

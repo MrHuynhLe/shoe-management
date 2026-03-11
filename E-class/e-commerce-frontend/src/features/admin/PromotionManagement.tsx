@@ -18,6 +18,7 @@ interface Promotion {
   minOrderValue: number;
   maxDiscountAmount: number;
   startDate: string;
+  usageLimitPerCustomer: number;
   endDate: string;
   isActive: boolean;
 }
@@ -212,6 +213,7 @@ const PromotionManagementPage = () => {
         <ProFormDigit name="minOrderValue" label="Giá trị đơn hàng tối thiểu" />
         <ProFormDigit name="maxDiscountAmount" label="Giảm giá tối đa (cho loại %)" />
         <ProFormDateTimeRangePicker name="dateRange" label="Thời gian hiệu lực" rules={[{ required: true }]} />
+        <ProFormDigit name="usageLimitPerCustomer" label="Giới hạn lượt sử dụng / khách hàng" placeholder="Bỏ trống nếu không giới hạn" />
         <ProFormDigit name="usageLimit" label="Giới hạn lượt sử dụng (bỏ trống nếu không giới hạn)" />
         <ProFormSwitch name="isActive" label="Kích hoạt" />
       </ModalForm>

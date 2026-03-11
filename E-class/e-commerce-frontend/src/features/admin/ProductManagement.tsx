@@ -5,6 +5,7 @@ import { productService } from '@/services/product.service';
 import AddProductForm from '@/layouts/components/AddProductForm';
 import CreateOrderModal from '@/layouts/components/CreateOrderModal';
 import VariantDetailModal, { Variant } from './VariantDetailModal';
+import { API_BASE_URL } from '@/services/axiosClient';
 
 import EditVariantModal from './EditVariantModal';
 
@@ -33,7 +34,6 @@ type ProductForTable = Omit<ProductListWithVariants, 'brand'> & { brand: string 
 
 const { Title } = Typography;
 const { Search } = Input;
-const IMAGE_BASE_URL = 'http://localhost:8080/api';
 
 const ProductManagementPage = () => {
   const [products, setProducts] = useState<ProductListWithVariants[]>([]);
@@ -220,7 +220,7 @@ const ProductManagementPage = () => {
       width: 80,
       align: 'center' as const,
       render: (imageUrl: string) => (
-        <Image width={50} src={`${IMAGE_BASE_URL}${imageUrl}`} />
+        <Image width={50} src={`${API_BASE_URL}${imageUrl}`} />
       ),
     },
     {

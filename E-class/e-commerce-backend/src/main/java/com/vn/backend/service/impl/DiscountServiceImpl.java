@@ -31,7 +31,8 @@ public class DiscountServiceImpl implements DiscountService {
     
         Optional<Promotion> promotionOpt = promotionRepository.findByCode(code);
         if (promotionOpt.isPresent()) {
-            return validatePromotion(promotionOpt.get(), request.getSubtotal());
+            Customer customer = resolveCustomer(userDetails.getUserId());
+            return validatePromotion(promotionOpt.get(), customer, request.getSubtotal());
         }
 
         Optional<Coupon> couponOpt = couponRepository.findByCodeAndIsActiveTrue(code);
@@ -44,7 +45,13 @@ public class DiscountServiceImpl implements DiscountService {
         throw new InvalidRequestException("Mã giảm giá không hợp lệ hoặc đã hết hạn.");
     }
 
-    private ValidateDiscountResponse validatePromotion(Promotion promotion, BigDecimal subtotal) {
+    @Override
+    public Coupon findCouponByCode(String code) {
+        return couponRepository.findByCodeAndIsActiveTrue(code)
+                .orElse(null);
+    }
+
+    private ValidateDiscountResponse validatePromotion(Promotion promotion, Customer customer, BigDecimal subtotal) {
         OffsetDateTime now = OffsetDateTime.now();
 
         if (promotion.getStartDate() != null && now.isBefore(promotion.getStartDate())) {
@@ -52,6 +59,18 @@ public class DiscountServiceImpl implements DiscountService {
         }
         if (promotion.getEndDate() != null && now.isAfter(promotion.getEndDate())) {
             throw new InvalidRequestException("Chương trình khuyến mãi đã kết thúc.");
+        }
+        if (promotion.getUsageLimit() != null && promotion.getUsageLimit() > 0) {
+            long totalUsage = couponUsageRepository.countByPromotion_Id(promotion.getId());
+            if (totalUsage >= promotion.getUsageLimit()) {
+                throw new InvalidRequestException("Chương trình khuyến mãi đã hết lượt sử dụng.");
+            }
+        }
+        if (promotion.getUsageLimitPerCustomer() != null && promotion.getUsageLimitPerCustomer() > 0) {
+            long customerUsage = couponUsageRepository.countByPromotion_IdAndCustomer_Id(promotion.getId(), customer.getId());
+            if (customerUsage >= promotion.getUsageLimitPerCustomer()) {
+                throw new InvalidRequestException("Bạn đã sử dụng hết lượt của chương trình khuyến mãi này.");
+            }
         }
 
         if (promotion.getMinOrderValue() != null && subtotal.compareTo(promotion.getMinOrderValue()) < 0) {

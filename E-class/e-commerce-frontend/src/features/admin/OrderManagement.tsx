@@ -155,7 +155,6 @@ const OrderManagementPage = () => {
 
   const tabItems = [
     { key: 'PENDING', label: `Chờ xác nhận (${allOrders.filter(o => o.status === 'PENDING').length})`, children: renderOrderTable('PENDING') },
-    { key: 'CONFIRMED', label: `Đã xác nhận (${allOrders.filter(o => o.status === 'CONFIRMED').length})`, children: renderOrderTable('CONFIRMED') },
     { key: 'SHIPPING', label: `Đang giao (${allOrders.filter(o => o.status === 'SHIPPING').length})`, children: renderOrderTable('SHIPPING') },
     { key: 'COMPLETED', label: `Hoàn thành (${allOrders.filter(o => o.status === 'COMPLETED').length})`, children: renderOrderTable('COMPLETED') },
     { key: 'CANCELLED', label: `Đã hủy (${allOrders.filter(o => o.status === 'CANCELLED').length})`, children: renderOrderTable('CANCELLED') },

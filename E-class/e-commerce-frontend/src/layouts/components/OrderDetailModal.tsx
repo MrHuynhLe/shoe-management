@@ -20,14 +20,16 @@ interface OrderItem {
 interface OrderDetail {
   id: number;
   code: string;
-  orderDate: string;
+  createdAt: string; 
   status: string;
   customerName: string;
   phone: string;
   address: string;
-  paymentMethod: string;
+  paymentMethodName: string; 
   totalAmount: number;
   shippingFee: number;
+  voucherCode?: string;
+  discountAmount?: number;
   items: OrderItem[];
 }
 
@@ -124,13 +126,13 @@ const OrderDetailModal = ({ orderId, visible, onClose }: { orderId: number | nul
           <Card bordered={false}>
             <Descriptions bordered column={1} size="small">
               <Descriptions.Item label="Ngày đặt">
-                {order.orderDate ? new Date(order.orderDate).toLocaleString('vi-VN') : 'N/A'}
+                {order.createdAt ? new Date(order.createdAt).toLocaleString('vi-VN') : 'N/A'}
               </Descriptions.Item>
               <Descriptions.Item label="Trạng thái">{getStatusTag(order.status)}</Descriptions.Item>
               <Descriptions.Item label="Người nhận">{order.customerName}</Descriptions.Item>
               <Descriptions.Item label="Số điện thoại">{order.phone}</Descriptions.Item>
               <Descriptions.Item label="Địa chỉ giao hàng">{order.address}</Descriptions.Item>
-              <Descriptions.Item label="Phương thức thanh toán">{order.paymentMethod}</Descriptions.Item>
+              <Descriptions.Item label="Phương thức thanh toán">{order.paymentMethodName}</Descriptions.Item>
             </Descriptions>
 
             <Title level={5} style={{ marginTop: 24, marginBottom: 16 }}>Danh sách sản phẩm</Title>
@@ -142,10 +144,17 @@ const OrderDetailModal = ({ orderId, visible, onClose }: { orderId: number | nul
             />
 
             <Descriptions bordered column={1} size="small" style={{ marginTop: 24 }}>
+                {order.discountAmount && order.discountAmount > 0 && (
+                    <Descriptions.Item label="Tiền hàng">
+                        {(order.totalAmount - order.shippingFee + order.discountAmount).toLocaleString('vi-VN')} ₫
+                    </Descriptions.Item>
+                )}
+                {order.discountAmount && order.discountAmount > 0 && (
+                    <Descriptions.Item label={<Text type="success">Giảm giá ({order.voucherCode})</Text>}>
+                        <Text strong type="success">-{order.discountAmount.toLocaleString('vi-VN')} ₫</Text>
+                    </Descriptions.Item>
+                )}
                 <Descriptions.Item label="Tổng tiền hàng">
-                    <Text strong>{(order.totalAmount - order.shippingFee).toLocaleString('vi-VN')} ₫</Text>
-                </Descriptions.Item>
-                <Descriptions.Item label="Phí vận chuyển">
                     <Text strong>{order.shippingFee.toLocaleString('vi-VN')} ₫</Text>
                 </Descriptions.Item>
                 <Descriptions.Item label="Tổng cộng">

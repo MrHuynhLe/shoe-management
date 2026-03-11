@@ -25,4 +25,13 @@ declare module '*.gif' {
   export default value;
 }
 
-// Thêm các định dạng hình ảnh khác nếu cần
+
+/// <reference types="vite/client" />
+
+interface ImportMetaEnv {
+  readonly VITE_API_BASE_URL: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}

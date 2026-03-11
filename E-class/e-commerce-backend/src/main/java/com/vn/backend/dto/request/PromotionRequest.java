@@ -20,6 +20,8 @@ public class PromotionRequest {
     private BigDecimal minOrderValue;
     private BigDecimal maxDiscountAmount;
     private Integer usageLimit;
+    @NotNull
+    private Integer usageLimitPerCustomer;
     private OffsetDateTime startDate;
     private OffsetDateTime endDate;
     private Boolean isActive;

@@ -13,7 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v1/promotions")
+@RequestMapping("/v1/promotions")
 @CrossOrigin(origins = "http://localhost:5173")
 @RequiredArgsConstructor
 public class PromotionController {

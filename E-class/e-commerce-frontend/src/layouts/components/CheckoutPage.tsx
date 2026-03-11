@@ -10,12 +10,17 @@ import {
   Button,
   List,
   Avatar,
+  Checkbox,
   Divider,
   Typography,
   message,
   Spin,
   Space,
   Select,
+  Tag,
+  Modal,
+  Image,
+  Descriptions,
 } from 'antd';
 import { Popconfirm } from 'antd';
 import { ArrowLeftOutlined, CreditCardOutlined, TruckOutlined } from '@ant-design/icons';
@@ -37,12 +42,26 @@ const CheckoutPage = () => {
   const [discount, setDiscount] = useState(0);
   const [appliedVoucher, setAppliedVoucher] = useState<string | null>(null);
   const [availableVouchers, setAvailableVouchers] = useState<any[]>([]);
+  const [isBankModalVisible, setIsBankModalVisible] = useState(false);
+  const [pendingOrderData, setPendingOrderData] = useState<any>(null);
   const { isAuthenticated } = useAuth();
 
   const { items, subtotal } = location.state || { items: [], subtotal: 0 };
 
   const shippingFee = items.length > 0 ? 30000 : 0; 
   const total = subtotal + shippingFee - discount;
+
+  const generateVietQRUrl = (amount: number, note: string) => {
+    const bankId = "VCB"; 
+    const accountNumber = "1234567890";
+    const accountName = "CONG TY TNHH ABC";
+    const template = "compact2"; 
+    const encodedNote = encodeURIComponent(note);
+    const encodedAccountName = encodeURIComponent(accountName);
+
+    return `https://img.vietqr.io/image/${bankId}-${accountNumber}-${template}.png?amount=${amount}&addInfo=${encodedNote}&accountName=${encodedAccountName}`;
+  };
+
 
   useEffect(() => {
 
@@ -69,30 +88,33 @@ const CheckoutPage = () => {
   }, [isAuthenticated, form]);
 
   useEffect(() => {
+    setAvailableVouchers([]);
+
     const fetchAvailableVouchers = async () => {
       try {
         const response = await promotionService.getPublicPromotions({ page: 0, size: 50 });
         const promotions = response.data.content.map((p: any) => ({ ...p, type: 'PROMOTION' })) || [];
-        setAvailableVouchers(prev => [...prev, ...promotions]);
+        setAvailableVouchers(prev => [...promotions, ...prev.filter(v => v.type !== 'PROMOTION')]);
       } catch (error) {
         console.error("Không thể tải danh sách khuyến mãi:", error);
       }
     };
 
     const fetchMyCoupons = async () => {
-      if (isAuthenticated) {
-        try {
-          const response = await couponService.getMyCoupons();
-          const coupons = response.data.map((c: any) => ({ ...c, name: `Mã giảm giá cá nhân`, type: 'COUPON' })) || [];
-          setAvailableVouchers(prev => [...prev, ...coupons]);
-        } catch (error) {
-          console.error("Không thể tải danh sách coupon:", error);
-        }
+      try {
+        const response = await couponService.getMyCoupons();
+        const coupons = response.data.map((c: any) => ({ ...c, type: 'COUPON' })) || [];
+        setAvailableVouchers(prev => [...prev.filter(v => v.type !== 'COUPON'), ...coupons]);
+      } catch (error) {
+        console.error("Không thể tải danh sách coupon:", error);
       }
     };
+
     fetchAvailableVouchers();
-    fetchMyCoupons();
-  }, []);
+    if (isAuthenticated) {
+      fetchMyCoupons();
+    }
+  }, [isAuthenticated]);
 
   const handleApplyVoucher = async () => {
     if (!voucherCode) {
@@ -112,7 +134,6 @@ const CheckoutPage = () => {
   };
 
   const handlePlaceOrder = async (values: any) => {
-    setLoading(true);
     const orderData = {
       shippingInfo: {
         customerName: values.customerName,
@@ -120,6 +141,7 @@ const CheckoutPage = () => {
         address: values.address,
         note: values.note,
       },
+      shouldUpdateProfile: values.saveAddress,
       paymentMethodCode: values.paymentMethod,
       items: items.map((item: any) => ({
         variantId: item.variantId,
@@ -128,16 +150,29 @@ const CheckoutPage = () => {
       voucherCode: appliedVoucher,
     };
 
-    console.log('Submitting order:', orderData);
+    if (values.paymentMethod === 'BANK') {
+      setPendingOrderData(orderData);
+      setIsBankModalVisible(true);
+    } else {
+      await submitOrder(orderData);
+    }
+  };
+  const handleConfirmBankTransfer = async () => {
+    setIsBankModalVisible(false);
+    if (pendingOrderData) {
+      await submitOrder(pendingOrderData);
+    }
+  };
 
+  const submitOrder = async (orderData: any) => {
+    setLoading(true);
     try {
-      const response = await orderService.placeOrder(orderData);
-
+      await orderService.placeOrder(orderData);
       message.success('Đặt hàng thành công!');
-      navigate('/cart', { replace: true });
-
+      navigate('/cart?tab=pending');
     } catch (error: any) {
-      message.error('Đặt hàng thất bại. Vui lòng thử lại.');
+      const errorMessage = error.response?.data?.message || 'Đặt hàng thất bại. Vui lòng thử lại.';
+      message.error(errorMessage);
       console.error('Failed to place order:', error);
     } finally {
       setLoading(false);
@@ -172,30 +207,41 @@ const CheckoutPage = () => {
               <Form.Item name="note" label="Ghi chú cho đơn hàng (tùy chọn)">
                 <Input.TextArea rows={2} placeholder="Ghi chú thêm cho người bán hoặc shipper" />
               </Form.Item>
+          <Form.Item name="saveAddress" valuePropName="checked">
+            <Checkbox>Lưu thông tin này cho lần mua sắm tiếp theo</Checkbox>
+          </Form.Item>
             </Card>
             <Card title="2. Mã giảm giá" bordered={false} style={{ marginTop: 24, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
-              <Select
-                showSearch
-                allowClear
-                style={{ width: '100%' }}
-                placeholder="Chọn hoặc nhập mã giảm giá"
-                value={appliedVoucher}
-                onSelect={(value) => { setVoucherCode(value); }}
-                onSearch={(value) => { setVoucherCode(value); }}
-                onChange={(value) => { if (!value) { setVoucherCode(''); setDiscount(0); setAppliedVoucher(null); } }}
-                filterOption={(input, option) =>
-                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                }
-                options={availableVouchers.map(v => ({
-                  label: v.type === 'PROMOTION'
-                    ? `${v.name} (${v.code})`
-                    : `${v.name}: ${v.code}`,
-                  value: v.code,
-                }))}
-              />
-              <Button type="primary" onClick={handleApplyVoucher} disabled={!!appliedVoucher} style={{ marginTop: 12 }}>
-                Áp dụng mã
-              </Button>
+              <Space.Compact style={{ width: '100%' }}>
+                <Select
+                  showSearch
+                  allowClear
+                  style={{ width: '100%' }}
+                  placeholder="Chọn hoặc nhập mã giảm giá"
+                  value={voucherCode || undefined}
+                  onSelect={(value) => { setVoucherCode(value); }}
+                  onSearch={(value) => { setVoucherCode(value); }}
+                  onChange={(value) => { 
+                    setVoucherCode(value || '');
+                    if (!value) {
+                      setDiscount(0);
+                      setAppliedVoucher(null);
+                    }
+                  }}
+                  filterOption={(input, option) =>
+                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                  }
+                  options={availableVouchers.map(v => ({
+                    label: v.type === 'PROMOTION'
+                      ? `${v.name} (Giảm ${v.discountValue}${v.discountType === 'PERCENTAGE' ? '%' : '₫'})`                      : `${v.name || v.code} (Giảm ${v.discountValue}${v.discountType === 'PERCENTAGE' ? '%' : '₫'})`,
+                    value: v.code,
+                  }))}
+                  notFoundContent={isAuthenticated ? "Bạn không có mã giảm giá nào" : "Đăng nhập để xem mã giảm giá của bạn"}
+                />
+                <Button type="primary" onClick={handleApplyVoucher} disabled={!!appliedVoucher || !voucherCode}>
+                  Áp dụng
+                </Button>
+              </Space.Compact>
               {appliedVoucher && (
                 <div style={{ marginTop: '12px' }}>
                   <Text type="success">Đã áp dụng mã: <strong>{appliedVoucher}</strong></Text>
@@ -256,6 +302,12 @@ const CheckoutPage = () => {
                     <Text strong type="success">- {discount.toLocaleString('vi-VN')} ₫</Text>
                   </Row>
                 )}
+                {appliedVoucher && (
+                  <Row justify="space-between" style={{ marginBottom: 12 }}>
+                    <Text>Mã đã dùng</Text>
+                    <Text strong><Tag color="green">{appliedVoucher}</Tag></Text>
+                  </Row>
+                )}
                 <Divider />
                 <Row justify="space-between">
                   <Title level={4} style={{ margin: 0 }}>Tổng cộng</Title>
@@ -284,6 +336,33 @@ const CheckoutPage = () => {
           </Col>
         </Row>
       </Form>
+
+      <Modal
+        title="Thông tin chuyển khoản"
+        open={isBankModalVisible}
+        onCancel={() => setIsBankModalVisible(false)}
+        footer={[
+          <Button key="back" onClick={() => setIsBankModalVisible(false)}>
+            Hủy
+          </Button>,
+          <Button key="submit" type="primary" loading={loading} onClick={handleConfirmBankTransfer}>
+            Tôi đã chuyển khoản
+          </Button>,
+        ]}
+      >
+        <div style={{ textAlign: 'center' }}>
+          <p>Vui lòng quét mã QR hoặc chuyển khoản theo thông tin dưới đây.</p>
+          <Image width={250} src={generateVietQRUrl(total, `DH ${pendingOrderData?.shippingInfo?.phone || ''}`)} preview={false} />
+          <Descriptions bordered column={1} style={{ marginTop: 20 }}>
+            <Descriptions.Item label="Ngân hàng">Vietcombank</Descriptions.Item>
+            <Descriptions.Item label="Chủ tài khoản">CONG TY TNHH ABC</Descriptions.Item>
+            <Descriptions.Item label="Số tài khoản">1234567890</Descriptions.Item>
+            <Descriptions.Item label="Số tiền"><Text strong style={{color: '#c81d1d'}}>{total.toLocaleString('vi-VN')} ₫</Text></Descriptions.Item>
+            <Descriptions.Item label="Nội dung chuyển khoản"><Text copyable strong>{`DH ${pendingOrderData?.shippingInfo?.phone}`}</Text></Descriptions.Item>
+          </Descriptions>
+          <Text type="danger" style={{ marginTop: 16, display: 'block' }}>Lưu ý: Vui lòng nhập chính xác nội dung chuyển khoản để đơn hàng được xác nhận tự động.</Text>
+        </div>
+      </Modal>
     </div>
   );
 };

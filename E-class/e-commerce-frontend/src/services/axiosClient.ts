@@ -1,7 +1,10 @@
 import axios from "axios";
 
+
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
+
 export const axiosClient = axios.create({
-  baseURL: "http://localhost:8080/api",
+  baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
@@ -23,7 +26,12 @@ axiosClient.interceptors.response.use(
     return response;
   },
   (error) => {
-
+    if (error.response?.status === 401) {
+      localStorage.removeItem("token");
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
     return Promise.reject(error);
   }
 );

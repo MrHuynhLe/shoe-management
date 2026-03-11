@@ -80,6 +80,7 @@ public class PromotionServiceImpl implements PromotionService {
         response.setMinOrderValue(promotion.getMinOrderValue());
         response.setMaxDiscountAmount(promotion.getMaxDiscountAmount());
         response.setUsageLimit(promotion.getUsageLimit());
+        response.setUsageLimitPerCustomer(promotion.getUsageLimitPerCustomer());
         response.setStartDate(promotion.getStartDate());
         response.setEndDate(promotion.getEndDate());
         response.setIsActive(promotion.getIsActive());
@@ -95,6 +96,7 @@ public class PromotionServiceImpl implements PromotionService {
         promotion.setMinOrderValue(request.getMinOrderValue());
         promotion.setMaxDiscountAmount(request.getMaxDiscountAmount());
         promotion.setUsageLimit(request.getUsageLimit());
+        promotion.setUsageLimitPerCustomer(request.getUsageLimitPerCustomer());
         promotion.setStartDate(request.getStartDate());
         promotion.setEndDate(request.getEndDate());
         promotion.setIsActive(request.getIsActive() != null ? request.getIsActive() : true);

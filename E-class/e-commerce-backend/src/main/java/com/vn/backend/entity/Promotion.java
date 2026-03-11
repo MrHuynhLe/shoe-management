@@ -26,7 +26,7 @@ public class Promotion {
     private String name;
 
     @Column(name = "discount_type", nullable = false, length = 20)
-    private String discountType; // 'PERCENTAGE' or 'FIXED_AMOUNT'
+    private String discountType;
 
     @Column(name = "discount_value", nullable = false, precision = 15, scale = 2)
     private BigDecimal discountValue;
@@ -39,6 +39,9 @@ public class Promotion {
 
     @Column(name = "usage_limit")
     private Integer usageLimit;
+
+    @Column(name = "usage_limit_per_customer")
+    private Integer usageLimitPerCustomer;
 
     @Column(name = "start_date")
     private OffsetDateTime startDate;

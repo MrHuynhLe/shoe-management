@@ -14,7 +14,7 @@ public class PlaceOrderRequest {
 
     @NotNull
     @Valid
-    private ShippingInfo shippingInfo;
+    private ShippingInfoRequest shippingInfo;
 
     @NotBlank
     private String paymentMethodCode;
@@ -24,19 +24,6 @@ public class PlaceOrderRequest {
 
     private String voucherCode;
 
-    private Long employeeId; // For POS orders
+    private Long employeeId; 
 
-    @Data
-    public static class ShippingInfo {
-        @NotBlank private String customerName;
-        @NotBlank private String phone;
-        @NotBlank private String address;
-        private String note;
-    }
-
-    @Data
-    public static class OrderItemRequest {
-        @NotNull private Long variantId;
-        @NotNull @Min(1) private Integer quantity;
-    }
 }

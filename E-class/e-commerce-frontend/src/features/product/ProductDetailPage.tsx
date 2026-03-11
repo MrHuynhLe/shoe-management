@@ -7,10 +7,10 @@ import { cartService } from '@/services/cart.service';
 import { useAuth } from '@/services/AuthContext';
 import { ProductDetail, Variant } from '../admin/VariantDetailModal';
 import { Link } from 'react-router-dom';
+import { API_BASE_URL } from '@/services/axiosClient';
 import { PageResponse, ProductList } from './product.model';
 const { Title, Text, Paragraph } = Typography;
 const NO_IMAGE_PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath fill='%23cccccc' d='M448 80h-80L288 0 160 80H80c-26.5 0-48 21.5-48 48v304c0 26.5 21.5 48 48 48h368c26.5 0 48-21.5 48-48V128c0-26.5-21.5-48-48-48zm-224 48c44.2 0 80 35.8 80 80s-35.8 80-80 80-80-35.8-80-80 35.8-80 80-80zm144 256H96v-16c0-44.2 89.5-64 128-64s89.5 19.8 128 64v16z'/%3E%3C/svg%3E";
-const IMAGE_BASE_URL = 'http://localhost:8080/api';
 
 const ProductDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -33,7 +33,7 @@ const ProductDetailPage = () => {
           const productData = response.data;
           setProduct(productData);
           if (productData.images && productData.images.length > 0) {
-            setSelectedImage(`${IMAGE_BASE_URL}${productData.images[0]}`);
+            setSelectedImage(`${API_BASE_URL}${productData.images[0]}`);
           }
         })
         .catch(error => {
@@ -76,7 +76,7 @@ const ProductDetailPage = () => {
     if (!product) return;
 
     if (selectedVariant && selectedVariant.images && selectedVariant.images.length > 0) {
-      setSelectedImage(`${IMAGE_BASE_URL}${selectedVariant.images[0]}`);
+      setSelectedImage(`${API_BASE_URL}${selectedVariant.images[0]}`);
       return;
     }
 
@@ -84,7 +84,7 @@ const ProductDetailPage = () => {
       const variantsOfColor = product.variants.filter(v => v.attributes.COLOR === selectedColor);
       const colorImages = variantsOfColor.flatMap(v => v.images || []);
       if (colorImages.length > 0) {
-        setSelectedImage(`${IMAGE_BASE_URL}${colorImages[0]}`);
+        setSelectedImage(`${API_BASE_URL}${colorImages[0]}`);
         return;
       }
     }
@@ -210,13 +210,13 @@ const ProductDetailPage = () => {
             <Row gutter={[10, 10]} style={{ marginTop: 16, maxHeight: '220px', overflowY: 'auto' }}>
               {imageListToDisplay.map((img, index) => (
                 <Col span={4} key={index}>
-                  <div style={{ aspectRatio: '1 / 1', border: selectedImage === `${IMAGE_BASE_URL}${img}` ? '2px solid #1677ff' : '2px solid #f0f0f0', borderRadius: '4px', padding: '4px', cursor: 'pointer', transition: 'transform 0.2s ease, border-color 0.2s ease' }}
-                       onClick={() => setSelectedImage(`${IMAGE_BASE_URL}${img}`)}
-                       onMouseOver={(e) => { e.currentTarget.style.transform = 'scale(1.05)'; if (selectedImage !== `${IMAGE_BASE_URL}${img}`) e.currentTarget.style.borderColor = '#91caff'; }}
-                       onMouseOut={(e) => { e.currentTarget.style.transform = 'scale(1)'; if (selectedImage !== `${IMAGE_BASE_URL}${img}`) e.currentTarget.style.borderColor = '#f0f0f0'; }}
+                  <div style={{ aspectRatio: '1 / 1', border: selectedImage === `${API_BASE_URL}${img}` ? '2px solid #1677ff' : '2px solid #f0f0f0', borderRadius: '4px', padding: '4px', cursor: 'pointer', transition: 'transform 0.2s ease, border-color 0.2s ease' }}
+                       onClick={() => setSelectedImage(`${API_BASE_URL}${img}`)}
+                       onMouseOver={(e) => { e.currentTarget.style.transform = 'scale(1.05)'; if (selectedImage !== `${API_BASE_URL}${img}`) e.currentTarget.style.borderColor = '#91caff'; }}
+                       onMouseOut={(e) => { e.currentTarget.style.transform = 'scale(1)'; if (selectedImage !== `${API_BASE_URL}${img}`) e.currentTarget.style.borderColor = '#f0f0f0'; }}
                   >
                     <Image
-                      src={`${IMAGE_BASE_URL}${img}`}
+                      src={`${API_BASE_URL}${img}`}
                       preview={false}
                       fallback={NO_IMAGE_PLACEHOLDER}
                       width="100%"
@@ -343,7 +343,7 @@ const SuggestedProducts = ({ currentProductId }: { currentProductId: number }) =
               bodyStyle={{ padding: '16px', flex: '1' }}
               cover={
                 <Link to={`/products/${p.id}`} style={{ display: 'block', aspectRatio: '1 / 1' }}>
-                  <img alt={p.name} src={`${IMAGE_BASE_URL}${p.imageUrl}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img alt={p.name} src={`${API_BASE_URL}${p.imageUrl}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </Link>
               }
             >
