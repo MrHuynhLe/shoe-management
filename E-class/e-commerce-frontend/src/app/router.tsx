@@ -24,12 +24,14 @@ import MaterialManagementPage from "@/features/admin/MaterialManagement";
 import PromotionManagementPage from "@/features/admin/PromotionManagement";
 import CouponManagementPage from "@/features/admin/CouponManagement";
 
+import ProfilePage from "@/layouts/components/ProfilePage";
 import CheckoutPage from "@/layouts/components/CheckoutPage";
 export const router = createBrowserRouter([
   {
     element: <MainLayout />,
     children: [
       { index: true, element: <Home /> },
+      { path: "profile", element: <ProfilePage /> },
       { path: "products", element: <ProductPage /> },
       { path: "products/:id", element: <ProductDetailPage /> },
       { path: "cart", element: <CartPage /> },

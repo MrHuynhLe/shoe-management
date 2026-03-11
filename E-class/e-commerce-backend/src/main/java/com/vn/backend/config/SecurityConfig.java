@@ -75,6 +75,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/v1/users/me")
                         .authenticated()
 
+                        .requestMatchers("/v1/profile/me")
+                        .authenticated()
+
                         .requestMatchers("/v1/admin/**").hasRole("ADMIN")
 
                         .requestMatchers("/v1/users/**", "/v1/roles/**")

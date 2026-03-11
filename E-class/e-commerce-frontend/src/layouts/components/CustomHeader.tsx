@@ -28,7 +28,7 @@ const CustomHeader = () => {
   const userMenuItems = isAuthenticated ? [
     {
       key: 'profile',
-      label: <Link to="/account">Quản lý thông tin cá nhân</Link>,
+      label: <Link to="/profile">Quản lý thông tin cá nhân</Link>,
     },
     {
       key: 'logout',

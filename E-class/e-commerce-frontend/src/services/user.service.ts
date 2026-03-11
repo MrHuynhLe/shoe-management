@@ -1,4 +1,5 @@
 import { axiosClient } from "./axiosClient";
+import type { ProfileUpdateRequest } from "./user.model";
 
 export const userService = {
   getUsers: (page: number, size: number, keyword?: string) =>
@@ -26,4 +27,15 @@ export const userService = {
 
   getRoles: () =>
     axiosClient.get("/v1/roles"),
+
+  getProfile: () =>
+    axiosClient.get("/v1/users/me"),
+
+  getMyProfile: () => {
+    return axiosClient.get('/v1/profile/me');
+  },
+
+  updateMyProfile: (data: ProfileUpdateRequest) => {
+    return axiosClient.put('/v1/profile/me', data);
+  }
 };
