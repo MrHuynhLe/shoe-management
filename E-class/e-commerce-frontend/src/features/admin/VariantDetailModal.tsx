@@ -180,6 +180,15 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
     try {
       setLoading(true);
 
+      if (!values.variants || values.variants.length === 0) {
+        notification.warning({
+          message: 'Chưa có biến thể',
+          description: 'Vui lòng thêm ít nhất một biến thể trước khi lưu.',
+        });
+        setLoading(false); 
+        return;
+      }
+
       const variantsToSubmit = values.variants.map((variant: any) => {
         const attributeValueIds: number[] = [];
         for (const attr of dynamicAttributes) {
@@ -457,7 +466,7 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
                         </Col>
                         <Col span={3}>
                           <Form.Item {...restField} name={[name, 'stockQuantity']} rules={[{ required: true, message: 'Nhập' }]} noStyle>
-                            <InputNumber placeholder="Tồn kho" min={0} style={{ width: '100%' }} disabled />
+                            <InputNumber placeholder="Tồn kho" min={0} style={{ width: '100%' }} />
                           </Form.Item>
                         </Col>
                         <Col span={5}>

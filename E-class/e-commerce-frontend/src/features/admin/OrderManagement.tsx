@@ -114,12 +114,26 @@ const OrderManagementPage = () => {
           <Popconfirm
             key="confirm"
             title="Xác nhận đơn hàng này?"
-            description="Trạng thái sẽ chuyển sang Đang giao hàng"
+            description="Trạng thái sẽ chuyển sang Đã xác nhận để kho xử lý."
+            onConfirm={() => handleUpdateStatus(record.id, 'CONFIRMED')}
+            okText="Xác nhận"
+            cancelText="Hủy"
+          >
+            <Tooltip title="Xác nhận đơn hàng">
+              <Button type="primary" icon={<CheckCircleOutlined />} shape="circle" />
+            </Tooltip>
+          </Popconfirm>
+        ),
+        record.status === 'CONFIRMED' && (
+          <Popconfirm
+            key="ship"
+            title="Xác nhận giao hàng?"
+            description="Trạng thái sẽ chuyển sang Đang giao hàng và trừ tồn kho."
             onConfirm={() => handleUpdateStatus(record.id, 'SHIPPING')}
             okText="Xác nhận"
             cancelText="Hủy"
           >
-            <Tooltip title="Xác nhận & Giao hàng">
+            <Tooltip title="Giao hàng">
               <Button type="primary" icon={<CheckCircleOutlined />} shape="circle" />
             </Tooltip>
           </Popconfirm>
@@ -155,6 +169,7 @@ const OrderManagementPage = () => {
 
   const tabItems = [
     { key: 'PENDING', label: `Chờ xác nhận (${allOrders.filter(o => o.status === 'PENDING').length})`, children: renderOrderTable('PENDING') },
+    { key: 'CONFIRMED', label: `Đã xác nhận (${allOrders.filter(o => o.status === 'CONFIRMED').length})`, children: renderOrderTable('CONFIRMED') },
     { key: 'SHIPPING', label: `Đang giao (${allOrders.filter(o => o.status === 'SHIPPING').length})`, children: renderOrderTable('SHIPPING') },
     { key: 'COMPLETED', label: `Hoàn thành (${allOrders.filter(o => o.status === 'COMPLETED').length})`, children: renderOrderTable('COMPLETED') },
     { key: 'CANCELLED', label: `Đã hủy (${allOrders.filter(o => o.status === 'CANCELLED').length})`, children: renderOrderTable('CANCELLED') },
