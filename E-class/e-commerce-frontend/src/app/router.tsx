@@ -23,6 +23,7 @@ import SizeManagementPage from "@/features/admin/SizeManagement";
 import MaterialManagementPage from "@/features/admin/MaterialManagement";
 import PromotionManagementPage from "@/features/admin/PromotionManagement";
 import CouponManagementPage from "@/features/admin/CouponManagement";
+import PosManagementPage from "@/features/admin/PosManagement";
 
 import ProfilePage from "@/layouts/components/ProfilePage";
 import CheckoutPage from "@/layouts/components/CheckoutPage";
@@ -68,7 +69,9 @@ export const router = createBrowserRouter([
       { path: "employees", element: <EmployeeManagementPage /> },
       { path: "customers", element: <CustomerManagementPage /> },
       { path: "inventory", element: <InventoryManagementPage /> },
+      { path: "pos", element: <PosManagementPage /> },
       { path: "orders", element: <OrderManagementPage /> },
+      
       { path: "revenue", element: <RevenueStatisticPage /> },
     ],
   },
