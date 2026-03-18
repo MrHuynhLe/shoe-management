@@ -110,6 +110,11 @@ const AdminLayout = () => {
                 ],
               },
               {
+                key: "/admin/pos",
+                path: "/admin/pos",
+                name: "Bán tại quầy",
+              },
+              {
                 key: "/admin/orders",
                 path: "/admin/orders",
                 name: "Quản lý hoá đơn",
