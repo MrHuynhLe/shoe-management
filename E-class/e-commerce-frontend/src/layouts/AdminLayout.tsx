@@ -121,28 +121,28 @@ const AdminLayout = () => {
               },
             ],
           },
-          {
-            key: "warehouse",
-            name: "Kho hàng",
-            icon: <ShopOutlined />,
-            children: [
-              {
-                key: "/admin/inventory",
-                path: "/admin/inventory",
-                name: "Tồn kho",
-              },
-              {
-                key: "/admin/warehouse/receipts",
-                path: "/admin/warehouse/receipts",
-                name: "Phiếu nhập",
-              },
-              {
-                key: "/admin/warehouse/issues",
-                path: "/admin/warehouse/issues",
-                name: "Phiếu xuất",
-              },
-            ],
-          },
+          // {
+          //   key: "warehouse",
+          //   name: "Kho hàng",
+          //   icon: <ShopOutlined />,
+          //   children: [
+          //     {
+          //       key: "/admin/inventory",
+          //       path: "/admin/inventory",
+          //       name: "Tồn kho",
+          //     },
+          //     {
+          //       key: "/admin/warehouse/receipts",
+          //       path: "/admin/warehouse/receipts",
+          //       name: "Phiếu nhập",
+          //     },
+          //     {
+          //       key: "/admin/warehouse/issues",
+          //       path: "/admin/warehouse/issues",
+          //       name: "Phiếu xuất",
+          //     },
+          //   ],
+          // },
           {
             key: "/admin/employees",
             path: "/admin/employees",
@@ -172,12 +172,12 @@ const AdminLayout = () => {
               },
             ],
           },
-          {
-            key: "/admin/revenue",
-            path: "/admin/revenue",
-            name: "Thống kê doanh thu",
-            icon: <LineChartOutlined />,
-          },
+          // {
+          //   key: "/admin/revenue",
+          //   path: "/admin/revenue",
+          //   name: "Thống kê doanh thu",
+          //   icon: <LineChartOutlined />,
+          // },
         ]}
         menuItemRender={(menuItemProps, defaultDom) => {
           if (menuItemProps.isUrl || !menuItemProps.path) {
