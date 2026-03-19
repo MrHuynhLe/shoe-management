@@ -10,21 +10,27 @@ import java.util.List;
 
 @Data
 public class ProductVariantCreateRequest {
-    @NotNull
+
+    @NotNull(message = "ProductId không được để trống")
     private Long productId;
 
-    @NotBlank
+    @NotBlank(message = "Mã biến thể không được để trống")
     private String code;
 
-    @NotNull
+    private String barcode;
+
+    @NotNull(message = "Giá nhập không được để trống")
     private BigDecimal costPrice;
 
-    @NotNull
+    @NotNull(message = "Giá bán không được để trống")
     private BigDecimal sellingPrice;
 
-    // Optional – nếu có nhập kho ngay
     private Integer stockQuantity;
 
-    @NotEmpty
+    private String binLocation;
+
+    private Boolean isActive;
+
+    @NotEmpty(message = "Biến thể phải có ít nhất 1 thuộc tính")
     private List<Long> attributeValueIds;
 }

@@ -1,4 +1,3 @@
-
 package com.vn.backend.repository;
 
 import com.vn.backend.entity.ProductVariant;
@@ -37,7 +36,7 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     List<ProductVariant> findByProductIdWithAttributes(@Param("productId") Long productId);
 
     @Query("""
-        SELECT pv
+        SELECT DISTINCT pv
         FROM ProductVariant pv
         LEFT JOIN FETCH pv.variantAttributeValues vav
         LEFT JOIN FETCH vav.attributeValue av
@@ -48,7 +47,11 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     Optional<ProductVariant> findActiveById(@Param("id") Long id);
 
     boolean existsByCodeAndDeletedAtIsNull(String code);
+
+    boolean existsByBarcodeAndDeletedAtIsNull(String barcode);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select v from ProductVariant v where v.id = :id and v.deletedAt is null")
-    Optional<ProductVariant> findByIdForUpdate(Long id);
+    Optional<ProductVariant> findByIdForUpdate(@Param("id") Long id);
+
 }
