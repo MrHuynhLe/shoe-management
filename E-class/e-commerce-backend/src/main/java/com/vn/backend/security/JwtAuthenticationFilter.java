@@ -9,8 +9,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+
 import java.io.IOException;
 
 @Component
@@ -41,20 +43,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String username = jwtUtil.extractUsername(token);
-        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-        UsernamePasswordAuthenticationToken authentication =
-                new UsernamePasswordAuthenticationToken(
-                        userDetails,
-                        null,
-                        userDetails.getAuthorities()
-                );
+        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-        SecurityContextHolder.getContext().setAuthentication(authentication);
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            userDetails.getAuthorities()
+                    );
+
+            authentication.setDetails(
+                    new WebAuthenticationDetailsSource().buildDetails(request)
+            );
+
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+
+            System.out.println("TOKEN: " + token);
+            System.out.println("VALID: " + jwtUtil.isValid(token));
+            System.out.println("USERNAME: " + username);
+            System.out.println("AUTH SET: " + authentication.getAuthorities());
+        }
 
         filterChain.doFilter(request, response);
-        System.out.println("TOKEN: " + token);
-        System.out.println("VALID: " + jwtUtil.isValid(token));
-        System.out.println("AUTH SET: " + authentication.getAuthorities());
     }
 }

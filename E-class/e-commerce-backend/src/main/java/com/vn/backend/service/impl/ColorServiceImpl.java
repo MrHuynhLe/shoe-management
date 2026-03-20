@@ -23,7 +23,7 @@ public class ColorServiceImpl implements ColorService {
     private final AttributeValueRepository attributeValueRepository;
 
     private Attribute getColorAttribute() {
-        return attributeRepository.findByCode(COLOR_CODE)
+        return attributeRepository.findByCodeIgnoreCase(COLOR_CODE)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy attribute COLOR"));
     }
 

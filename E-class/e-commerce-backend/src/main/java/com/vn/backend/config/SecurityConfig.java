@@ -85,8 +85,9 @@ public class SecurityConfig {
 
                         .requestMatchers(
                                 "/v1/products/**",
-                                "/v1/variants/**",
-                                "/v1/product-images/**").hasAnyRole("ADMIN", "INVENTORY")
+                                "/v1/product-variants/**",
+                                "/v1/product-images/**"
+                        ).hasAnyRole("ADMIN", "INVENTORY", "STAFF")
 
                         .requestMatchers("/v1/brands/**",
                                 "/v1/categories/**",
