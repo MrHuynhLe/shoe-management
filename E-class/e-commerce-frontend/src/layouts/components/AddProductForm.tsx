@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from "react";
 import {
   Button,
   Card,
@@ -14,9 +14,9 @@ import {
   Switch,
   Upload,
   message,
-} from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
-import { productService } from '@/services/product.service';
+} from "antd";
+import { PlusOutlined } from "@ant-design/icons";
+import { productService } from "@/services/product.service";
 
 const { TextArea } = Input;
 
@@ -55,9 +55,9 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
   const [loading, setLoading] = useState(false);
   const [variantRows, setVariantRows] = useState<VariantItem[]>([]);
 
-  const selectedColorIds = Form.useWatch('selected_color_ids', form) || [];
-  const selectedSizeIds = Form.useWatch('selected_size_ids', form) || [];
-  const productCode = Form.useWatch('code', form) || '';
+  const selectedColorIds = Form.useWatch("selected_color_ids", form) || [];
+  const selectedSizeIds = Form.useWatch("selected_size_ids", form) || [];
+  const productCode = Form.useWatch("code", form) || "";
 
   useEffect(() => {
     const fetchOptions = async () => {
@@ -76,7 +76,7 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
           productService.getOrigins(),
           productService.getSuppliers(),
           productService.getColors(), // nhớ kiểm tra service của bạn có hàm này chưa
-          productService.getSizes(),  // nhớ kiểm tra service của bạn có hàm này chưa
+          productService.getSizes(), // nhớ kiểm tra service của bạn có hàm này chưa
         ]);
 
         const formatOptions = (raw: any): SelectOption[] => {
@@ -89,7 +89,7 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
           } else if (raw?.data && Array.isArray(raw.data)) {
             list = raw.data;
           } else {
-            console.error('Invalid options payload:', raw);
+            console.error("Invalid options payload:", raw);
             return [];
           }
 
@@ -106,8 +106,8 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
         setColors(formatOptions(colorsRes.data));
         setSizes(formatOptions(sizesRes.data));
       } catch (error) {
-        console.error('Failed to fetch select options:', error);
-        message.error('Không tải được dữ liệu danh mục');
+        console.error("Failed to fetch select options:", error);
+        message.error("Không tải được dữ liệu danh mục");
       } finally {
         setLoading(false);
       }
@@ -129,25 +129,25 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
       value
         .trim()
         .toUpperCase()
-        .replace(/\s+/g, '-')
-        .replace(/[^A-Z0-9-]/g, '');
+        .replace(/\s+/g, "-")
+        .replace(/[^A-Z0-9-]/g, "");
 
-    const code = normalize(baseCode || 'SP');
-    const color = normalize(colorName || 'COLOR');
-    const size = normalize(sizeName || 'SIZE');
+    const code = normalize(baseCode || "SP");
+    const color = normalize(colorName || "COLOR");
+    const size = normalize(sizeName || "SIZE");
 
     return `${code}-${color}-${size}`;
   };
 
   const handleGenerateVariants = () => {
     if (!selectedColorIds.length || !selectedSizeIds.length) {
-      message.warning('Vui lòng chọn ít nhất 1 màu và 1 size');
+      message.warning("Vui lòng chọn ít nhất 1 màu và 1 size");
       return;
     }
 
-    const oldVariants: VariantItem[] = form.getFieldValue('variants') || [];
+    const oldVariants: VariantItem[] = form.getFieldValue("variants") || [];
     const oldVariantMap = new Map(
-      oldVariants.map((item) => [`${item.color_id}-${item.size_id}`, item])
+      oldVariants.map((item) => [`${item.color_id}-${item.size_id}`, item]),
     );
 
     const generated: VariantItem[] = [];
@@ -157,8 +157,8 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
         const key = `${colorId}-${sizeId}`;
         const oldItem = oldVariantMap.get(key);
 
-        const colorName = colorMap.get(colorId) || '';
-        const sizeName = sizeMap.get(sizeId) || '';
+        const colorName = colorMap.get(colorId) || "";
+        const sizeName = sizeMap.get(sizeId) || "";
 
         generated.push({
           color_id: colorId,
@@ -176,13 +176,13 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
 
     setVariantRows(generated);
     form.setFieldsValue({ variants: generated });
-    message.success('Đã tạo danh sách biến thể');
+    message.success("Đã tạo danh sách biến thể");
   };
 
   const handleVariantChange = (
     index: number,
     field: keyof VariantItem,
-    value: any
+    value: any,
   ) => {
     const next = [...variantRows];
     next[index] = {
@@ -208,7 +208,7 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
     };
 
     if (!payload.variants?.length) {
-      message.error('Vui lòng tạo ít nhất 1 biến thể');
+      message.error("Vui lòng tạo ít nhất 1 biến thể");
       return;
     }
 
@@ -234,7 +234,7 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
           <Form.Item
             name="name"
             label="Tên sản phẩm"
-            rules={[{ required: true, message: 'Vui lòng nhập tên sản phẩm' }]}
+            rules={[{ required: true, message: "Vui lòng nhập tên sản phẩm" }]}
           >
             <Input placeholder="VD: Nike Air Force 1 '07" />
           </Form.Item>
@@ -244,7 +244,7 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
           <Form.Item
             name="code"
             label="Mã dòng sản phẩm"
-            rules={[{ required: true, message: 'Vui lòng nhập mã sản phẩm' }]}
+            rules={[{ required: true, message: "Vui lòng nhập mã sản phẩm" }]}
           >
             <Input placeholder="VD: AF1-WHITE" />
           </Form.Item>
@@ -256,7 +256,7 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
           <Form.Item
             name="brand_id"
             label="Thương hiệu"
-            rules={[{ required: true, message: 'Vui lòng chọn thương hiệu' }]}
+            rules={[{ required: true, message: "Vui lòng chọn thương hiệu" }]}
           >
             <Select
               placeholder="Chọn thương hiệu"
@@ -270,7 +270,7 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
           <Form.Item
             name="category_id"
             label="Danh mục"
-            rules={[{ required: true, message: 'Vui lòng chọn danh mục' }]}
+            rules={[{ required: true, message: "Vui lòng chọn danh mục" }]}
           >
             <Select
               placeholder="Chọn danh mục"
@@ -284,7 +284,7 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
           <Form.Item
             name="origin_id"
             label="Xuất xứ"
-            rules={[{ required: true, message: 'Vui lòng chọn xuất xứ' }]}
+            rules={[{ required: true, message: "Vui lòng chọn xuất xứ" }]}
           >
             <Select
               placeholder="Chọn xuất xứ"
@@ -298,7 +298,7 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
           <Form.Item
             name="supplier_id"
             label="Nhà cung cấp"
-            rules={[{ required: true, message: 'Vui lòng chọn nhà cung cấp' }]}
+            rules={[{ required: true, message: "Vui lòng chọn nhà cung cấp" }]}
           >
             <Select
               placeholder="Chọn nhà cung cấp"
@@ -318,7 +318,7 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
 
       <Form.Item
         name="images"
-        label="Ảnh chung sản phẩm"
+        label="Ảnh sản phẩm"
         valuePropName="fileList"
         getValueFromEvent={(e) => (Array.isArray(e) ? e : e?.fileList)}
       >
@@ -327,11 +327,15 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
           listType="picture-card"
           beforeUpload={() => false}
           multiple
+          maxCount={5}
         >
           <p className="ant-upload-drag-icon">
             <PlusOutlined />
           </p>
           <p className="ant-upload-text">Kéo & thả hoặc nhấn để chọn ảnh</p>
+          <p style={{ fontSize: 12, color: "#999" }}>
+            Ảnh đầu tiên sẽ là ảnh chính của sản phẩm
+          </p>
         </Upload.Dragger>
       </Form.Item>
 
@@ -350,7 +354,7 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
           <Form.Item
             name="selected_color_ids"
             label="Chọn màu"
-            rules={[{ required: true, message: 'Vui lòng chọn ít nhất 1 màu' }]}
+            rules={[{ required: true, message: "Vui lòng chọn ít nhất 1 màu" }]}
           >
             <Select
               mode="multiple"
@@ -366,7 +370,9 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
           <Form.Item
             name="selected_size_ids"
             label="Chọn size"
-            rules={[{ required: true, message: 'Vui lòng chọn ít nhất 1 size' }]}
+            rules={[
+              { required: true, message: "Vui lòng chọn ít nhất 1 size" },
+            ]}
           >
             <Select
               mode="multiple"
@@ -396,7 +402,7 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
       {variantRows.length === 0 ? (
         <Empty description="Chưa có biến thể. Hãy chọn màu, size và bấm Tạo biến thể" />
       ) : (
-        <Space direction="vertical" style={{ width: '100%' }} size={12}>
+        <Space direction="vertical" style={{ width: "100%" }} size={12}>
           {variantRows.map((variant, index) => (
             <Card
               key={`${variant.color_id}-${variant.size_id}`}
@@ -409,7 +415,7 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
                     <Input
                       value={variant.sku}
                       onChange={(e) =>
-                        handleVariantChange(index, 'sku', e.target.value)
+                        handleVariantChange(index, "sku", e.target.value)
                       }
                       placeholder="SKU biến thể"
                     />
@@ -419,11 +425,11 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
                 <Col span={5}>
                   <Form.Item label="Giá bán" required>
                     <InputNumber
-                      style={{ width: '100%' }}
+                      style={{ width: "100%" }}
                       min={0}
                       value={variant.price}
                       onChange={(value) =>
-                        handleVariantChange(index, 'price', value)
+                        handleVariantChange(index, "price", value)
                       }
                       placeholder="Giá bán"
                     />
@@ -433,11 +439,11 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
                 <Col span={5}>
                   <Form.Item label="Giá khuyến mãi">
                     <InputNumber
-                      style={{ width: '100%' }}
+                      style={{ width: "100%" }}
                       min={0}
                       value={variant.sale_price}
                       onChange={(value) =>
-                        handleVariantChange(index, 'sale_price', value)
+                        handleVariantChange(index, "sale_price", value)
                       }
                       placeholder="Giá khuyến mãi"
                     />
@@ -447,11 +453,11 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
                 <Col span={4}>
                   <Form.Item label="Tồn kho" required>
                     <InputNumber
-                      style={{ width: '100%' }}
+                      style={{ width: "100%" }}
                       min={0}
                       value={variant.stock_quantity}
                       onChange={(value) =>
-                        handleVariantChange(index, 'stock_quantity', value ?? 0)
+                        handleVariantChange(index, "stock_quantity", value ?? 0)
                       }
                       placeholder="Số lượng"
                     />
@@ -463,7 +469,7 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
                     <Switch
                       checked={variant.is_active}
                       onChange={(checked) =>
-                        handleVariantChange(index, 'is_active', checked)
+                        handleVariantChange(index, "is_active", checked)
                       }
                     />
                   </Form.Item>

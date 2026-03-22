@@ -1,7 +1,6 @@
 import { axiosClient } from "./axiosClient";
 
 export const productService = {
-
   getProducts: (params?: any) => {
     return axiosClient.get("/v1/products", { params });
   },
@@ -9,17 +8,17 @@ export const productService = {
   getProductById: (productId: number) =>
     axiosClient.get(`/v1/products/${productId}`),
 
-  getBrands: () => axiosClient.get('/v1/brands'),
-  getCategories: () => axiosClient.get('/v1/categories'),
-  getOrigins: () => axiosClient.get('/v1/origins'),
-  getSuppliers: () => axiosClient.get('/v1/suppliers'),
-  getAttributes: () => axiosClient.get('/v1/attributes'),
+  getBrands: () => axiosClient.get("/v1/brands"),
+  getCategories: () => axiosClient.get("/v1/categories"),
+  getOrigins: () => axiosClient.get("/v1/origins"),
+  getSuppliers: () => axiosClient.get("/v1/suppliers"),
+  getAttributes: () => axiosClient.get("/v1/attributes"),
 
   getColors: () => axiosClient.get("/v1/attributes/color/values"),
   getSizes: () => axiosClient.get("/v1/attributes/size/values"),
 
-  createProduct: (productData: FormData) =>
-    axiosClient.post("/v1/products/with-images", productData, {
+  createProduct: (formData: FormData) =>
+    axiosClient.post("/v1/products/with-images", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
@@ -27,6 +26,13 @@ export const productService = {
 
   uploadImage: (formData: FormData) =>
     axiosClient.post("/v1/products/upload-image", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }),
+
+  createProductWithImages: (formData: FormData) =>
+    axiosClient.post("/v1/products/with-images", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },

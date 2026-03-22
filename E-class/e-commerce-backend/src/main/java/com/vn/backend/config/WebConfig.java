@@ -1,22 +1,25 @@
 package com.vn.backend.config;
 
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.web.config.EnableSpringDataWebSupport;
-import org.springframework.web.servlet.config.annotation.*;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 @Configuration
-@EnableSpringDataWebSupport(pageSerializationMode = EnableSpringDataWebSupport.PageSerializationMode.VIA_DTO)
 public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        Path uploadRoot = Paths.get("uploads").toAbsolutePath().normalize();
 
-        String uploadPath = System.getProperty("user.dir") + "/uploads/";
+        String uploadLocation = uploadRoot.toUri().toString();
+
+        System.out.println("RESOURCE UPLOAD ROOT = " + uploadRoot);
+        System.out.println("RESOURCE LOCATION = " + uploadLocation);
 
         registry.addResourceHandler("/uploads/**")
-                .addResourceLocations("file:" + uploadPath);
-
-        registry.addResourceHandler("/image/**")
-                .addResourceLocations("classpath:/static/image/");
+                .addResourceLocations(uploadLocation);
     }
 }
