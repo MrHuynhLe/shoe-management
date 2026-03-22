@@ -172,12 +172,12 @@ const AdminLayout = () => {
               },
             ],
           },
-          // {
-          //   key: "/admin/revenue",
-          //   path: "/admin/revenue",
-          //   name: "Thống kê doanh thu",
-          //   icon: <LineChartOutlined />,
-          // },
+          {
+            key: "/admin/revenue",
+            path: "/admin/revenue",
+            name: "Thống kê doanh thu",
+            icon: <LineChartOutlined />,
+          },
         ]}
         menuItemRender={(menuItemProps, defaultDom) => {
           if (menuItemProps.isUrl || !menuItemProps.path) {

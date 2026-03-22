@@ -1,4 +1,12 @@
 package com.vn.backend.dto.response.statistics;
 
-public class RevenueChartItemResponse {
+import java.math.BigDecimal;
+
+public record RevenueChartItemResponse(
+        String label,
+        Long totalOrders,
+        BigDecimal revenue,
+        Long itemsSold,
+        BigDecimal profit
+) {
 }
