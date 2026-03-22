@@ -19,11 +19,11 @@ SELECT new com.vn.backend.dto.response.ProductListResponse(
     p.code,
     p.name,
     b.name,
-    o.name,
     c.name,
+    o.name,
     MIN(v.sellingPrice),
     MAX(v.sellingPrice),
-    SUM(v.stockQuantity),
+    COALESCE(SUM(v.stockQuantity), 0),
     MAX(img.imageUrl),
     p.isActive,
     p.deletedAt
@@ -35,10 +35,10 @@ LEFT JOIN p.category c
 LEFT JOIN p.variants v ON (v.isActive = true AND v.deletedAt IS NULL)
 LEFT JOIN ProductImage img ON (img.product.id = p.id AND img.isPrimary = true)
 WHERE p.isActive = true
-  AND p.deletedAt IS NULL 
+  AND p.deletedAt IS NULL
   AND (:categoryId IS NULL OR c.id = :categoryId)
 GROUP BY
-    p.id, p.code, p.name, b.name, o.name, c.name, p.isActive, p.deletedAt
+    p.id, p.code, p.name, b.name, c.name, o.name, p.isActive, p.deletedAt
 ORDER BY p.id DESC
 """,
             countQuery = """
@@ -58,7 +58,7 @@ WHERE p.isActive = true
     JOIN FETCH p.brand
     JOIN FETCH p.category
     JOIN FETCH p.origin
-    LEFT JOIN FETCH p.variants v
+    LEFT JOIN FETCH p.images img
     WHERE p.id = :id
       AND p.isActive = true
       AND p.deletedAt IS NULL
@@ -68,5 +68,4 @@ WHERE p.isActive = true
     boolean existsByCodeAndDeletedAtIsNull(String code);
 
     Optional<Product> findByIdAndDeletedAtIsNull(Long id);
-
 }

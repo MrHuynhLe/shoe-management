@@ -11,6 +11,7 @@ import java.util.List;
 
 @Data
 public class VariantBulkRequest {
+
     @NotNull(message = "ID sản phẩm không được rỗng")
     private Long productId;
 
@@ -23,10 +24,13 @@ public class VariantBulkRequest {
         @NotBlank(message = "SKU không được để trống")
         private String code;
 
+        private String barcode;
         private BigDecimal costPrice;
         private BigDecimal sellingPrice;
         private Integer stockQuantity;
+        private String binLocation;
         private String imageUrl;
+
         @NotEmpty(message = "Mỗi biến thể phải có ít nhất 1 thuộc tính")
         private List<Long> attributeValueIds;
     }
