@@ -1,13 +1,30 @@
-import { Button, Input, Space, Table, Tag, Typography, Tooltip, Modal, notification, Image, Popconfirm } from 'antd';
-import { PlusOutlined, EyeOutlined, DeleteOutlined, InboxOutlined } from '@ant-design/icons';
-import { useEffect, useState, Key } from 'react';
-import { productService } from '@/services/product.service';
-import AddProductForm from '@/layouts/components/AddProductForm';
-import CreateOrderModal from '@/layouts/components/CreateOrderModal';
-import VariantDetailModal, { Variant } from './VariantDetailModal';
-import { API_BASE_URL } from '@/services/axiosClient';
+import {
+  Button,
+  Input,
+  Space,
+  Table,
+  Tag,
+  Typography,
+  Tooltip,
+  Modal,
+  notification,
+  Image,
+  Popconfirm,
+} from "antd";
+import {
+  PlusOutlined,
+  EyeOutlined,
+  DeleteOutlined,
+  InboxOutlined,
+} from "@ant-design/icons";
+import { useEffect, useState, Key } from "react";
+import { productService } from "@/services/product.service";
+import AddProductForm from "@/layouts/components/AddProductForm";
+import CreateOrderModal from "@/layouts/components/CreateOrderModal";
+import VariantDetailModal, { Variant } from "./VariantDetailModal";
+import { API_BASE_URL } from "@/services/axiosClient";
 
-import EditVariantModal from './EditVariantModal';
+import EditVariantModal from "./EditVariantModal";
 
 interface ProductList {
   id: number;
@@ -22,7 +39,6 @@ interface ProductList {
   imageUrl: string;
 }
 
-
 interface ProductListWithVariants extends ProductList {
   key: Key;
   hasVariants: boolean;
@@ -30,7 +46,9 @@ interface ProductListWithVariants extends ProductList {
   variants: Variant[];
 }
 
-type ProductForTable = Omit<ProductListWithVariants, 'brand'> & { brand: string };
+type ProductForTable = Omit<ProductListWithVariants, "brand"> & {
+  brand: string;
+};
 
 const { Title } = Typography;
 const { Search } = Input;
@@ -40,28 +58,34 @@ const ProductManagementPage = () => {
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
-  const [isVariantDetailModalOpen, setIsVariantDetailModalOpen] = useState(false);
+  const [isVariantDetailModalOpen, setIsVariantDetailModalOpen] =
+    useState(false);
   const [isEditVariantModalOpen, setIsEditVariantModalOpen] = useState(false);
   const [editingVariant, setEditingVariant] = useState<Variant | null>(null);
-  const [selectedProduct, setSelectedProduct] = useState<ProductForTable | null>(null);
-  const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
+  const [selectedProduct, setSelectedProduct] =
+    useState<ProductForTable | null>(null);
+  const [selectedProductId, setSelectedProductId] = useState<number | null>(
+    null,
+  );
 
   const fetchProducts = () => {
     setLoading(true);
     productService
       .getProducts({ page: 0, size: 10 })
       .then((res) => {
-        const formattedData: ProductForTable[] = res.data.content.map((p: ProductList) => ({
-          ...p,
-          key: p.id,
-          brand: p.brandName,
-          hasVariants: true,
-          hasPendingOrder: false,
-          variants: [],
-        }));
+        const formattedData: ProductForTable[] = res.data.content.map(
+          (p: ProductList) => ({
+            ...p,
+            key: p.id,
+            brand: p.brandName,
+            hasVariants: true,
+            hasPendingOrder: false,
+            variants: [],
+          }),
+        );
         setProducts(formattedData);
       })
-      .catch((error) => console.error('Lỗi khi tải danh sách sản phẩm:', error))
+      .catch((error) => console.error("Lỗi khi tải danh sách sản phẩm:", error))
       .finally(() => setLoading(false));
   };
 
@@ -72,7 +96,9 @@ const ProductManagementPage = () => {
   const handleAddProduct = async (values: any) => {
     try {
       setLoading(true);
+
       const formData = new FormData();
+
       const productDTO = {
         name: values.name,
         code: values.code,
@@ -81,10 +107,8 @@ const ProductManagementPage = () => {
         categoryId: values.category_id ? Number(values.category_id) : null,
         originId: values.origin_id ? Number(values.origin_id) : null,
         supplierId: values.supplier_id ? Number(values.supplier_id) : null,
-        isActive: values.is_active ?? true
+        isActive: values.is_active ?? true,
       };
-
-      console.log("FINAL DTO TO SEND:", productDTO);
 
       if (
         !productDTO.brandId ||
@@ -95,52 +119,81 @@ const ProductManagementPage = () => {
         !productDTO.code
       ) {
         notification.warning({
-          message: 'Thiếu thông tin',
-          description: 'Vui lòng điền đầy đủ các trường bắt buộc (*)',
+          message: "Thiếu thông tin",
+          description: "Vui lòng điền đầy đủ các trường bắt buộc (*)",
         });
-        setLoading(false);
         return;
       }
+
       formData.append(
         "data",
-        new Blob([JSON.stringify(productDTO)], { type: "application/json" })
+        new Blob([JSON.stringify(productDTO)], {
+          type: "application/json",
+        }),
       );
 
-      if (values.image?.originFileObj) {
-        formData.append("image", values.image.originFileObj);
-      } else if (values.image?.[0]?.originFileObj) {
+      const imageFileList =
+        values.images?.fileList || values.image?.fileList || [];
 
-        formData.append("image", values.image[0].originFileObj);
-      }
-
-      if (values.images && values.images.length > 0) {
-        values.images.forEach((file: any) => {
+      if (imageFileList.length > 0) {
+        imageFileList.forEach((file: any) => {
           if (file.originFileObj) {
             formData.append("images", file.originFileObj);
           }
         });
       }
-      await productService.createProduct(formData);
+
+      const productRes = await productService.createProduct(formData);
+
+      const createdProductId =
+        productRes?.data?.id || productRes?.data?.data?.id;
+
+      if (!createdProductId) {
+        throw new Error("Không lấy được productId sau khi tạo sản phẩm");
+      }
+
+      if (values.variants && values.variants.length > 0) {
+        const variantsPayload = values.variants.map((item: any) => ({
+          code: item.sku,
+          costPrice: item.sale_price ?? item.price,
+          sellingPrice: item.price,
+          stockQuantity: item.stock_quantity,
+          attributeValueIds: [item.color_id, item.size_id],
+        }));
+
+        await productService.bulkCreateVariantsOnly({
+          productId: createdProductId,
+          variants: variantsPayload,
+        });
+      }
+
       setIsModalOpen(false);
       notification.success({
-        message: 'Thành công',
-        description: 'Sản phẩm đã được tạo thành công!',
+        message: "Thành công",
+        description: "Sản phẩm đã được tạo thành công!",
       });
 
+      fetchProducts();
     } catch (error: any) {
-      const serverMessage = error.response?.data?.message
-        || error.response?.data
-        || 'Đã có lỗi xảy ra trong quá trình tạo sản phẩm.';
+      console.error("CREATE PRODUCT ERROR:", error);
+
+      const serverMessage =
+        error.response?.data?.message ||
+        error.response?.data ||
+        error.message ||
+        "Đã có lỗi xảy ra trong quá trình tạo sản phẩm.";
 
       notification.error({
-        message: 'Tạo sản phẩm thất bại',
-        description: typeof serverMessage === 'string' ? serverMessage : 'Dữ liệu không hợp lệ, vui lòng kiểm tra lại.',
+        message: "Tạo sản phẩm thất bại",
+        description:
+          typeof serverMessage === "string"
+            ? serverMessage
+            : "Dữ liệu không hợp lệ, vui lòng kiểm tra lại.",
       });
     } finally {
       setLoading(false);
     }
   };
-
 
   const showAddModal = () => {
     setIsModalOpen(true);
@@ -162,7 +215,7 @@ const ProductManagementPage = () => {
   };
 
   const handleDeleteVariant = (variantId: number) => {
-    console.log('Deleting variant:', variantId);
+    console.log("Deleting variant:", variantId);
   };
 
   const handleCancelVariantDetailModal = () => {
@@ -171,16 +224,19 @@ const ProductManagementPage = () => {
   };
 
   const handleCreateOrder = (values: any) => {
-    console.log('Submitting new purchase order:', values);
+    console.log("Submitting new purchase order:", values);
     setIsOrderModalOpen(false);
   };
 
   const handleSaveVariant = (values: Variant) => {
-    console.log('Saving variant changes:', values);
+    console.log("Saving variant changes:", values);
     setIsEditVariantModalOpen(false);
   };
 
-  const handleAddVariant = async (data: { productId: number; variants: any[] }) => {
+  const handleAddVariant = async (data: {
+    productId: number;
+    variants: any[];
+  }) => {
     const { productId, variants } = data;
 
     try {
@@ -188,17 +244,21 @@ const ProductManagementPage = () => {
 
       await productService.bulkCreateVariants(productId, variants);
       notification.success({
-        message: 'Thành công',
-        description: 'Các biến thể đã được thêm thành công!',
+        message: "Thành công",
+        description: "Các biến thể đã được thêm thành công!",
       });
       handleCancelVariantDetailModal();
       fetchProducts();
     } catch (error: any) {
-      console.error('Failed to add variants:', error);
-      const serverMessage = error.response?.data?.message || 'Đã có lỗi xảy ra khi thêm biến thể.';
+      console.error("Failed to add variants:", error);
+      const serverMessage =
+        error.response?.data?.message || "Đã có lỗi xảy ra khi thêm biến thể.";
       notification.error({
-        message: 'Thêm biến thể thất bại',
-        description: typeof serverMessage === 'string' ? serverMessage : 'Dữ liệu không hợp lệ, vui lòng kiểm tra lại.',
+        message: "Thêm biến thể thất bại",
+        description:
+          typeof serverMessage === "string"
+            ? serverMessage
+            : "Dữ liệu không hợp lệ, vui lòng kiểm tra lại.",
       });
     } finally {
       setLoading(false);
@@ -207,63 +267,80 @@ const ProductManagementPage = () => {
 
   const columns = [
     {
-      title: 'STT',
-      key: 'stt',
+      title: "STT",
+      key: "stt",
       width: 60,
-      align: 'center' as const,
+      align: "center" as const,
       render: (_text: any, _record: any, index: number) => index + 1,
     },
     {
-      title: 'Ảnh',
-      dataIndex: 'imageUrl',
-      key: 'imageUrl',
+      title: "Ảnh",
+      dataIndex: "imageUrl",
+      key: "imageUrl",
       width: 80,
-      align: 'center' as const,
-      render: (imageUrl: string) => (
-        <Image width={50} src={`${API_BASE_URL}${imageUrl}`} />
-      ),
-    },
-    {
-      title: 'Mã sản phẩm',
-      dataIndex: 'code',
-      key: 'code',
-    },
-    {
-      title: 'Tên sản phẩm',
-      dataIndex: 'name',
-      key: 'name',
-    },
-    {
-      title: 'Hãng',
-      dataIndex: 'brand',
-      key: 'brand',
-      align: 'center' as const,
-    },
- {
-  title: 'Giá bán',
-  key: 'price',
-  align: 'center' as const,
-  render: (_: any, record: ProductList) => {
-    const { minPrice, maxPrice } = record;
-    if (minPrice === null || maxPrice === null) {
-      return 'Chưa có giá';
-    }
-    const min = Number(minPrice);
-    const max = Number(maxPrice);
+      align: "center" as const,
+      render: (imageUrl: string) => {
+        if (!imageUrl) return "Không có ảnh";
 
-    if (min === max) {
-      return `${min.toLocaleString('vi-VN')} ₫`;
-    }
+        const fullImageUrl = imageUrl.startsWith("http")
+          ? imageUrl
+          : `${API_BASE_URL}${imageUrl}`;
 
-    return `${min.toLocaleString('vi-VN')} ₫ - ${max.toLocaleString('vi-VN')} ₫`;
-  },
-},
-    { title: 'Tổng tồn kho', dataIndex: 'totalStock', key: 'totalStock', align: 'center' as const },
+        return (
+          <Image
+            width={50}
+            src={fullImageUrl}
+            fallback="https://via.placeholder.com/50?text=No+Image"
+          />
+        );
+      },
+    },
     {
-      title: 'Trạng thái',
-      dataIndex: 'totalStock',
-      key: 'totalStock',
-      align: 'center' as const,
+      title: "Mã sản phẩm",
+      dataIndex: "code",
+      key: "code",
+    },
+    {
+      title: "Tên sản phẩm",
+      dataIndex: "name",
+      key: "name",
+    },
+    {
+      title: "Hãng",
+      dataIndex: "brand",
+      key: "brand",
+      align: "center" as const,
+    },
+    {
+      title: "Giá bán",
+      key: "price",
+      align: "center" as const,
+      render: (_: any, record: ProductList) => {
+        const { minPrice, maxPrice } = record;
+        if (minPrice === null || maxPrice === null) {
+          return "Chưa có giá";
+        }
+        const min = Number(minPrice);
+        const max = Number(maxPrice);
+
+        if (min === max) {
+          return `${min.toLocaleString("vi-VN")} ₫`;
+        }
+
+        return `${min.toLocaleString("vi-VN")} ₫ - ${max.toLocaleString("vi-VN")} ₫`;
+      },
+    },
+    {
+      title: "Tổng tồn kho",
+      dataIndex: "totalStock",
+      key: "totalStock",
+      align: "center" as const,
+    },
+    {
+      title: "Trạng thái",
+      dataIndex: "totalStock",
+      key: "totalStock",
+      align: "center" as const,
       render: (stock: number) => {
         if (stock > 0) {
           return <Tag color="green">ĐANG BÁN</Tag>;
@@ -272,13 +349,18 @@ const ProductManagementPage = () => {
       },
     },
     {
-      title: 'Thao tác',
-      key: 'action',
-      align: 'center' as const,
+      title: "Thao tác",
+      key: "action",
+      align: "center" as const,
       render: (_text: any, record: any) => (
         <Space size="middle">
-          <Tooltip title="Xem chi tiết sản phẩm"><Button icon={<EyeOutlined />} onClick={() => showVariantDetailModal(record)} /></Tooltip> {/* Chỉ giữ lại một nút */}
-
+          <Tooltip title="Xem chi tiết sản phẩm">
+            <Button
+              icon={<EyeOutlined />}
+              onClick={() => showVariantDetailModal(record)}
+            />
+          </Tooltip>{" "}
+          {/* Chỉ giữ lại một nút */}
           {record.hasVariants && (
             <Tooltip title="Tạo phiếu kho">
               <Button
@@ -291,11 +373,15 @@ const ProductManagementPage = () => {
           <Popconfirm
             title="Xóa sản phẩm?"
             description="Hành động này không thể hoàn tác. Bạn có chắc chắn?"
-            onConfirm={() => notification.info({ message: 'Chức năng đang phát triển' })}
+            onConfirm={() =>
+              notification.info({ message: "Chức năng đang phát triển" })
+            }
             okText="Đồng ý"
             cancelText="Không"
           >
-            <Tooltip title="Xóa"><Button icon={<DeleteOutlined />} danger /></Tooltip>
+            <Tooltip title="Xóa">
+              <Button icon={<DeleteOutlined />} danger />
+            </Tooltip>
           </Popconfirm>
         </Space>
       ),
@@ -303,14 +389,30 @@ const ProductManagementPage = () => {
   ];
 
   return (
-    <Space direction="vertical" style={{ width: '100%' }} size="large">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Search placeholder="Tìm kiếm theo tên hoặc mã sản phẩm" style={{ width: 400 }} />
+    <Space direction="vertical" style={{ width: "100%" }} size="large">
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <Search
+          placeholder="Tìm kiếm theo tên hoặc mã sản phẩm"
+          style={{ width: 400 }}
+        />
         <Button type="primary" icon={<PlusOutlined />} onClick={showAddModal}>
           Thêm mới sản phẩm
         </Button>
       </div>
-      <Table columns={columns} dataSource={products} bordered loading={loading} rowKey="key" size="middle" />
+      <Table
+        columns={columns}
+        dataSource={products}
+        bordered
+        loading={loading}
+        rowKey="key"
+        size="middle"
+      />
 
       <Modal
         title="Thêm mới sản phẩm"
@@ -320,7 +422,10 @@ const ProductManagementPage = () => {
         width={1000}
         destroyOnClose
       >
-        <AddProductForm onFinish={handleAddProduct} onCancel={() => setIsModalOpen(false)} />
+        <AddProductForm
+          onFinish={handleAddProduct}
+          onCancel={() => setIsModalOpen(false)}
+        />
       </Modal>
       <VariantDetailModal
         open={isVariantDetailModalOpen}

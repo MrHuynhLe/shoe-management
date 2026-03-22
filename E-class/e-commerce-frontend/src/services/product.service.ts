@@ -15,8 +15,11 @@ export const productService = {
   getSuppliers: () => axiosClient.get('/v1/suppliers'),
   getAttributes: () => axiosClient.get('/v1/attributes'),
 
+  getColors: () => axiosClient.get("/v1/attributes/color/values"),
+  getSizes: () => axiosClient.get("/v1/attributes/size/values"),
+
   createProduct: (productData: FormData) =>
-    axiosClient.post("/v1/products", productData, {
+    axiosClient.post("/v1/products/with-images", productData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
@@ -28,8 +31,9 @@ export const productService = {
         "Content-Type": "multipart/form-data",
       },
     }),
+
   bulkCreateVariantsOnly: (payload: { productId: number; variants: any[] }) =>
-    axiosClient.post("/v1/variants/bulk", payload),
+    axiosClient.post("/v1/product-variants/bulk", payload),
 
   bulkCreateVariants: (productId: number, variants: any[]) => {
     const formData = new FormData();
@@ -56,7 +60,7 @@ export const productService = {
       }
     });
 
-    return axiosClient.post("/v1/variants/bulk", formData, {
+    return axiosClient.post("/v1/product-variants/bulk", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },

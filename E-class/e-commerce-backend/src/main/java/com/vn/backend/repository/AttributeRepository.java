@@ -13,5 +13,4 @@ public interface AttributeRepository extends JpaRepository<Attribute, Long> {
     @EntityGraph(attributePaths = {"attributeValues"})
     List<Attribute> findAll();
 
-    Optional<Attribute> findByCode(String code);
-}
+    Optional<Attribute> findByCodeIgnoreCase(String code);}
