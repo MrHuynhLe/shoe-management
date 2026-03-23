@@ -1,4 +1,9 @@
 package com.vn.backend.dto.response.statistics;
 
-public class DashboardCompareResponse {
+public record DashboardCompareResponse(
+        CompareMetricResponse revenue,
+        CompareMetricResponse profit,
+        CompareMetricResponse orders,
+        CompareMetricResponse itemsSold
+) {
 }
