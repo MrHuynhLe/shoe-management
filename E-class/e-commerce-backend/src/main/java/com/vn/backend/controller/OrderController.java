@@ -3,6 +3,7 @@ package com.vn.backend.controller;
 import com.vn.backend.dto.request.PlaceOrderRequest;
 import com.vn.backend.dto.response.OrderDetailResponse;
 import com.vn.backend.dto.response.OrderResponse;
+import com.vn.backend.dto.response.OrderShippingAddressResponse;
 import com.vn.backend.security.CustomUserDetails;
 import com.vn.backend.service.OrderService;
 import jakarta.validation.Valid;
@@ -13,6 +14,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/v1/orders")
@@ -58,5 +61,10 @@ public class OrderController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         orderService.cancelOrder(id, userDetails.getUserId());
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/shipping-addresses")
+    public ResponseEntity<List<OrderShippingAddressResponse>> getUserShippingAddresses(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(orderService.getUserShippingAddresses(userDetails.getUserId()));
     }
 }

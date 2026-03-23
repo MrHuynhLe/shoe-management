@@ -25,6 +25,9 @@ interface OrderDetail {
   customerName: string;
   phone: string;
   address: string;
+  province?: string;
+  district?: string;
+  ward?: string;
   paymentMethodName: string; 
   totalAmount: number;
   shippingFee: number;
@@ -131,7 +134,9 @@ const OrderDetailModal = ({ orderId, visible, onClose }: { orderId: number | nul
               <Descriptions.Item label="Trạng thái">{getStatusTag(order.status)}</Descriptions.Item>
               <Descriptions.Item label="Người nhận">{order.customerName}</Descriptions.Item>
               <Descriptions.Item label="Số điện thoại">{order.phone}</Descriptions.Item>
-              <Descriptions.Item label="Địa chỉ giao hàng">{order.address}</Descriptions.Item>
+              <Descriptions.Item label="Địa chỉ giao hàng">
+                {`${order.address}, ${order.ward || ''}, ${order.district || ''}, ${order.province || ''}`.replace(/,\s*$/, '')}
+              </Descriptions.Item>
               <Descriptions.Item label="Phương thức thanh toán">{order.paymentMethodName}</Descriptions.Item>
             </Descriptions>
 
@@ -154,7 +159,7 @@ const OrderDetailModal = ({ orderId, visible, onClose }: { orderId: number | nul
                         <Text strong type="success">-{order.discountAmount.toLocaleString('vi-VN')} ₫</Text>
                     </Descriptions.Item>
                 )}
-                <Descriptions.Item label="Tổng tiền hàng">
+                <Descriptions.Item label="Phí vận chuyển">
                     <Text strong>{order.shippingFee.toLocaleString('vi-VN')} ₫</Text>
                 </Descriptions.Item>
                 <Descriptions.Item label="Tổng cộng">

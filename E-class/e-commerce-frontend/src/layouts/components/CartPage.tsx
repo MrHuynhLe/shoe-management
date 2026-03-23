@@ -108,15 +108,13 @@ const fetchCart = async () => {
   useEffect(() => {
     if (activeTab === 'cart') {
       fetchCart();
-    } else if (['pending', 'shipping', 'completed', 'cancelled'].includes(activeTab) && !ordersFetched) { // Chỉ fetch orders lần đầu
+    } else if (['pending', 'shipping', 'completed', 'cancelled'].includes(activeTab) && !ordersFetched) { 
       fetchOrders();
       setOrdersFetched(true);
     }
-  }, [activeTab]); // Bỏ ordersFetched khỏi dependency array
+  }, [activeTab]); 
 
   const handleQuantityChange = async (cartItemId: number, quantity: number | null) => {
-      console.log("cartItemId:", cartItemId);
-  console.log("quantity:", quantity);
     if (quantity === null || quantity < 1) return;
     try {
       await cartService.updateItemQuantity(cartItemId, quantity);
@@ -178,7 +176,6 @@ const fetchCart = async () => {
           onChange={
             (value) => {
               console.log("record:", record);
-  console.log("cartItemId:", record.id);
   handleQuantityChange(record.id, value)}}
         />
       ),

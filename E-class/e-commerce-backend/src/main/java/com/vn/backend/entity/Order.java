@@ -41,6 +41,9 @@ public class Order {
     @Column(name = "discount_amount", precision = 15, scale = 2, nullable = false)
     private BigDecimal discountAmount = BigDecimal.ZERO; 
 
+    @Column(name = "shipping_fee", precision = 15, scale = 2, nullable = false)
+    private BigDecimal shippingFee = BigDecimal.ZERO;
+
     @Column(name = "voucher_code", length = 50)
     private String voucherCode; 
 

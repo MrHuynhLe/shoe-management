@@ -12,4 +12,7 @@ public class ShippingInfoRequest {
     @NotBlank(message = "Địa chỉ không được để trống")
     private String address;
     private String note;
+    private String province;
+    private String district;
+    private String ward;
 }

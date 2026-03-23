@@ -83,13 +83,14 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
         const response = await productService.getAttributes();
         setDynamicAttributes(response.data || []);
       } catch (error) {
-        console.error("Failed to fetch attributes:", error);
+        console.error("Failed to fetch attributes:", error) ;
         notification.error({
           message: 'Lỗi',
           description: 'Không thể tải thuộc tính sản phẩm.',
         });
       }
     };
+
 
     if (open && productId) {
       setLoading(true);
@@ -100,6 +101,7 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
         })
         .catch(error => {
           console.error("Failed to fetch product details:", error);
+
           setProduct(null);
         })
         .finally(() => {
@@ -442,8 +444,12 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
                             <Form.Item {...restField} name={[name, 'attributes', attr.code]} rules={[{ required: true, message: 'Chọn' }]} noStyle>
                               <Select
                                 placeholder={attr.name}
+
                                 style={{ width: '100%' }}
+
                                 options={attr.values.map((v: any) => ({ label: v.value, value: v.value }))}
+
+
                               />
                             </Form.Item>
                           </Col>

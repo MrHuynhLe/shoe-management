@@ -3,19 +3,17 @@ package com.vn.backend.service.impl;
 import com.vn.backend.dto.request.PlaceOrderRequest;
 import com.vn.backend.dto.request.ValidateDiscountRequest;
 import com.vn.backend.dto.request.OrderItemRequest;
-import com.vn.backend.dto.response.CustomerResponse;
-import com.vn.backend.dto.response.UserProfileResponse;
-import com.vn.backend.dto.response.OrderResponse;
-import com.vn.backend.dto.response.OrderDetailResponse;
-import com.vn.backend.dto.response.ValidateDiscountResponse;
+import com.vn.backend.dto.response.*;
+import com.vn.backend.dto.ghtk.GhtkFeeRequest;
 import com.vn.backend.entity.*;
 import com.vn.backend.exception.InvalidRequestException;
-import com.vn.backend.dto.response.OrderItemResponse;
 import com.vn.backend.exception.ResourceNotFoundException;
 import com.vn.backend.repository.*;
 import com.vn.backend.security.CustomUserDetails;
 import com.vn.backend.service.DiscountService;
 import com.vn.backend.service.OrderService;
+import com.vn.backend.service.GhtkService;
+import com.vn.backend.service.impl.GHTKLogicHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
@@ -27,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.util.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -46,6 +45,8 @@ public class OrderServiceImpl implements OrderService {
     private final CouponUsageRepository couponUsageRepository;
     private final PromotionRepository promotionRepository;
     private final EmployeeRepository employeeRepository;
+    private final GhtkService ghtkService; // Inject GhtkService
+    private final GHTKLogicHandler ghtkLogicHandler;
 
     @Override
     @Transactional
@@ -101,14 +102,21 @@ public class OrderServiceImpl implements OrderService {
         }
 
 
-        BigDecimal shippingFee = new BigDecimal("30000");
+        List<Integer> itemQuantities = request.getItems().stream().map(OrderItemRequest::getQuantity).toList();
+        BigDecimal shippingFee = ghtkLogicHandler.calculateShippingFee(
+                request.getShippingInfo().getProvince(),
+                request.getShippingInfo().getDistrict(),
+                request.getShippingInfo().getAddress(),
+                subTotal,
+                itemQuantities
+        );
+
         BigDecimal totalAmount = subTotal.add(shippingFee).subtract(discountAmount);
 
         Employee employee = null;
         if (request.getEmployeeId() != null) {
             employee = employeeRepository.findById(request.getEmployeeId()).orElse(null);
         }
-
         Order order = Order.builder()
                 .code("ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
                 .customer(customer)
@@ -116,6 +124,7 @@ public class OrderServiceImpl implements OrderService {
                 .status("PENDING")
                 .discountAmount(discountAmount)
                 .totalAmount(totalAmount)
+                .shippingFee(shippingFee) // Save shipping fee
                 .voucherCode(request.getVoucherCode()) 
                 .build();
         OrderShippingDetails shippingDetails = new OrderShippingDetails();
@@ -124,6 +133,9 @@ public class OrderServiceImpl implements OrderService {
         shippingDetails.setShippingPhone(request.getShippingInfo().getPhone());
         shippingDetails.setShippingAddress(request.getShippingInfo().getAddress());
         shippingDetails.setShippingNote(request.getShippingInfo().getNote());
+        shippingDetails.setProvince(request.getShippingInfo().getProvince()); // Save province
+        shippingDetails.setDistrict(request.getShippingInfo().getDistrict()); // Save district
+        shippingDetails.setWard(request.getShippingInfo().getWard()); // Save ward
         order.setShippingDetails(shippingDetails);
 
         for (OrderItem item : orderItems) {
@@ -135,14 +147,12 @@ public class OrderServiceImpl implements OrderService {
 
         if (appliedPromotion != null || appliedCoupon != null) {
             CouponUsage usage = CouponUsage.builder()
-                    .customer(customer)
                     .order(savedOrder)
                     .promotion(appliedPromotion)
                     .coupon(appliedCoupon)
                     .build();
             couponUsageRepository.save(usage);
         }
-
 
 
         PaymentMethod paymentMethod = paymentMethodRepository.findByCode(request.getPaymentMethodCode())
@@ -155,12 +165,6 @@ public class OrderServiceImpl implements OrderService {
                 .status("PENDING") 
                 .build();
         paymentRepository.save(payment);
-
-        for (OrderItem item : savedOrder.getItems()) {
-            ProductVariant variant = item.getProductVariant();
-            variant.setStockQuantity(variant.getStockQuantity() - item.getQuantity());
-            productVariantRepository.save(variant);
-        }
 
         cartItemRepository.deleteAllByCart_Customer_IdAndProductVariant_IdIn(customer.getId(), requestedVariantIds);
 
@@ -193,6 +197,9 @@ public class OrderServiceImpl implements OrderService {
         String customerName = shippingDetails != null ? shippingDetails.getShippingName() : "N/A";
         String phone = shippingDetails != null ? shippingDetails.getShippingPhone() : "N/A";
         String address = shippingDetails != null ? shippingDetails.getShippingAddress() : "N/A";
+        String province = shippingDetails != null ? shippingDetails.getProvince() : "N/A";
+        String district = shippingDetails != null ? shippingDetails.getDistrict() : "N/A";
+        String ward = shippingDetails != null ? shippingDetails.getWard() : "N/A";
 
         String paymentMethodName = paymentRepository.findByOrder_Id(order.getId()).stream()
                 .findFirst()
@@ -207,12 +214,15 @@ public class OrderServiceImpl implements OrderService {
                 customerName,
                 phone,
                 address,
+                province,
+                district,
+                ward,
                 paymentMethodName,
                 order.getTotalAmount(),
                 order.getVoucherCode(), 
                 order.getDiscountAmount(),
-                new BigDecimal("30000"),
-                itemResponses
+                order.getShippingFee(),
+                itemResponses 
         );
     }
 
@@ -248,6 +258,23 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
 
         order.setStatus(status);
+
+        // Deduct stock only when status changes to SHIPPING
+        if ("SHIPPING".equals(status)) {
+            for (OrderItem item : order.getItems()) {
+                ProductVariant variant = item.getProductVariant();
+                if (variant.getStockQuantity() < item.getQuantity()) {
+                    throw new InvalidRequestException(
+                            "Không đủ số lượng tồn kho cho sản phẩm: "
+                                    + variant.getProduct().getName()
+                                    + " - "
+                                    + variant.getCode());
+                }
+                variant.setStockQuantity(variant.getStockQuantity() - item.getQuantity());
+                productVariantRepository.save(variant);
+            }
+        }
+
         Order updatedOrder = orderRepository.save(order);
         return mapToOrderResponse(updatedOrder);
     }
@@ -278,6 +305,35 @@ public class OrderServiceImpl implements OrderService {
         couponUsageRepository.deleteByOrder_Id(order.getId());
 
         orderRepository.save(order);
+    }
+
+    @Override
+    public List<OrderShippingAddressResponse> getUserShippingAddresses(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        Customer customer = customerRepository
+                .findByUserProfileId(user.getUserProfile().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
+
+        return orderRepository.findAll()
+                .stream()
+                .filter(order -> order.getCustomer() != null && order.getCustomer().getId().equals(customer.getId()))
+                .sorted((o1, o2) -> o2.getCreatedAt().compareTo(o1.getCreatedAt()))
+                .filter(order -> order.getShippingDetails() != null)
+                .map(order -> {
+                    OrderShippingDetails details = order.getShippingDetails();
+                    OrderShippingAddressResponse response = new OrderShippingAddressResponse();
+                    response.setFullName(details.getShippingName());
+                    response.setPhone(details.getShippingPhone());
+                    response.setAddress(details.getShippingAddress());
+                    response.setProvince(details.getProvince());
+                    response.setDistrict(details.getDistrict());
+                    response.setWard(details.getWard());
+                    response.setNote(details.getShippingNote());
+                    return response;
+                })
+                .distinct()
+                .collect(Collectors.toList());
     }
     private OrderResponse mapToOrderResponse(Order order) {
         List<OrderItemResponse> itemResponses = order.getItems().stream()

@@ -35,4 +35,8 @@ export const orderService = {
   cancelOrder: (orderId: number) => {
     return axiosClient.put(`/v1/orders/${orderId}/cancel`);
   },
+
+  getUserShippingAddresses: () => {
+    return axiosClient.get('/v1/orders/shipping-addresses');
+  },
 };

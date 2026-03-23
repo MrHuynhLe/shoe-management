@@ -19,6 +19,9 @@ public class OrderDetailResponse {
     private String customerName;
     private String phone;
     private String address;
+    private String province;
+    private String district;
+    private String ward;
 
     private String paymentMethodName;
     private BigDecimal totalAmount;

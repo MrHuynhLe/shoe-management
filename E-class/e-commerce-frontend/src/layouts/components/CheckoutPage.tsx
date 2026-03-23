@@ -23,13 +23,24 @@ import {
   Descriptions,
 } from 'antd';
 import { Popconfirm } from 'antd';
-import { ArrowLeftOutlined, CreditCardOutlined, TruckOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, CreditCardOutlined, TruckOutlined, EditOutlined } from '@ant-design/icons';
 import { orderService } from '@/services/order.service';
 import { useAuth } from '@/services/AuthContext';
 import { discountService } from '@/services/discount.service';
 import { userService } from '@/services/userService';
-import { promotionService } from '@/services/promotion.service';
-import { couponService } from '@/services/coupon.service';
+import { shippingService } from '@/services/shipping.service'; 
+import { promotionService } from '@/services/promotion.service'; 
+import { couponService } from '@/services/coupon.service'; 
+
+interface Address {
+  fullName: string;
+  phone: string;
+  province: string;
+  district: string;
+  ward: string;
+  address: string;
+  note?: string;
+}
 
 const { Title, Text } = Typography;
 
@@ -42,13 +53,17 @@ const CheckoutPage = () => {
   const [discount, setDiscount] = useState(0);
   const [appliedVoucher, setAppliedVoucher] = useState<string | null>(null);
   const [availableVouchers, setAvailableVouchers] = useState<any[]>([]);
+  const [shippingFee, setShippingFee] = useState(0); 
+  const [isEstimatingShipping, setIsEstimatingShipping] = useState(false);
   const [isBankModalVisible, setIsBankModalVisible] = useState(false);
   const [pendingOrderData, setPendingOrderData] = useState<any>(null);
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [isAddressModalVisible, setIsAddressModalVisible] = useState(false);
+  const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
+  const [previewAddress, setPreviewAddress] = useState('');
   const { isAuthenticated } = useAuth();
-
   const { items, subtotal } = location.state || { items: [], subtotal: 0 };
 
-  const shippingFee = items.length > 0 ? 30000 : 0; 
   const total = subtotal + shippingFee - discount;
 
   const generateVietQRUrl = (amount: number, note: string) => {
@@ -62,14 +77,91 @@ const CheckoutPage = () => {
     return `https://img.vietqr.io/image/${bankId}-${accountNumber}-${template}.png?amount=${amount}&addInfo=${encodedNote}&accountName=${encodedAccountName}`;
   };
 
-
   useEffect(() => {
 
     if (!items || items.length === 0) {
       message.warning('Không có sản phẩm nào để thanh toán.');
       navigate('/cart', { replace: true });
     }
+    estimateShippingCost();
   }, [items, navigate]);
+
+  const loadUserAddresses = async () => {
+    if (addresses.length === 0) {
+      try {
+        const response = await orderService.getUserShippingAddresses();
+        setAddresses(response.data);
+      } catch (error) {
+        console.error('Không thể tải danh sách địa chỉ:', error);
+      }
+    }
+  };
+
+  const updatePreviewAddress = () => {
+    const values = form.getFieldsValue(['province', 'district', 'ward', 'address']);
+    const parts = [];
+    if (values.province) parts.push(values.province);
+    if (values.district) parts.push(values.district);
+    if (values.ward) parts.push(values.ward);
+    if (values.address) parts.push(values.address);
+    setPreviewAddress(parts.join(', '));
+  };
+
+  const handleAddressSelect = (address: Address) => {
+    form.setFieldsValue({
+      customerName: address.fullName,
+      phone: address.phone,
+      province: address.province,
+      district: address.district,
+      ward: address.ward,
+      address: address.address,
+      note: address.note,
+    });
+    setSelectedAddress(address);
+    updatePreviewAddress();
+    setIsAddressModalVisible(false);
+    setTimeout(() => estimateShippingCost(), 100);
+  };
+
+  const handleNewAddress = () => {
+    setIsAddressModalVisible(false);
+  };
+
+  const handleAddressFieldChange = () => {
+    updatePreviewAddress();
+    estimateShippingCost();
+  };
+
+  const estimateShippingCost = async () => {
+    const { address, province, district, ward } = form.getFieldsValue(['address', 'province', 'district', 'ward']);
+    if (!province || !district || !ward || items.length === 0) {
+      setShippingFee(0);
+      return;
+    }
+
+    setIsEstimatingShipping(true);
+    try {
+      const shippingEstimateRequest = {
+        shippingInfo: {
+          province: province,
+          district: district,
+          address: address, 
+        },
+        items: items.map((item: any) => ({
+          variantId: item.variantId,
+          quantity: item.quantity,
+        })),
+      };
+      const response = await shippingService.estimateShippingFee(shippingEstimateRequest);
+      setShippingFee(response.data.shippingFee);
+    } catch (error) {
+      message.error('Không thể ước tính phí vận chuyển. Vui lòng kiểm tra địa chỉ.');
+      setShippingFee(0);
+    } finally {
+      setIsEstimatingShipping(false);
+    }
+  };
+
   useEffect(() => {
     if (isAuthenticated) {
       userService.getProfile()
@@ -79,7 +171,8 @@ const CheckoutPage = () => {
             form.setFieldsValue({
               customerName: profile.fullName,
               phone: profile.phone,
-              address: profile.address,
+              province: profile.province, 
+              district: profile.district,
             });
           }
         })
@@ -139,6 +232,9 @@ const CheckoutPage = () => {
         customerName: values.customerName,
         phone: values.phone,
         address: values.address,
+        province: values.province, 
+        district: values.district,
+        ward: values.ward,
         note: values.note,
       },
       shouldUpdateProfile: values.saveAddress,
@@ -194,22 +290,79 @@ const CheckoutPage = () => {
       <Form form={form} layout="vertical" onFinish={handlePlaceOrder}>
         <Row gutter={[32, 32]}>
           <Col xs={24} lg={14}>
-            <Card title="1. Thông tin giao hàng" bordered={false} style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+            <Card title="1. Thông tin giao hàng" bordered={false} style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+            extra={isEstimatingShipping && <Spin size="small" />}>
               <Form.Item name="customerName" label="Họ và tên người nhận" rules={[{ required: true, message: 'Vui lòng nhập họ tên!' }]}>
                 <Input placeholder="Nguyễn Văn A" />
               </Form.Item>
               <Form.Item name="phone" label="Số điện thoại" rules={[{ required: true, message: 'Vui lòng nhập số điện thoại!' }]}>
-                <Input placeholder="09xxxxxxxx" />
+                <Input placeholder="Ví dụ: 0123456789" />
               </Form.Item>
-              <Form.Item name="address" label="Địa chỉ nhận hàng" rules={[{ required: true, message: 'Vui lòng nhập địa chỉ!' }]}>
-                <Input.TextArea rows={3} placeholder="Số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành phố" />
-              </Form.Item>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="province" label="Tỉnh/Thành phố" rules={[{ required: true, message: 'Vui lòng nhập Tỉnh/Thành phố!' }]}>
+                    <Input placeholder="Ví dụ: Hà Nội" onChange={handleAddressFieldChange} />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="district" label="Quận/Huyện" rules={[{ required: true, message: 'Vui lòng nhập Quận/Huyện!' }]}>
+                    <Input placeholder="Ví dụ: Quận Cầu Giấy" onChange={handleAddressFieldChange} />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="ward" label="Phường/Xã" rules={[{ required: true, message: 'Vui lòng nhập Phường/Xã!' }]}>
+                    <Input placeholder="Ví dụ: Phường Dịch Vọng" onChange={handleAddressFieldChange} />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="address" label="Địa chỉ chi tiết" rules={[{ required: true, message: 'Vui lòng nhập địa chỉ chi tiết!' }]}>
+                    <Input placeholder="Số nhà, tên đường" onChange={updatePreviewAddress} />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Button type="link" icon={<EditOutlined />} onClick={() => {
+                loadUserAddresses();
+                setIsAddressModalVisible(true);
+              }} style={{ padding: 0, marginBottom: 16 }}>
+                Chọn địa chỉ đã lưu
+              </Button>
               <Form.Item name="note" label="Ghi chú cho đơn hàng (tùy chọn)">
                 <Input.TextArea rows={2} placeholder="Ghi chú thêm cho người bán hoặc shipper" />
               </Form.Item>
           <Form.Item name="saveAddress" valuePropName="checked">
             <Checkbox>Lưu thông tin này cho lần mua sắm tiếp theo</Checkbox>
           </Form.Item>
+            </Card>
+            <Card title="Địa chỉ giao hàng" bordered={false} style={{ marginTop: 24, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+              {(() => {
+                const values = form.getFieldsValue(['customerName', 'phone', 'province', 'district', 'ward', 'address']);
+                const hasCompleteAddress = values.customerName && values.phone && values.province && values.district && values.ward && values.address;
+                
+                if (!hasCompleteAddress) {
+                  return <Text type="secondary">Vui lòng nhập thông tin giao hàng đầy đủ</Text>;
+                }
+                
+                return (
+                  <div style={{ lineHeight: '1.8' }}>
+                    <div style={{ marginBottom: '8px' }}>
+                      <Text strong style={{ display: 'inline-block', minWidth: '120px' }}>Người nhận:</Text>
+                      <Text>{values.customerName}</Text>
+                    </div>
+                    <div style={{ marginBottom: '8px' }}>
+                      <Text strong style={{ display: 'inline-block', minWidth: '120px' }}>Số điện thoại:</Text>
+                      <Text>{values.phone}</Text>
+                    </div>
+                    <div>
+                      <Text strong style={{ display: 'inline-block', minWidth: '120px', verticalAlign: 'top' }}>Địa chỉ:</Text>
+                      <Text style={{ display: 'inline-block', maxWidth: 'calc(100% - 120px)' }}>
+                        {values.address}, {values.ward}, {values.district}, {values.province}
+                      </Text>
+                    </div>
+                  </div>
+                );
+              })()}
             </Card>
             <Card title="2. Mã giảm giá" bordered={false} style={{ marginTop: 24, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
               <Space.Compact style={{ width: '100%' }}>
@@ -362,6 +515,46 @@ const CheckoutPage = () => {
           </Descriptions>
           <Text type="danger" style={{ marginTop: 16, display: 'block' }}>Lưu ý: Vui lòng nhập chính xác nội dung chuyển khoản để đơn hàng được xác nhận tự động.</Text>
         </div>
+      </Modal>
+      <Modal
+        title="Chọn địa chỉ giao hàng"
+        open={isAddressModalVisible}
+        onCancel={() => setIsAddressModalVisible(false)}
+        footer={null}
+        width={600}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <Button type="primary" onClick={handleNewAddress} style={{ marginBottom: 16 }}>
+            Nhập địa chỉ mới
+          </Button>
+        </div>
+        {addresses.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '20px' }}>
+            <Text type="secondary">Không có địa chỉ đã lưu</Text>
+          </div>
+        ) : (
+          <List
+            dataSource={addresses}
+            renderItem={(address) => (
+              <List.Item
+                actions={[
+                  <Button
+                    type="link"
+                    onClick={() => handleAddressSelect(address)}
+                    disabled={selectedAddress?.fullName === address.fullName && selectedAddress?.phone === address.phone}
+                  >
+                    Chọn
+                  </Button>
+                ]}
+              >
+                <List.Item.Meta
+                  title={`${address.fullName} - ${address.phone}`}
+                  description={`${address.address}${address.ward ? `, ${address.ward}` : ''}${address.district ? `, ${address.district}` : ''}${address.province ? `, ${address.province}` : ''}`}
+                />
+              </List.Item>
+            )}
+          />
+        )}
       </Modal>
     </div>
   );

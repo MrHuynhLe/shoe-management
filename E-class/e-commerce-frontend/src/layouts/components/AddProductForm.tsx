@@ -94,7 +94,7 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
           }
 
           return list.map((item: any) => ({
-            label: item.name ?? item.value,
+            label: item.value, // For attribute values (colors, sizes), the 'value' field is the display name
             value: item.id,
           }));
         };
