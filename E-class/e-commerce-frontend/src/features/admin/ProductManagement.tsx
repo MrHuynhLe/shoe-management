@@ -94,106 +94,113 @@ const ProductManagementPage = () => {
   }, []);
 
   const handleAddProduct = async (values: any) => {
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      const formData = new FormData();
+    const formData = new FormData();
 
-      const productDTO = {
-        name: values.name,
-        code: values.code,
-        description: values.description ?? "",
-        brandId: values.brand_id ? Number(values.brand_id) : null,
-        categoryId: values.category_id ? Number(values.category_id) : null,
-        originId: values.origin_id ? Number(values.origin_id) : null,
-        supplierId: values.supplier_id ? Number(values.supplier_id) : null,
-        isActive: values.is_active ?? true,
-      };
+    const productDTO = {
+      name: values.name,
+      code: values.code,
+      description: values.description ?? "",
+      brandId: values.brand_id ? Number(values.brand_id) : null,
+      categoryId: values.category_id ? Number(values.category_id) : null,
+      originId: values.origin_id ? Number(values.origin_id) : null,
+      supplierId: values.supplier_id ? Number(values.supplier_id) : null,
+      isActive: values.is_active ?? true,
+    };
 
-      if (
-        !productDTO.brandId ||
-        !productDTO.categoryId ||
-        !productDTO.originId ||
-        !productDTO.supplierId ||
-        !productDTO.name ||
-        !productDTO.code
-      ) {
-        notification.warning({
-          message: "Thiếu thông tin",
-          description: "Vui lòng điền đầy đủ các trường bắt buộc (*)",
-        });
-        return;
-      }
-
-      formData.append(
-        "data",
-        new Blob([JSON.stringify(productDTO)], {
-          type: "application/json",
-        }),
-      );
-
-      const imageFileList =
-        values.images?.fileList || values.image?.fileList || [];
-
-      if (imageFileList.length > 0) {
-        imageFileList.forEach((file: any) => {
-          if (file.originFileObj) {
-            formData.append("images", file.originFileObj);
-          }
-        });
-      }
-
-      const productRes = await productService.createProduct(formData);
-
-      const createdProductId =
-        productRes?.data?.id || productRes?.data?.data?.id;
-
-      if (!createdProductId) {
-        throw new Error("Không lấy được productId sau khi tạo sản phẩm");
-      }
-
-      if (values.variants && values.variants.length > 0) {
-        const variantsPayload = values.variants.map((item: any) => ({
-          code: item.sku,
-          costPrice: item.sale_price ?? item.price,
-          sellingPrice: item.price,
-          stockQuantity: item.stock_quantity,
-          attributeValueIds: [item.color_id, item.size_id],
-        }));
-
-        await productService.bulkCreateVariantsOnly({
-          productId: createdProductId,
-          variants: variantsPayload,
-        });
-      }
-
-      setIsModalOpen(false);
-      notification.success({
-        message: "Thành công",
-        description: "Sản phẩm đã được tạo thành công!",
+    if (
+      !productDTO.brandId ||
+      !productDTO.categoryId ||
+      !productDTO.originId ||
+      !productDTO.supplierId ||
+      !productDTO.name ||
+      !productDTO.code
+    ) {
+      notification.warning({
+        message: "Thiếu thông tin",
+        description: "Vui lòng điền đầy đủ các trường bắt buộc (*)",
       });
-
-      fetchProducts();
-    } catch (error: any) {
-      console.error("CREATE PRODUCT ERROR:", error);
-
-      const serverMessage =
-        error.response?.data?.message ||
-        error.response?.data ||
-        error.message ||
-        "Đã có lỗi xảy ra trong quá trình tạo sản phẩm.";
-
-      notification.error({
-        message: "Tạo sản phẩm thất bại",
-        description:
-          typeof serverMessage === "string"
-            ? serverMessage
-            : "Dữ liệu không hợp lệ, vui lòng kiểm tra lại.",
-      });
-    } finally {
-      setLoading(false);
+      return;
     }
-  };
+
+    formData.append(
+      "data",
+      new Blob([JSON.stringify(productDTO)], {
+        type: "application/json",
+      })
+    );
+
+    const imageFileList = values.images || [];
+
+    if (imageFileList.length > 0) {
+      // ảnh đầu tiên = ảnh chính
+      const firstFile = imageFileList[0];
+      if (firstFile?.originFileObj) {
+        formData.append("image", firstFile.originFileObj);
+      }
+
+      // các ảnh còn lại = ảnh phụ
+      imageFileList.slice(1).forEach((file: any) => {
+        if (file?.originFileObj) {
+          formData.append("images", file.originFileObj);
+        }
+      });
+    }
+
+    // QUAN TRỌNG: gọi đúng endpoint with-images
+    const productRes = await productService.createProductWithImages(formData);
+
+    const createdProductId =
+      productRes?.data?.id || productRes?.data?.data?.id;
+
+    if (!createdProductId) {
+      throw new Error("Không lấy được productId sau khi tạo sản phẩm");
+    }
+
+    if (values.variants && values.variants.length > 0) {
+      const variantsPayload = values.variants.map((item: any) => ({
+        code: item.sku,
+        costPrice: item.sale_price ?? item.price,
+        sellingPrice: item.price,
+        stockQuantity: item.stock_quantity,
+        attributeValueIds: [item.color_id, item.size_id],
+      }));
+
+      await productService.bulkCreateVariantsOnly({
+        productId: createdProductId,
+        variants: variantsPayload,
+      });
+    }
+
+    setIsModalOpen(false);
+    notification.success({
+      message: "Thành công",
+      description: "Sản phẩm đã được tạo thành công!",
+    });
+
+    fetchProducts();
+  } catch (error: any) {
+    console.error("CREATE PRODUCT ERROR:", error);
+
+    const serverMessage =
+      error.response?.data?.message ||
+      error.response?.data ||
+      error.message ||
+      "Đã có lỗi xảy ra trong quá trình tạo sản phẩm.";
+
+    notification.error({
+      message: "Tạo sản phẩm thất bại",
+      description:
+        typeof serverMessage === "string"
+          ? serverMessage
+          : "Dữ liệu không hợp lệ, vui lòng kiểm tra lại.",
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
   const showAddModal = () => {
     setIsModalOpen(true);
