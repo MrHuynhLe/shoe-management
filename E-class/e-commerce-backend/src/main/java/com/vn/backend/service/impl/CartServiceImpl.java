@@ -218,6 +218,7 @@ public class CartServiceImpl implements CartService {
 
             CartItemResponse itemResp = new CartItemResponse();
             itemResp.setCartItemId(item.getId());
+            itemResp.setProductId(variant.getProduct().getId());
             itemResp.setVariantId(variant.getId());
             itemResp.setProductName(variant.getProduct().getName());
             itemResp.setVariantCode(variant.getCode());
