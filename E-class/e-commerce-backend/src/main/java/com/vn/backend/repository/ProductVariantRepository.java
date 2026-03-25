@@ -54,4 +54,23 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     @Query("select v from ProductVariant v where v.id = :id and v.deletedAt is null")
     Optional<ProductVariant> findByIdForUpdate(@Param("id") Long id);
 
+    @Query("""
+        select pv
+        from ProductVariant pv
+        join pv.product p
+        where pv.deletedAt is null
+          and (pv.isActive = true)
+          and p.deletedAt is null
+          and (p.isActive = true)
+          and (
+                lower(p.name) like lower(concat('%', :keyword, '%'))
+                or lower(p.code) like lower(concat('%', :keyword, '%'))
+                or lower(pv.code) like lower(concat('%', :keyword, '%'))
+                or lower(coalesce(pv.barcode, '')) like lower(concat('%', :keyword, '%'))
+          )
+        order by p.name asc
+    """)
+    List<ProductVariant> searchForPos(@Param("keyword") String keyword);
+
+
 }
