@@ -37,15 +37,41 @@ const AdminLayout = () => {
   ];
 
   return (
-    <ConfigProvider locale={{ ...antdViVN, ...proViVN }}>
+    <ConfigProvider
+      locale={{ ...antdViVN, ...proViVN }}
+      theme={{
+        token: {
+          colorPrimary: '#1b6eea',
+          colorBgLayout: '#f7f9fb',
+          colorBgContainer: '#ffffff',
+          colorText: '#1f2937',
+          colorTextSecondary: '#6b7280',
+          colorBorder: '#e5e7eb',
+          borderRadius: 10,
+          borderRadiusSM: 8,
+          controlHeight: 44,
+          controlHeightLG: 48,
+          boxShadow: '0 4px 10px rgba(15, 23, 42, 0.08)',
+        },
+      }}
+    >
       <ProLayout
-        style={{ minHeight: "100vh" }}
+        style={{ minHeight: '100vh', backgroundColor: '#f7f9fb' }}
         title="S-Shop Admin"
         logo={logo}
         layout="mix"
+        navTheme="light"
+        splitMenus={false}
         token={{
           sider: {
-            colorBgMenuItemHover: "rgba(0,0,0,0.08)",
+            colorBgMenuItemHover: 'rgba(27, 110, 234, 0.08)',
+            colorTextMenuActive: '#1b6eea',
+            colorTextMenu: '#374151',
+            colorBgMenuItemActive: '#ffffff',
+          },
+          pageContainer: {
+            paddingInlinePageContainerContent: 24,
+            paddingBlockPageContainerContent: 24,
           },
         }}
         location={location}
@@ -64,62 +90,57 @@ const AdminLayout = () => {
           },
           {
             key: "pos",
+            path: "/admin/pos",
             name: "Bán hàng (POS)",
             icon: <ShopOutlined />,
+          },
+          {
+            key: "product-management",
+            name: "Quản lý sản phẩm",
+            icon: <AppstoreOutlined />,
             children: [
               {
-                key: "product-management",
-                name: "Quản lý sản phẩm",
-                icon: <AppstoreOutlined />,
-                children: [
-                  {
-                    key: "/admin/products",
-                    path: "/admin/products",
-                    name: "Sản phẩm",
-                  },
-                  {
-                    key: "/admin/brands",
-                    path: "/admin/brands",
-                    name: "Thương hiệu",
-                  },
-                  {
-                    key: "/admin/categories",
-                    path: "/admin/categories",
-                    name: "Danh mục",
-                  },
-                  {
-                    key: "/admin/attributes/colors",
-                    path: "/admin/attributes/colors",
-                    name: "Màu sắc",
-                  },
-                  {
-                    key: "/admin/attributes/sizes",
-                    path: "/admin/attributes/sizes",
-                    name: "Kích cỡ",
-                  },
-                  {
-                    key: "/admin/attributes/materials",
-                    path: "/admin/attributes/materials",
-                    name: "Chất liệu",
-                  },
-                  {
-                    key: "/admin/product-images",
-                    path: "/admin/product-images",
-                    name: "Hình ảnh",
-                  },
-                ],
+                key: "/admin/products",
+                path: "/admin/products",
+                name: "Sản phẩm",
               },
               {
-                key: "/admin/pos",
-                path: "/admin/pos",
-                name: "Bán tại quầy",
+                key: "/admin/brands",
+                path: "/admin/brands",
+                name: "Thương hiệu",
               },
               {
-                key: "/admin/orders",
-                path: "/admin/orders",
-                name: "Quản lý hoá đơn",
+                key: "/admin/categories",
+                path: "/admin/categories",
+                name: "Danh mục",
+              },
+              {
+                key: "/admin/attributes/colors",
+                path: "/admin/attributes/colors",
+                name: "Màu sắc",
+              },
+              {
+                key: "/admin/attributes/sizes",
+                path: "/admin/attributes/sizes",
+                name: "Kích cỡ",
+              },
+              {
+                key: "/admin/attributes/materials",
+                path: "/admin/attributes/materials",
+                name: "Chất liệu",
+              },
+                  {
+                key: "/admin/product-images",
+                path: "/admin/product-images",
+                name: "Hình ảnh",
               },
             ],
+          },
+          {
+            key: "/admin/orders",
+            path: "/admin/orders",
+            name: "Quản lý hoá đơn",
+            icon: <SolutionOutlined />,
           },
           // {
           //   key: "warehouse",

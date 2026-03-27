@@ -10,7 +10,7 @@ const FooterBar = () => {
           <h3 style={{ color: '#fff', marginBottom: 16 }}>
             S-Shop Online
           </h3>
-          <p style={{ color: '#555' }}>
+          <p style={{ color: 'rgba(255, 255, 255, 0.65)' }}>
             Cửa hàng giày chính hãng – cam kết chất lượng – giá tốt nhất.
           </p>
         </Col>
@@ -39,7 +39,7 @@ const FooterBar = () => {
 
       <Divider style={{ borderColor: 'rgba(255, 255, 255, 0.25)' }} />
 
-      <div style={{ textAlign: 'center', color: '#888' }}>
+      <div style={{ textAlign: 'center', color: 'rgba(255, 255, 255, 0.45)' }}>
         © {new Date().getFullYear()} S-Shop Online. All rights reserved.
       </div>
     </Footer>
