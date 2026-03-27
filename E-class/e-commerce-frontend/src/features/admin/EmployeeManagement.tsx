@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
-import { Button, Tooltip, Space, Modal, Form, Input, Select, notification } from 'antd';
+import { Button, Tooltip, Space, Modal, Form, Input, Select, notification, Card } from 'antd';
 import type { ProColumns, ActionType } from '@ant-design/pro-table';
 import ProTable from '@ant-design/pro-table';
 
@@ -123,7 +123,12 @@ const EmployeeManagementPage = () => {
   ];
 
   return (
-    <>
+    <Card
+      style={{ borderRadius: 14, border: '1px solid #e5e7eb', boxShadow: '0 6px 16px rgb(0 0 0 / 8%)', margin: 16 }}
+      bodyStyle={{ padding: '20px 24px' }}
+      title={<span style={{ fontSize: 20, fontWeight: 600 }}>Quản lý nhân viên</span>}
+      bordered={false}
+    >
       <ProTable<Employee>
         columns={columns}
         dataSource={mockEmployees}
@@ -134,7 +139,7 @@ const EmployeeManagementPage = () => {
           labelWidth: 'auto',
         }}
         toolBarRender={() => [
-          <Button key="add" type="primary" icon={<PlusOutlined />}>
+          <Button key="add" type="primary" icon={<PlusOutlined />} style={{ borderRadius: 8 }}>
             Thêm nhân viên
           </Button>,
         ]}
@@ -168,7 +173,7 @@ const EmployeeManagementPage = () => {
           </Form.Item>
         </Form>
       </Modal>
-    </>
+    </Card>
   );
 };
 

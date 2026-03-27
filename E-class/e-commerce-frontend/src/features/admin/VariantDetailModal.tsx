@@ -20,7 +20,7 @@ import {
 import { useState, useEffect } from 'react';
 import { EditOutlined, DeleteOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons';
 import { productService } from '@/services/product.service';
-import { App} from 'antd';
+import { App } from 'antd';
 export interface ProductVariantAttributes {
   [key: string]: string;
 }
@@ -76,14 +76,31 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
   const [bulkCostPrice, setBulkCostPrice] = useState<number | null>(null);
   const [bulkSellingPrice, setBulkSellingPrice] = useState<number | null>(null);
 
+  const fetchProductDetails = async () => {
+    if (!productId) return;
+    setLoading(true);
+    try {
+      const response = await productService.getProductById(productId);
+      setProduct(response.data);
+    } catch (error) {
+      console.error("Failed to fetch product details:", error);
+      notification.error({
+        message: 'Lỗi',
+        description: 'Không thể tải chi tiết sản phẩm.',
+      });
+      setProduct(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     const fetchAttributes = async () => {
       try {
-
         const response = await productService.getAttributes();
         setDynamicAttributes(response.data || []);
       } catch (error) {
-        console.error("Failed to fetch attributes:", error) ;
+        console.error("Failed to fetch attributes:", error);
         notification.error({
           message: 'Lỗi',
           description: 'Không thể tải thuộc tính sản phẩm.',
@@ -91,32 +108,24 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
       }
     };
 
-
-    if (open && productId) {
-      setLoading(true);
-      fetchAttributes();
-      productService.getProductById(productId)
-        .then(response => {
-          setProduct(response.data);
-        })
-        .catch(error => {
-          console.error("Failed to fetch product details:", error);
-
-          setProduct(null);
-        })
-        .finally(() => {
-          setLoading(false);
-        });
-    } else if (!open) {
-      setProduct(null);
-      addVariantForm.resetFields();
-      setSelectedBulkAttributes({});
+    if (open && productId) { 
+      fetchAttributes(); 
+      fetchProductDetails(); 
+    } else if (!open) { 
+      setProduct(null); 
+      addVariantForm.resetFields(); 
+      setSelectedBulkAttributes({}); 
     }
-  }, [open, productId, addVariantForm]);
+  }, [open, productId, addVariantForm]); 
 
+
+  const handleDeleteVariantWithRefresh = async (variantId: number) => {
+    await onDelete(variantId); 
+    fetchProductDetails(); 
+  };
 
   const getExistingAndFormCombinations = (excludeIndex?: number) => {
-    const combinations = new Set<string>(); 
+    const combinations = new Set<string>();
     const createCombinationKey = (attributes: Record<string, string>) => {
       return Object.keys(attributes).sort().map(key => `${key}:${attributes[key]}`).join('|');
     };
@@ -128,7 +137,7 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
 
     const currentFormVariants = addVariantForm.getFieldsValue().variants || [];
     currentFormVariants.forEach((v: any, index: number) => {
-  
+
       if ((excludeIndex === undefined || index !== excludeIndex) && v && v.attributes) {
         const hasAllAttributes = dynamicAttributes.every(attr => v.attributes[attr.code]);
         if (hasAllAttributes) {
@@ -161,7 +170,7 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
       render: (_: any, record: Variant) => (
         <Space size="middle">
           <Button icon={<EditOutlined />} onClick={() => onEdit(record)} />
-          <Button icon={<DeleteOutlined />} danger onClick={() => onDelete(record.id)}>
+          <Button icon={<DeleteOutlined />} danger onClick={() => handleDeleteVariantWithRefresh(record.id)}>
           </Button>
         </Space>
       ),
@@ -187,7 +196,7 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
           message: 'Chưa có biến thể',
           description: 'Vui lòng thêm ít nhất một biến thể trước khi lưu.',
         });
-        setLoading(false); 
+        setLoading(false);
         return;
       }
 
@@ -206,7 +215,7 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
           costPrice: variant.costPrice,
           sellingPrice: variant.sellingPrice,
           stockQuantity: variant.stockQuantity || 0,
-          imageUrl: variant.imageUrl || null, 
+          imageUrl: variant.imageUrl || null,
           attributeValueIds: attributeValueIds,
         };
       });
@@ -360,9 +369,9 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
             <Divider>Thêm biến thể mới</Divider>
             <Space direction="vertical" style={{ width: '100%', marginBottom: 16 }}>
               <Typography.Text>Tạo hàng loạt theo thuộc tính</Typography.Text>
-              <Row gutter={[16, 16]}>
+              <Row gutter={[16, 16]} wrap>
                 {dynamicAttributes.map(attr => (
-                  <Col span={24 / (dynamicAttributes.length + 1)} key={attr.code}>
+                  <Col flex="1 1 200px" key={attr.code}>
                     <Select
                       mode="multiple" allowClear style={{ width: '100%' }}
                       placeholder={`Chọn ${attr.name}`}

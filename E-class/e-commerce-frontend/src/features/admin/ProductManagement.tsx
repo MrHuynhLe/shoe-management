@@ -10,12 +10,14 @@ import {
   notification,
   Image,
   Popconfirm,
+  Card,
 } from "antd";
 import {
   PlusOutlined,
   EyeOutlined,
   DeleteOutlined,
   InboxOutlined,
+  EditOutlined,
 } from "@ant-design/icons";
 import { useEffect, useState, Key } from "react";
 import { productService } from "@/services/product.service";
@@ -221,8 +223,22 @@ const ProductManagementPage = () => {
     setIsEditVariantModalOpen(true);
   };
 
-  const handleDeleteVariant = (variantId: number) => {
-    console.log("Deleting variant:", variantId);
+  const handleDeleteVariant = async (variantId: number) => {
+    try {
+      setLoading(true);
+      await productService.deleteVariant(variantId);
+      notification.success({
+        message: "Thành công",
+        description: "Biến thể đã được xóa thành công!",
+      });
+      
+      fetchProducts();
+    } catch (error: any) {
+      console.error("Lỗi khi xóa biến thể:", error);
+      notification.error({ message: "Lỗi", description: error.response?.data?.message || "Không thể xóa biến thể." });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCancelVariantDetailModal = () => {
@@ -364,14 +380,28 @@ const ProductManagementPage = () => {
           <Tooltip title="Xem chi tiết sản phẩm">
             <Button
               icon={<EyeOutlined />}
+              shape="circle"
+              type="text"
+              size="large"
               onClick={() => showVariantDetailModal(record)}
             />
-          </Tooltip>{" "}
-          {/* Chỉ giữ lại một nút */}
+          </Tooltip>
+          <Tooltip title="Chỉnh sửa sản phẩm">
+            <Button
+              icon={<EditOutlined />}
+              shape="circle"
+              type="text"
+              size="large"
+              onClick={() => notification.info({ message: 'Chức năng đang phát triển' })}
+            />
+          </Tooltip>
           {record.hasVariants && (
             <Tooltip title="Tạo phiếu kho">
               <Button
                 icon={<InboxOutlined />}
+                shape="circle"
+                type="text"
+                size="large"
                 onClick={() => showOrderModal(record)}
                 disabled={record.hasPendingOrder}
               />
@@ -379,15 +409,28 @@ const ProductManagementPage = () => {
           )}
           <Popconfirm
             title="Xóa sản phẩm?"
-            description="Hành động này không thể hoàn tác. Bạn có chắc chắn?"
-            onConfirm={() =>
-              notification.info({ message: "Chức năng đang phát triển" })
-            }
+            description="Hành động này sẽ xóa sản phẩm và tất cả biến thể liên quan. Bạn có chắc chắn?"
+            onConfirm={async () => {
+              try {
+                setLoading(true);
+                await productService.deleteProduct(record.id);
+                notification.success({
+                  message: "Thành công",
+                  description: "Sản phẩm đã được xóa thành công!",
+                });
+                fetchProducts();
+              } catch (error: any) {
+                console.error("Lỗi khi xóa sản phẩm:", error);
+                notification.error({ message: "Lỗi", description: error.response?.data?.message || "Không thể xóa sản phẩm." });
+              } finally {
+                setLoading(false);
+              }
+            }}
             okText="Đồng ý"
             cancelText="Không"
           >
             <Tooltip title="Xóa">
-              <Button icon={<DeleteOutlined />} danger />
+              <Button icon={<DeleteOutlined />} danger shape="circle" size="large" />
             </Tooltip>
           </Popconfirm>
         </Space>
@@ -396,30 +439,46 @@ const ProductManagementPage = () => {
   ];
 
   return (
-    <Space direction="vertical" style={{ width: "100%" }} size="large">
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <Search
-          placeholder="Tìm kiếm theo tên hoặc mã sản phẩm"
-          style={{ width: 400 }}
+    <Card
+      style={{ borderRadius: 14, border: '1px solid #e5e7eb', boxShadow: '0 6px 16px rgb(0 0 0 / 8%)' }}
+      bodyStyle={{ padding: 24 }}
+      bordered={false}
+      title={<Title level={3} style={{ margin: 0, color: '#0f172a' }}>Quản lý sản phẩm</Title>}
+    >
+      <Space direction="vertical" style={{ width: "100%" }} size="large">
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            paddingBottom: 10,
+          }}
+        >
+          <Search
+            placeholder="Tìm kiếm theo tên hoặc mã sản phẩm"
+            style={{ maxWidth: 420, width: '100%' }}
+            allowClear
+            onSearch={(v) => console.log('Search', v)}
+          />
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={showAddModal}
+            style={{ borderRadius: 8, minWidth: 170 }}
+          >
+            Thêm mới sản phẩm
+          </Button>
+        </div>
+        <Table
+          columns={columns}
+          dataSource={products}
+          pagination={{ pageSize: 8 }}
+          loading={loading}
+          rowKey="key"
+          size="middle"
+          bordered
+          style={{ borderRadius: 10, background: '#ffffff' }}
         />
-        <Button type="primary" icon={<PlusOutlined />} onClick={showAddModal}>
-          Thêm mới sản phẩm
-        </Button>
-      </div>
-      <Table
-        columns={columns}
-        dataSource={products}
-        bordered
-        loading={loading}
-        rowKey="key"
-        size="middle"
-      />
 
       <Modal
         title="Thêm mới sản phẩm"
@@ -457,6 +516,7 @@ const ProductManagementPage = () => {
         onSubmit={handleCreateOrder}
       />
     </Space>
+  </Card>
   );
 };
 export default ProductManagementPage;

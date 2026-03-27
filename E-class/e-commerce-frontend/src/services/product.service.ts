@@ -13,9 +13,9 @@ export const productService = {
   getOrigins: () => axiosClient.get("/v1/origins"),
   getSuppliers: () => axiosClient.get("/v1/suppliers"),
   getAttributes: () => axiosClient.get("/v1/attributes"),
-
   getColors: () => axiosClient.get("/v1/attributes/color/values"),
   getSizes: () => axiosClient.get("/v1/attributes/size/values"),
+
 
   createProduct: (formData: FormData) =>
     axiosClient.post("/v1/products/with-images", formData, {
@@ -71,5 +71,13 @@ export const productService = {
         "Content-Type": "multipart/form-data",
       },
     });
+  },
+
+  deleteProduct: (productId: number) => {
+    return axiosClient.delete(`/v1/products/${productId}`);
+  },
+
+  deleteVariant: (variantId: number) => {
+    return axiosClient.delete(`/v1/product-variants/${variantId}`);
   },
 };

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Tag, Space, Button, message, Tooltip, Popconfirm, Tabs, Table, Spin, Typography } from 'antd';
+import { Tag, Space, Button, message, Tooltip, Popconfirm, Tabs, Table, Spin, Typography, Card } from 'antd';
 import { EyeOutlined, CheckCircleOutlined, CarOutlined } from '@ant-design/icons';
 import type { ProColumns } from '@ant-design/pro-table';
 import { adminOrderService } from '@/services/admin.order.service';
@@ -108,7 +108,7 @@ const OrderManagementPage = () => {
       align: 'center',
       render: (_, record) => [
         <Tooltip title="Xem chi tiết" key="view">
-          <Button icon={<EyeOutlined />} shape="circle" onClick={() => { setSelectedOrderId(record.id); setIsModalVisible(true); }} />
+          <Button icon={<EyeOutlined />} shape="circle" type="text" size="large" onClick={() => { setSelectedOrderId(record.id); setIsModalVisible(true); }} />
         </Tooltip>,
         record.status === 'PENDING' && (
           <Popconfirm
@@ -120,7 +120,7 @@ const OrderManagementPage = () => {
             cancelText="Hủy"
           >
             <Tooltip title="Xác nhận đơn hàng">
-              <Button type="primary" icon={<CheckCircleOutlined />} shape="circle" />
+              <Button type="primary" icon={<CheckCircleOutlined />} shape="circle" size="large" />
             </Tooltip>
           </Popconfirm>
         ),
@@ -134,21 +134,21 @@ const OrderManagementPage = () => {
             cancelText="Hủy"
           >
             <Tooltip title="Giao hàng">
-              <Button type="primary" icon={<CheckCircleOutlined />} shape="circle" />
+              <Button type="default" icon={<CarOutlined />} shape="circle" size="large" />
             </Tooltip>
           </Popconfirm>
         ),
         record.status === 'SHIPPING' && (
-             <Popconfirm
+          <Popconfirm
             key="complete"
             title="Hoàn thành đơn hàng?"
             onConfirm={() => handleUpdateStatus(record.id, 'COMPLETED')}
             okText="Đồng ý"
             cancelText="Hủy"
           >
-          <Tooltip title="Hoàn thành">
-            <Button icon={<CarOutlined />} shape="circle" style={{ color: 'green', borderColor: 'green' }} />
-          </Tooltip>
+            <Tooltip title="Hoàn thành">
+              <Button icon={<CheckCircleOutlined />} shape="circle" size="large" style={{ color: 'green', borderColor: 'green' }} />
+            </Tooltip>
           </Popconfirm>
         ),
       ],
@@ -176,8 +176,12 @@ const OrderManagementPage = () => {
   ];
 
   return (
-    <div style={{ padding: '24px' }}>
-      <Title level={2} style={{ marginBottom: '24px' }}>Quản lý Đơn hàng</Title>
+    <Card
+      style={{ borderRadius: 14, border: '1px solid #e5e7eb', boxShadow: '0 6px 16px rgb(0 0 0 / 8%)', margin: '16px' }}
+      bodyStyle={{ padding: 24 }}
+      bordered={false}
+      title={<Title level={3} style={{ margin: 0, color: '#0f172a' }}>Quản lý Đơn hàng</Title>}
+    >
       <Spin spinning={loading}>
         <Tabs defaultActiveKey="PENDING" activeKey={activeTab} items={tabItems} onChange={(key) => navigate(`/admin/orders?tab=${key}`)} />
       </Spin>
@@ -186,7 +190,7 @@ const OrderManagementPage = () => {
         visible={isModalVisible}
         onClose={() => setIsModalVisible(false)}
       />
-    </div>
+    </Card>
   );
 };
 

@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -84,6 +85,20 @@ public class ProductVariantServiceImpl implements ProductVariantService {
                 .filter(v -> v.getDeletedAt() == null)
                 .map(this::toResponseFromEntity)
                 .toList();
+    }
+
+    @Override
+    @Transactional
+    public void delete(Long variantId) {
+        ProductVariant variant = productVariantRepository.findById(variantId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy biến thể với ID: " + variantId));
+
+        if (variant.getDeletedAt() != null) {
+            throw new RuntimeException("Biến thể đã bị xóa trước đó.");
+        }
+
+        variant.setDeletedAt(OffsetDateTime.now());
+        productVariantRepository.save(variant);
     }
 
     private ProductVariantResponse createInternal(
