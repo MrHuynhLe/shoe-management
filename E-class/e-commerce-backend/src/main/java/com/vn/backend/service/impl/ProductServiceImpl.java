@@ -14,6 +14,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import java.time.OffsetDateTime;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -197,5 +199,26 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public String uploadSingleImage(MultipartFile file) {
         return fileStorageService.store(file);
+    }
+
+    @Override
+    @Transactional
+    public void deleteProduct(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm với ID: " + productId));
+
+        if (product.getDeletedAt() != null) {
+            throw new RuntimeException("Sản phẩm đã bị xóa trước đó.");
+        }
+
+        product.setDeletedAt(OffsetDateTime.now());
+        productRepository.save(product);
+
+        productVariantRepository.findByProductId(productId).forEach(variant -> {
+            if (variant.getDeletedAt() == null) {
+                variant.setDeletedAt(OffsetDateTime.now());
+                productVariantRepository.save(variant);
+            }
+        });
     }
 }

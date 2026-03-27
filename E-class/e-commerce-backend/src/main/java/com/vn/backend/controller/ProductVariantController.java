@@ -37,4 +37,10 @@ public class ProductVariantController {
     public ResponseEntity<List<ProductVariantResponse>> getByProductId(@PathVariable Long productId) {
         return ResponseEntity.ok(productVariantService.getByProductId(productId));
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteVariant(@PathVariable Long id) {
+        productVariantService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
 }

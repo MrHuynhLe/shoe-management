@@ -22,6 +22,7 @@ public class GHTKLogicHandler {
                 .district(district)
                 .weight(totalWeight > 0 ? totalWeight : 100)
                 .value(subTotal)
+                .transport("road")
                 .build();
 
         return ghtkService.calculateShippingFee(ghtkFeeRequest);

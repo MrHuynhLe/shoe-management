@@ -53,5 +53,5 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select v from ProductVariant v where v.id = :id and v.deletedAt is null")
     Optional<ProductVariant> findByIdForUpdate(@Param("id") Long id);
-
+    List<ProductVariant> findByProductId(Long productId);
 }

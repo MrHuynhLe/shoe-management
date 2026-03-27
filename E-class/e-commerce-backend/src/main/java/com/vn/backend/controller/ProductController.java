@@ -58,4 +58,10 @@ public class ProductController {
         String fileUrl = productService.uploadSingleImage(file);
         return ResponseEntity.ok(fileUrl);
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
+        productService.deleteProduct(id);
+        return ResponseEntity.noContent().build();
+    }
 }

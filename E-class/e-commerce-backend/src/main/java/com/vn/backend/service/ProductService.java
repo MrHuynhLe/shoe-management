@@ -24,4 +24,6 @@ public interface ProductService {
     );
 
     String uploadSingleImage(MultipartFile file);
+
+    void deleteProduct(Long productId);
 }
