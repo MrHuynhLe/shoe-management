@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ProductImageRepository extends JpaRepository<ProductImage, Long> {
 
@@ -46,4 +47,7 @@ public interface ProductImageRepository extends JpaRepository<ProductImage, Long
         WHERE pi.productVariant.id = :variantId
     """)
     void resetPrimaryVariantImage(@Param("variantId") Long variantId);
+
+    Optional<ProductImage> findFirstByProductVariant_IdOrderByIsPrimaryDescDisplayOrderAsc(Long variantId);
+    Optional<ProductImage> findFirstByProduct_IdOrderByIsPrimaryDescDisplayOrderAsc(Long productId);
 }
