@@ -15,6 +15,8 @@ import com.vn.backend.service.OrderService;
 import com.vn.backend.service.GhtkService;
 import com.vn.backend.service.impl.GHTKLogicHandler;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.data.domain.Page;
@@ -79,6 +81,7 @@ public class OrderServiceImpl implements OrderService {
                     .build();
             orderItems.add(orderItem);
         }
+
 
         BigDecimal discountAmount = BigDecimal.ZERO;
         Promotion appliedPromotion = null;
@@ -148,6 +151,7 @@ public class OrderServiceImpl implements OrderService {
         if (appliedPromotion != null || appliedCoupon != null) {
             CouponUsage usage = CouponUsage.builder()
                     .order(savedOrder)
+                    .customer(customer)
                     .promotion(appliedPromotion)
                     .coupon(appliedCoupon)
                     .build();
@@ -247,7 +251,13 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional(readOnly = true)
     public Page<OrderResponse> getAllOrders(Pageable pageable) {
-        return orderRepository.findAll(pageable)
+        Pageable sortedPageable = PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                Sort.by(Sort.Direction.DESC, "createdAt")
+        );
+
+        return orderRepository.findAll(sortedPageable)
                 .map(this::mapToOrderResponse);
     }
 
@@ -336,6 +346,16 @@ public class OrderServiceImpl implements OrderService {
                 .collect(Collectors.toList());
     }
     private OrderResponse mapToOrderResponse(Order order) {
+        String customerName = null;
+        String phone = null;
+
+        if (order.getShippingDetails() != null) {
+            customerName = order.getShippingDetails().getShippingName();
+            phone = order.getShippingDetails().getShippingPhone();
+        } else if (order.getCustomer() != null && order.getCustomer().getUserProfile() != null) {
+            customerName = order.getCustomer().getUserProfile().getFullName();
+            phone = order.getCustomer().getUserProfile().getPhone();
+        }
         List<OrderItemResponse> itemResponses = order.getItems().stream()
                 .map(item -> {
                     ProductVariant variant = item.getProductVariant();
@@ -371,6 +391,8 @@ public class OrderServiceImpl implements OrderService {
                 .createdAt(order.getCreatedAt()) 
                 .customer(customerResponse) 
                 .items(itemResponses)
+                .customerName(customerName)
+                .phone(phone)
                 .build();
     }
 
