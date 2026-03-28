@@ -44,6 +44,7 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
         WHERE pv.deletedAt IS NULL
           AND pv.id = :id
     """)
+
     Optional<ProductVariant> findActiveById(@Param("id") Long id);
 
     boolean existsByCodeAndDeletedAtIsNull(String code);
@@ -54,4 +55,22 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     @Query("select v from ProductVariant v where v.id = :id and v.deletedAt is null")
     Optional<ProductVariant> findByIdForUpdate(@Param("id") Long id);
     List<ProductVariant> findByProductId(Long productId);
+    @Query("""
+    SELECT DISTINCT pv
+    FROM ProductVariant pv
+    JOIN FETCH pv.product p
+    LEFT JOIN FETCH pv.images img
+    WHERE pv.deletedAt IS NULL
+      AND (pv.isActive = true OR pv.isActive IS NULL)
+      AND p.deletedAt IS NULL
+      AND (p.isActive = true OR p.isActive IS NULL)
+      AND (
+            LOWER(pv.code) LIKE LOWER(CONCAT('%', :keyword, '%'))
+         OR LOWER(COALESCE(pv.barcode, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+         OR LOWER(p.code) LIKE LOWER(CONCAT('%', :keyword, '%'))
+         OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+      )
+    ORDER BY p.name ASC, pv.code ASC
+""")
+    List<ProductVariant> searchForPos(@Param("keyword") String keyword);
 }
