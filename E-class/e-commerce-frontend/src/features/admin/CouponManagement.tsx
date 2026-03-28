@@ -9,9 +9,10 @@ import { couponService, CouponRequest } from '@/services/coupon.service';
 interface Coupon {
   id: number;
   code: string;
-  discountType: 'PERCENTAGE' | 'FIXED_AMOUNT';
+  discountType: string;
   discountValue: number;
-  usageLimit: number;
+  usageLimit: number | null;
+  remainingUsage?: number | null;
   isActive: boolean;
 }
 
@@ -84,6 +85,17 @@ const CouponManagementPage = () => {
       },
     },
     { title: 'Lượt sử dụng', dataIndex: 'usageLimit', align: 'center', search: false },
+    {
+      title: 'Còn lại',
+      dataIndex: 'remainingUsage',
+      key: 'remainingUsage',
+      align: 'center',
+      search: false,
+      render: (_, record) => {
+        if (record.usageLimit == null) return 'Không giới hạn';
+        return record.remainingUsage ?? 0;
+      },
+    },
     {
       title: 'Trạng thái',
       dataIndex: 'isActive',
