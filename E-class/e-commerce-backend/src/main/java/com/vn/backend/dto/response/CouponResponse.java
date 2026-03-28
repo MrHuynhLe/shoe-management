@@ -12,6 +12,7 @@ public class CouponResponse {
     private String discountType;
     private BigDecimal discountValue;
     private Integer usageLimit;
+    private Integer remainingUsage;
     private Boolean isActive;
     private OffsetDateTime createdAt;
 }
