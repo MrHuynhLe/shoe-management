@@ -15,6 +15,7 @@ public class PromotionResponse {
     private BigDecimal minOrderValue;
     private BigDecimal maxDiscountAmount;
     private Integer usageLimit;
+    private Integer remainingUsage;
     private Integer usageLimitPerCustomer;
     private OffsetDateTime startDate;
     private OffsetDateTime endDate;

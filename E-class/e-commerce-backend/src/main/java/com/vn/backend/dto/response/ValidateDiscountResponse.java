@@ -13,4 +13,10 @@ public class ValidateDiscountResponse {
     private String code;
     private BigDecimal discountAmount;
     private String message;
+    private String discountType;
+    private BigDecimal discountValue;
+    private BigDecimal minOrderValue;
+    private BigDecimal maxDiscountAmount;
+    private Integer usageLimit;
+    private Integer remainingUsage;
 }
