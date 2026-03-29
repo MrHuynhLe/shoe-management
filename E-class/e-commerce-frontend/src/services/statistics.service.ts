@@ -2,6 +2,7 @@ import { axiosClient } from "./axiosClient";
 import {
   OverviewStatistics,
   PageResponse,
+  RevenueChartItem,
   StatisticsQuery,
   TopProductItem,
 } from "@/features/statistics/statistics.model";
@@ -9,8 +10,8 @@ import {
 const buildOverviewParams = (query?: StatisticsQuery) => {
   const params: Record<string, any> = {};
 
-  if (query?.fromDate) params.fromDate = query.fromDate;
-  if (query?.toDate) params.toDate = query.toDate;
+  if (query?.from) params.from = query.from;
+  if (query?.to) params.to = query.to;
 
   return params;
 };
@@ -18,11 +19,23 @@ const buildOverviewParams = (query?: StatisticsQuery) => {
 const buildTopProductParams = (query?: StatisticsQuery) => {
   const params: Record<string, any> = {};
 
-  if (query?.fromDate) params.fromDate = query.fromDate;
-  if (query?.toDate) params.toDate = query.toDate;
+  if (query?.from) params.from = query.from;
+  if (query?.to) params.to = query.to;
 
   params.page = Number.isFinite(Number(query?.page)) ? Number(query?.page) : 0;
   params.size = Number.isFinite(Number(query?.size)) ? Number(query?.size) : 10;
+
+  return params;
+};
+
+const buildRevenueParams = (
+  groupBy: "day" | "week" | "month",
+  query?: StatisticsQuery,
+) => {
+  const params: Record<string, any> = { groupBy };
+
+  if (query?.from) params.from = query.from;
+  if (query?.to) params.to = query.to;
 
   return params;
 };
@@ -40,6 +53,16 @@ export const statisticsService = {
   ): Promise<PageResponse<TopProductItem>> => {
     const res = await axiosClient.get("/v1/statistics/top-products", {
       params: buildTopProductParams(query),
+    });
+    return res.data;
+  },
+
+  getRevenue: async (
+    groupBy: "day" | "week" | "month",
+    query?: StatisticsQuery,
+  ): Promise<RevenueChartItem[]> => {
+    const res = await axiosClient.get("/v1/statistics/revenue", {
+      params: buildRevenueParams(groupBy, query),
     });
     return res.data;
   },

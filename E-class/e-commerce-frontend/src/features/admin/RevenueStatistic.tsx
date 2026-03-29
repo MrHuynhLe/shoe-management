@@ -20,10 +20,11 @@ import { statisticsService } from "@/services/statistics.service";
 import {
   OverviewStatistics,
   PageResponse,
+  RevenueChartItem,
   TopProductItem,
 } from "../statistics/statistics.model";
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
 
 const RevenueStatisticPage = () => {
@@ -46,6 +47,11 @@ const RevenueStatisticPage = () => {
     last: true,
   });
 
+  const [groupBy, setGroupBy] = useState<"day" | "week" | "month">("day");
+  const [revenueData, setRevenueData] = useState<RevenueChartItem[]>([]);
+  const [hoveredRevenue, setHoveredRevenue] = useState<number | null>(null);
+  const [hoveredLabel, setHoveredLabel] = useState<string>("");
+
   const [query, setQuery] = useState({
     from: undefined as string | undefined,
     to: undefined as string | undefined,
@@ -64,18 +70,22 @@ const RevenueStatisticPage = () => {
     };
   };
 
-  const fetchData = async (customQuery = query) => {
+  const fetchData = async (
+    customQuery = query,
+    customGroupBy: "day" | "week" | "month" = groupBy,
+  ) => {
     try {
       setLoading(true);
 
-      const [overviewRes, topProductsRes] = await Promise.all([
+      const [overviewRes, topProductsRes, revenueRes] = await Promise.all([
         statisticsService.getOverview(customQuery),
         statisticsService.getTopProducts(customQuery),
+        statisticsService.getRevenue(customGroupBy, customQuery),
       ]);
 
       const overviewData = (overviewRes as any)?.data ?? overviewRes ?? {};
-      const topProductsData =
-        (topProductsRes as any)?.data ?? topProductsRes ?? {};
+      const topProductsData = (topProductsRes as any)?.data ?? topProductsRes ?? {};
+      const revenueChartData = (revenueRes as any)?.data ?? revenueRes ?? [];
 
       setOverview({
         totalRevenue: Number(overviewData?.totalRevenue ?? 0),
@@ -85,6 +95,7 @@ const RevenueStatisticPage = () => {
       });
 
       setTopProducts(normalizePageResponse(topProductsData));
+      setRevenueData(Array.isArray(revenueChartData) ? revenueChartData : []);
     } catch (error) {
       message.error("Không tải được dữ liệu thống kê");
       console.error("fetchData error:", error);
@@ -96,6 +107,10 @@ const RevenueStatisticPage = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    fetchData(query, groupBy);
+  }, [groupBy]);
 
   const handleSearch = (values: any) => {
     const range = values?.dateRange;
@@ -109,7 +124,7 @@ const RevenueStatisticPage = () => {
     };
 
     setQuery(newQuery);
-    fetchData(newQuery);
+    fetchData(newQuery, groupBy);
   };
 
   const handleTableChange = (pagination: any) => {
@@ -120,7 +135,7 @@ const RevenueStatisticPage = () => {
     };
 
     setQuery(newQuery);
-    fetchData(newQuery);
+    fetchData(newQuery, groupBy);
   };
 
   const downloadFile = (blob: Blob, filename: string) => {
@@ -184,7 +199,70 @@ const RevenueStatisticPage = () => {
     return text.length > max ? `${text.slice(0, max)}...` : text;
   };
 
-  const columns = [
+  const formatGroupLabel = (label: string) => {
+    if (!label) return "-";
+
+    if (groupBy === "day") {
+      return dayjs(label).isValid() ? dayjs(label).format("DD/MM/YYYY") : label;
+    }
+
+    if (groupBy === "month") {
+      return dayjs(`${label}-01`).isValid()
+        ? dayjs(`${label}-01`).format("MM/YYYY")
+        : label;
+    }
+
+    return dayjs(label).isValid()
+      ? `Tuần từ ${dayjs(label).format("DD/MM/YYYY")}`
+      : label;
+  };
+
+  const getHoverTitle = () => {
+    if (hoveredRevenue === null || !hoveredLabel) {
+      return "Bấm vào 1 điểm trên biểu đồ để xem doanh thu";
+    }
+
+    return `${formatGroupLabel(hoveredLabel)}: ${formatCurrency(hoveredRevenue)}`;
+  };
+
+  const revenueColumns = [
+    {
+      title: groupBy === "day" ? "Ngày" : groupBy === "week" ? "Tuần" : "Tháng",
+      dataIndex: "label",
+      key: "label",
+      render: (value: string) => formatGroupLabel(value),
+    },
+    {
+      title: "Số đơn",
+      dataIndex: "totalOrders",
+      key: "totalOrders",
+      align: "right" as const,
+      render: (value: number) => Number(value || 0),
+    },
+    {
+      title: "Sản phẩm bán",
+      dataIndex: "itemsSold",
+      key: "itemsSold",
+      align: "right" as const,
+      render: (value: number) => Number(value || 0),
+    },
+    {
+      title: "Doanh thu",
+      dataIndex: "revenue",
+      key: "revenue",
+      align: "right" as const,
+      render: (value: number) => formatCurrency(Number(value || 0)),
+    },
+    {
+      title: "Lợi nhuận",
+      dataIndex: "profit",
+      key: "profit",
+      align: "right" as const,
+      render: (value: number) => formatCurrency(Number(value || 0)),
+    },
+  ];
+
+  const topProductColumns = [
     {
       title: "STT",
       key: "index",
@@ -239,14 +317,15 @@ const RevenueStatisticPage = () => {
     },
   ];
 
-  const chartData = (topProducts.content || []).map((item) => ({
-    productName: item.productName || "Không tên",
+  const chartData = (revenueData || []).map((item) => ({
+    rawLabel: item.label,
+    label: formatGroupLabel(item.label),
     revenue: Number(item.revenue || 0),
   }));
 
   const lineConfig = {
     data: chartData,
-    xField: "productName",
+    xField: "label",
     yField: "revenue",
     height: 360,
     autoFit: true,
@@ -257,7 +336,8 @@ const RevenueStatisticPage = () => {
     },
     xAxis: {
       title: {
-        text: "Sản phẩm",
+        text:
+          groupBy === "day" ? "Ngày" : groupBy === "week" ? "Tuần" : "Tháng",
       },
       label: {
         autoRotate: false,
@@ -296,15 +376,20 @@ const RevenueStatisticPage = () => {
       revenue: {
         alias: "Doanh thu",
       },
-      productName: {
-        alias: "Sản phẩm",
+      label: {
+        alias:
+          groupBy === "day" ? "Ngày" : groupBy === "week" ? "Tuần" : "Tháng",
       },
     },
     tooltip: {
-      formatter: (datum: any) => ({
-        name: datum?.productName || "Sản phẩm",
-        value: formatCurrency(Number(datum?.revenue || 0)),
-      }),
+      title: (datum: any) =>
+        formatGroupLabel(String(datum?.rawLabel || datum?.label || "")),
+      items: [
+        (datum: any) => ({
+          name: "Doanh thu",
+          value: formatCurrency(Number(datum?.revenue || 0)),
+        }),
+      ],
     },
     lineStyle: {
       lineWidth: 3,
@@ -338,7 +423,7 @@ const RevenueStatisticPage = () => {
                   <Button type="primary" htmlType="submit">
                     Lọc dữ liệu
                   </Button>
-                  <Button onClick={() => fetchData(query)}>Tải lại</Button>
+                  <Button onClick={() => fetchData(query, groupBy)}>Tải lại</Button>
                   <Button loading={exportLoading} onClick={handleExportExcel}>
                     Xuất Excel
                   </Button>
@@ -347,6 +432,43 @@ const RevenueStatisticPage = () => {
                   </Button>
                 </Space>
               </Form.Item>
+            </Col>
+          </Row>
+
+          <Row>
+            <Col span={24}>
+              <Space wrap>
+                <Button
+                  type={groupBy === "day" ? "primary" : "default"}
+                  onClick={() => {
+                    setHoveredRevenue(null);
+                    setHoveredLabel("");
+                    setGroupBy("day");
+                  }}
+                >
+                  Theo ngày
+                </Button>
+                <Button
+                  type={groupBy === "week" ? "primary" : "default"}
+                  onClick={() => {
+                    setHoveredRevenue(null);
+                    setHoveredLabel("");
+                    setGroupBy("week");
+                  }}
+                >
+                  Theo tuần
+                </Button>
+                <Button
+                  type={groupBy === "month" ? "primary" : "default"}
+                  onClick={() => {
+                    setHoveredRevenue(null);
+                    setHoveredLabel("");
+                    setGroupBy("month");
+                  }}
+                >
+                  Theo tháng
+                </Button>
+              </Space>
             </Col>
           </Row>
         </Form>
@@ -394,9 +516,10 @@ const RevenueStatisticPage = () => {
       <Card
         title={
           <span style={{ fontWeight: 600, fontSize: 16 }}>
-            Biểu đồ doanh thu theo sản phẩm
+            Biểu đồ doanh thu theo thời gian
           </span>
         }
+        extra={<Text type="secondary">{getHoverTitle()}</Text>}
         style={{ marginBottom: 16, borderRadius: 12 }}
       >
         {chartData.length > 0 ? (
@@ -411,12 +534,52 @@ const RevenueStatisticPage = () => {
                 minWidth: chartData.length > 6 ? chartData.length * 120 : 700,
               }}
             >
-              <Line {...lineConfig} />
+              <Line
+                {...lineConfig}
+                onReady={(plot: any) => {
+                  const chart = plot?.chart || plot;
+
+                  const handleClick = (evt: any) => {
+                    const data =
+                      evt?.data?.data ||
+                      evt?.data?.datum ||
+                      evt?.data?.record ||
+                      evt?.data ||
+                      {};
+
+                    setHoveredRevenue(Number(data?.revenue || 0));
+                    setHoveredLabel(String(data?.rawLabel || data?.label || ""));
+                  };
+
+                  chart.on("element:click", handleClick);
+                  chart.on("point:click", handleClick);
+                }}
+              />
             </div>
           </div>
         ) : (
           <Empty description="Không có dữ liệu biểu đồ" />
         )}
+      </Card>
+
+      <Card
+        title={
+          <span style={{ fontWeight: 600 }}>
+            Chi tiết doanh thu theo{" "}
+            {groupBy === "day" ? "ngày" : groupBy === "week" ? "tuần" : "tháng"}
+          </span>
+        }
+        style={{ marginBottom: 16, borderRadius: 12 }}
+      >
+        <Table
+          rowKey={(record) => `${record.label}-${groupBy}`}
+          loading={loading}
+          columns={revenueColumns}
+          dataSource={revenueData}
+          pagination={false}
+          scroll={{ x: 900 }}
+          locale={{ emptyText: "Không có dữ liệu chi tiết" }}
+        />
       </Card>
 
       <Card
@@ -426,7 +589,7 @@ const RevenueStatisticPage = () => {
         <Table
           rowKey="productId"
           loading={loading}
-          columns={columns}
+          columns={topProductColumns}
           dataSource={topProducts.content}
           pagination={{
             current: Number(topProducts.page || 0) + 1,
