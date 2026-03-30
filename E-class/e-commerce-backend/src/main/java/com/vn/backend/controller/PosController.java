@@ -17,25 +17,43 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/v1/pos")
-@CrossOrigin(origins = "http://localhost:5173")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "http://localhost:5173")
 public class PosController {
 
     private final PosService posService;
 
     @PostMapping("/orders")
-    public ResponseEntity<PosOrderResponse> createOrder(@Valid @RequestBody PosCreateOrderRequest request) {
+    public ResponseEntity<PosOrderResponse> createOrder(
+            @Valid @RequestBody PosCreateOrderRequest request
+    ) {
         return ResponseEntity.ok(posService.createOrder(request));
-    }
-
-    @GetMapping("/orders/{orderId}")
-    public ResponseEntity<PosOrderResponse> getOrder(@PathVariable Long orderId) {
-        return ResponseEntity.ok(posService.getOrder(orderId));
     }
 
     @GetMapping("/orders/drafts")
     public ResponseEntity<List<PosOrderResponse>> getDraftOrders() {
         return ResponseEntity.ok(posService.getDraftOrders());
+    }
+
+    @GetMapping("/orders/{orderId}")
+    public ResponseEntity<PosOrderResponse> getOrderDetail(
+            @PathVariable Long orderId
+    ) {
+        return ResponseEntity.ok(posService.getOrderDetail(orderId));
+    }
+
+    @GetMapping("/products/search")
+    public ResponseEntity<List<PosProductSearchResponse>> searchProducts(
+            @RequestParam(defaultValue = "") String keyword
+    ) {
+        return ResponseEntity.ok(posService.searchProducts(keyword));
+    }
+
+    @GetMapping("/products/barcode/{barcode}")
+    public ResponseEntity<PosProductSearchResponse> getProductByBarcode(
+            @PathVariable String barcode
+    ) {
+        return ResponseEntity.ok(posService.getProductByBarcode(barcode));
     }
 
     @PostMapping("/orders/{orderId}/items")
@@ -46,26 +64,21 @@ public class PosController {
         return ResponseEntity.ok(posService.addItem(orderId, request));
     }
 
-    @PostMapping("/orders/{orderId}/items/{variantId}")
-    public ResponseEntity<PosOrderResponse> addItemQuick(
-            @PathVariable Long orderId,
-            @PathVariable Long variantId
-    ) {
-        return ResponseEntity.ok(posService.addItem(orderId, variantId));
-    }
-
-    @PutMapping("/orders/items/{itemId}")
+    @PutMapping("/orders/{orderId}/items/{itemId}")
     public ResponseEntity<PosOrderResponse> updateItem(
+            @PathVariable Long orderId,
             @PathVariable Long itemId,
             @Valid @RequestBody PosUpdateItemRequest request
     ) {
-        return ResponseEntity.ok(posService.updateItem(itemId, request));
+        return ResponseEntity.ok(posService.updateItem(orderId, itemId, request));
     }
 
-    @DeleteMapping("/orders/items/{itemId}")
-    public ResponseEntity<Void> removeItem(@PathVariable Long itemId) {
-        posService.removeItem(itemId);
-        return ResponseEntity.noContent().build();
+    @DeleteMapping("/orders/{orderId}/items/{itemId}")
+    public ResponseEntity<PosOrderResponse> removeItem(
+            @PathVariable Long orderId,
+            @PathVariable Long itemId
+    ) {
+        return ResponseEntity.ok(posService.removeItem(orderId, itemId));
     }
 
     @PutMapping("/orders/{orderId}/customer")
@@ -85,12 +98,10 @@ public class PosController {
     }
 
     @PostMapping("/orders/{orderId}/cancel")
-    public ResponseEntity<PosOrderResponse> cancel(@PathVariable Long orderId) {
-        return ResponseEntity.ok(posService.cancel(orderId));
-    }
-
-    @GetMapping("/products/search")
-    public ResponseEntity<List<PosProductSearchResponse>> searchProducts(@RequestParam String keyword) {
-        return ResponseEntity.ok(posService.searchProducts(keyword));
+    public ResponseEntity<String> cancelOrder(
+            @PathVariable Long orderId
+    ) {
+        posService.cancelOrder(orderId);
+        return ResponseEntity.ok("Hủy hóa đơn thành công");
     }
 }

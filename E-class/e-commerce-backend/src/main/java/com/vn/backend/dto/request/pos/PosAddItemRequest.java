@@ -7,10 +7,10 @@ import lombok.Data;
 @Data
 public class PosAddItemRequest {
 
-    @NotNull(message = "productVariantId không được để trống")
+    @NotNull(message = "Product variant id không được để trống")
     private Long productVariantId;
 
-    @NotNull(message = "quantity không được để trống")
-    @Min(value = 1, message = "quantity phải lớn hơn 0")
+    @NotNull(message = "Số lượng không được để trống")
+    @Min(value = 1, message = "Số lượng phải lớn hơn 0")
     private Integer quantity;
 }

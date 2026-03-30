@@ -4,5 +4,5 @@ import lombok.Data;
 
 @Data
 public class PosAssignCustomerRequest {
-    private Integer customerId;
+    private Long customerId;
 }
