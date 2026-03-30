@@ -88,6 +88,9 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     List<ProductVariant> searchForPos(@Param("keyword") String keyword);
 
 //    Optional<Object> findByBarcode(String barcode);
-
-//    Optional<Object> findByIdForUpdate(long l);
+@Query(
+        value = "SELECT * FROM product_variants WHERE id = :id FOR UPDATE",
+        nativeQuery = true
+)
+Optional<ProductVariant> findByIdForUpdate(@Param("id") Long id);
 }

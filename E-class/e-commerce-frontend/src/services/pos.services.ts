@@ -23,6 +23,7 @@ export interface PosOrderResponse {
   customerId?: number | null;
   customerName?: string | null;
   employeeId?: number | null;
+  employeeName?: string | null; 
   storeId?: number | null;
   totalAmount: number;
   discountAmount: number;
@@ -31,6 +32,7 @@ export interface PosOrderResponse {
   changeAmount: number;
   orderType?: string | null;
   note?: string | null;
+  voucherCode?: string | null; 
   items: PosOrderItemResponse[];
 }
 
@@ -51,6 +53,7 @@ export interface PosCreateOrderRequest {
   employeeId: number;
   customerId?: number | null;
   storeId: number;
+  orderType: string; 
   note?: string;
 }
 
@@ -72,6 +75,10 @@ export interface PosCheckoutRequest {
   customerPaid: number;
   discountAmount: number;
   note?: string;
+}
+
+export interface PosApplyVoucherRequest {
+  voucherCode: string;
 }
 
 const POS_BASE = '/v1/pos';
@@ -141,6 +148,19 @@ export const posService = {
 
   cancelOrder: async (orderId: number): Promise<string> => {
     const res = await axiosClient.post(`${POS_BASE}/orders/${orderId}/cancel`);
+    return res.data;
+  },
+
+  applyVoucher: async (
+    orderId: number,
+    payload: PosApplyVoucherRequest
+  ): Promise<PosOrderResponse> => {
+    const res = await axiosClient.put(`${POS_BASE}/orders/${orderId}/voucher`, payload);
+    return res.data;
+  },
+
+  removeVoucher: async (orderId: number): Promise<PosOrderResponse> => {
+    const res = await axiosClient.delete(`${POS_BASE}/orders/${orderId}/voucher`);
     return res.data;
   },
 };

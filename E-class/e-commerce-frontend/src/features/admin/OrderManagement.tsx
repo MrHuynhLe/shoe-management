@@ -21,6 +21,7 @@ interface Order {
   totalAmount: number;
   status: string;
   createdAt: string;
+  orderType?: string | null; 
 }
 
 const OrderManagementPage = () => {
@@ -109,6 +110,12 @@ const OrderManagementPage = () => {
         CANCELLED: { text: 'Đã hủy', status: 'Error' },
       },
       render: (_, record) => getStatusTag(record.status),
+    },
+    {
+      title: 'Loại đơn hàng',
+      dataIndex: 'orderType',
+      key: 'orderType',
+      render: (_, record) => record.orderType === 'POS' ? <Tag color="blue">Tại quầy</Tag> : <Tag color="geekblue">Online</Tag>,
     },
     {
       title: 'Thao tác',

@@ -204,6 +204,9 @@ public class OrderServiceImpl implements OrderService {
         String province = shippingDetails != null ? shippingDetails.getProvince() : "N/A";
         String district = shippingDetails != null ? shippingDetails.getDistrict() : "N/A";
         String ward = shippingDetails != null ? shippingDetails.getWard() : "N/A";
+        
+        Long employeeId = order.getEmployee() != null ? order.getEmployee().getId() : null;
+        String employeeName = order.getEmployee() != null && order.getEmployee().getUserProfile() != null ? order.getEmployee().getUserProfile().getFullName() : null;
 
         String paymentMethodName = paymentRepository.findByOrder_Id(order.getId()).stream()
                 .findFirst()
@@ -226,7 +229,10 @@ public class OrderServiceImpl implements OrderService {
                 order.getVoucherCode(), 
                 order.getDiscountAmount(),
                 order.getShippingFee(),
-                itemResponses 
+                order.getOrderType(),
+                employeeId,
+                employeeName, 
+                itemResponses
         );
     }
 
@@ -269,7 +275,6 @@ public class OrderServiceImpl implements OrderService {
 
         order.setStatus(status);
 
-        // Deduct stock only when status changes to SHIPPING
         if ("SHIPPING".equals(status)) {
             for (OrderItem item : order.getItems()) {
                 ProductVariant variant = item.getProductVariant();
@@ -356,6 +361,12 @@ public class OrderServiceImpl implements OrderService {
             customerName = order.getCustomer().getUserProfile().getFullName();
             phone = order.getCustomer().getUserProfile().getPhone();
         }
+
+        Long employeeId = order.getEmployee() != null ? order.getEmployee().getId() : null;
+        String employeeName = order.getEmployee() != null && order.getEmployee().getUserProfile() != null
+                ? order.getEmployee().getUserProfile().getFullName()
+                : null;
+
         List<OrderItemResponse> itemResponses = order.getItems().stream()
                 .map(item -> {
                     ProductVariant variant = item.getProductVariant();
@@ -393,6 +404,9 @@ public class OrderServiceImpl implements OrderService {
                 .items(itemResponses)
                 .customerName(customerName)
                 .phone(phone)
+                .orderType(order.getOrderType()) 
+                .employeeId(employeeId) 
+                .employeeName(employeeName) 
                 .build();
     }
 

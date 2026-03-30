@@ -89,13 +89,13 @@ public class PosController {
         return ResponseEntity.ok(posService.assignCustomer(orderId, request));
     }
 
-//    @PostMapping("/orders/{orderId}/checkout")
-//    public ResponseEntity<PosOrderResponse> checkout(
-//            @PathVariable Long orderId,
-//            @Valid @RequestBody PosCheckoutRequest request
-//    ) {
-//        return ResponseEntity.ok(posService.checkout(orderId, request));
-//    }
+    @PostMapping("/orders/{orderId}/checkout")
+    public ResponseEntity<PosOrderResponse> checkout(
+            @PathVariable Long orderId,
+            @Valid @RequestBody PosCheckoutRequest request
+    ) {
+        return ResponseEntity.ok(posService.checkout(orderId, request));
+    }
 
     @PostMapping("/orders/{orderId}/cancel")
     public ResponseEntity<String> cancelOrder(

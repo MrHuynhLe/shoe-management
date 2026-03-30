@@ -30,7 +30,7 @@ public interface PosService {
 
     PosOrderResponse assignCustomer(Long orderId, PosAssignCustomerRequest request);
 
-  //  PosOrderResponse checkout(Long orderId, PosCheckoutRequest request);
+    PosOrderResponse checkout(Long orderId, PosCheckoutRequest request);
 
     void cancelOrder(Long orderId);
 }

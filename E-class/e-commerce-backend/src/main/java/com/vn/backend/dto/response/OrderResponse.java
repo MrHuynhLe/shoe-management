@@ -23,4 +23,7 @@ public class OrderResponse {
     private List<OrderItemResponse> items;
     private String customerName;
     private String phone;
+    private String orderType; 
+    private Long employeeId; 
+    private String employeeName; 
 }

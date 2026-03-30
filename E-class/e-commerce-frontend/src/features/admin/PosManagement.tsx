@@ -17,6 +17,7 @@ import {
   Typography,
   message,
 } from 'antd';
+import { useAuth } from '@/services/AuthContext'; // Import useAuth
 import {
   DeleteOutlined,
   PlusOutlined,
@@ -29,10 +30,13 @@ import {
   PosProductSearchResponse,
   posService,
 } from '@/services/pos.services';
+import { promotionService } from '@/services/promotion.service';
+import { couponService } from '@/services/coupon.service';
+import dayjs from 'dayjs';
+//} from '@/services/pos.services';
 
 const { Title, Text } = Typography;
 
-const DEFAULT_EMPLOYEE_ID = 2;
 const DEFAULT_STORE_ID = 1;
 
 const paymentOptions = [
@@ -44,6 +48,8 @@ const paymentOptions = [
 const currency = (value?: number | null) =>
   new Intl.NumberFormat('vi-VN').format(value ?? 0);
 const PosManagement = () => {
+  const { user } = useAuth(); // Get user from AuthContext
+
   const [draftOrders, setDraftOrders] = useState<PosOrderResponse[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<PosOrderResponse | null>(null);
@@ -56,6 +62,10 @@ const PosManagement = () => {
   const [loadingOrder, setLoadingOrder] = useState(false);
 
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [availableVouchers, setAvailableVouchers] = useState<any[]>([]);
+  const [loadingVouchers, setLoadingVouchers] = useState(false);
+  const [voucherCodeInput, setVoucherCodeInput] = useState<string>('');
+  const [appliedVoucherCode, setAppliedVoucherCode] = useState<string | null>(null);
   const [customerIdInput, setCustomerIdInput] = useState<number | null>(1);
   const [checkoutData, setCheckoutData] = useState({
     paymentMethodId: 1,
@@ -83,31 +93,91 @@ const PosManagement = () => {
     }
   };
 
+  const buildVoucherLabel = (v: any) => {
+    const discountText =
+      v.discountType === 'PERCENTAGE'
+        ? `Giảm ${v.discountValue}%${v.maxDiscountAmount ? `, tối đa ${currency(v.maxDiscountAmount)}` : ''}`
+        : `Giảm ${currency(v.discountValue)}`;
+
+    const minOrderText =
+      v.minOrderValue != null ? `, đơn tối thiểu ${currency(v.minOrderValue)}` : '';
+
+    const remainingText =
+      v.remainingUsage != null
+        ? `, còn ${v.remainingUsage} lượt`
+        : v.usageLimit != null
+          ? `, tổng ${v.usageLimit} lượt`
+          : '';
+
+    return `${v.code || v.name} - ${discountText}${minOrderText}${remainingText}`;
+  };
+
+  const fetchAndFilterVouchers = async () => {
+    setLoadingVouchers(true);
+    try {
+      const promotionsRes = await promotionService.getAll({ page: 0, size: 50 });
+      const promotions = promotionsRes.data.content?.map((p: any) => ({ ...p, type: 'PROMOTION' })) || [];
+
+      const couponsRes = await couponService.getAll({ page: 0, size: 50 }); // Assuming POS can access all coupons
+      const coupons = couponsRes.data.content?.map((c: any) => ({ ...c, type: 'COUPON' })) || [];
+
+      const allVouchers = [...promotions, ...coupons];
+
+      const filtered = allVouchers.filter(v => {
+        const now = dayjs();
+        const isActive = v.isActive;
+        const isPromotionValidTime = v.type === 'PROMOTION'
+          ? dayjs(v.startDate).isBefore(now) && dayjs(v.endDate).isAfter(now)
+          : true; 
+        const meetsMinOrder = selectedOrder?.totalAmount ? (v.minOrderValue ? selectedOrder.totalAmount >= v.minOrderValue : true) : false;
+
+        return isActive && isPromotionValidTime && meetsMinOrder;
+      });
+
+      setAvailableVouchers(filtered);
+    } catch (error) {
+      console.error('Không thể tải danh sách voucher:', error);
+      setAvailableVouchers([]);
+    } finally {
+      setLoadingVouchers(false);
+    }
+  };
+
   useEffect(() => {
-    // No draft orders to load initially, just search products
-  handleSearchProducts();
+    handleSearchProducts(); 
   }, []);
 
   useEffect(() => {
     if (selectedOrderId) {
       loadOrderDetail(selectedOrderId);
     }
-  }, [selectedOrderId]);
+    setAppliedVoucherCode(selectedOrder?.voucherCode || null);
+  }, [selectedOrderId, selectedOrder?.voucherCode]); 
 
   const handleCreateOrder = async () => {
+    setVoucherCodeInput('');
+    setAppliedVoucherCode(null);
+
     try {
+      if (!user?.userId) {
+        message.error('Không tìm thấy thông tin nhân viên. Vui lòng đăng nhập lại.');
+        return;
+      }
+
       setCreating(true);
       const data = await posService.createOrder({
-        employeeId: DEFAULT_EMPLOYEE_ID,
+        employeeId: user.userId, 
         customerId: 1,
         storeId: DEFAULT_STORE_ID,
+        orderType: 'POS', 
         note: 'Khách mua tại quầy',
       });
 
       message.success('Tạo hóa đơn nháp thành công');
-      // No need to load draft orders, just set the new one as selected
       setSelectedOrderId(data.orderId);
       setSelectedOrder(data);
+      fetchAndFilterVouchers(); 
+      message.success('Tạo hóa đơn tại quầy thành công');
     } catch (error: any) {
       message.error(error?.response?.data?.message || 'Không tạo được hóa đơn');
     } finally {
@@ -119,7 +189,9 @@ const PosManagement = () => {
     try {
       setSearching(true);
       const data = await posService.searchProducts(keyword);
-      setProducts(data);
+      const sortedData = data.sort((a, b) => b.stockQuantity - a.stockQuantity);
+      setProducts(sortedData); 
+
     } catch (error: any) {
       message.error(error?.response?.data?.message || 'Không tìm được sản phẩm');
     } finally {
@@ -139,8 +211,8 @@ const PosManagement = () => {
         quantity: 1,
       });
       setSelectedOrder(data);
-      // No need to load draft orders, selected order is updated
       message.success('Đã thêm sản phẩm vào hóa đơn');
+      fetchAndFilterVouchers(); 
     } catch (error: any) {
       message.error(error?.response?.data?.message || 'Thêm sản phẩm thất bại');
     }
@@ -155,6 +227,8 @@ const PosManagement = () => {
       // No need to load draft orders, selected order is updated
     } catch (error: any) {
       message.error(error?.response?.data?.message || 'Cập nhật số lượng thất bại');
+    } finally {
+      fetchAndFilterVouchers();
     }
   };
 
@@ -164,22 +238,21 @@ const PosManagement = () => {
     try {
       const data = await posService.removeItem(selectedOrderId, itemId);
       setSelectedOrder(data);
-      // No need to load draft orders, selected order is updated
       message.success('Đã xóa sản phẩm');
     } catch (error: any) {
-      message.error(error?.response?.data?.message || 'Xóa sản phẩm thất bại');
+      message.error(error?.response?.data?.message || 'Xóa sản phẩm thất bại'); 
+    } finally {
+      fetchAndFilterVouchers();
     }
   };
-
   const handleAssignCustomer = async () => {
-    if (!selectedOrderId) return;
+    if (!selectedOrderId) return; 
 
     try {
       const data = await posService.assignCustomer(selectedOrderId, {
         customerId: customerIdInput,
       });
       setSelectedOrder(data);
-      // No need to load draft orders, selected order is updated
       message.success('Cập nhật khách hàng thành công');
     } catch (error: any) {
       message.error(error?.response?.data?.message || 'Cập nhật khách hàng thất bại');
@@ -199,7 +272,9 @@ const PosManagement = () => {
 
       message.success('Thanh toán thành công');
       setCheckoutOpen(false);
-      setSelectedOrder(null); // Clear selected order after checkout
+      setSelectedOrder(null);
+      setVoucherCodeInput('');
+      setAppliedVoucherCode(null);
     } catch (error: any) {
       message.error(error?.response?.data?.message || 'Checkout thất bại');
     }
@@ -211,11 +286,51 @@ const PosManagement = () => {
     try {
       await posService.cancelOrder(selectedOrderId);
       message.success('Hủy hóa đơn thành công');
-      setSelectedOrder(null); // Clear selected order after cancellation
+      setSelectedOrder(null); 
     } catch (error: any) {
       message.error(error?.response?.data?.message || 'Hủy hóa đơn thất bại');
+    } finally {
+      setVoucherCodeInput('');
+      setAppliedVoucherCode(null);
     }
   };
+
+  const handleApplyVoucher = async () => {
+    if (!selectedOrder?.orderId) {
+      message.warning('Hãy tạo hoặc chọn hóa đơn trước');
+      return;
+    }
+    if (!voucherCodeInput) {
+      message.warning('Vui lòng nhập mã giảm giá');
+      return;
+    }
+    try {
+      const data = await posService.applyVoucher(selectedOrder.orderId, {
+        voucherCode: voucherCodeInput,
+      });
+      setSelectedOrder(data);
+      setAppliedVoucherCode(voucherCodeInput);
+      message.success(`Áp dụng mã giảm giá "${voucherCodeInput}" thành công!`);
+    } catch (error: any) {
+      message.error(error?.response?.data?.message || 'Áp dụng mã giảm giá thất bại');
+    }
+  };
+
+  const handleRemoveVoucher = async () => {
+    if (!selectedOrder?.orderId) return;
+
+    try {
+      const data = await posService.removeVoucher(selectedOrder.orderId);
+      setSelectedOrder(data);
+      setAppliedVoucherCode(null);
+      setVoucherCodeInput('');
+      message.success('Đã hủy mã giảm giá');
+    } catch (error: any) {
+      message.error(error?.response?.data?.message || 'Hủy mã giảm giá thất bại');
+    }
+  };
+
+
 
   const orderColumns = [
     {
@@ -430,23 +545,51 @@ const PosManagement = () => {
                   <div>
                     <Text strong>Mã hóa đơn:</Text> {selectedOrder.orderCode}
                   </div>
-                  <div>
-                    <Text strong>Khách hàng:</Text>{' '}
-                    {selectedOrder.customerName || 'Khách lẻ'}
-                  </div>
+                  {selectedOrder.employeeId && (
+                    <div>
+                      <Text strong>ID NV tạo:</Text> {selectedOrder.employeeId}
+                    </div>
+                  )}
+                  {selectedOrder.employeeName && (
+                    <div>
+                      <Text strong>Tên NV tạo:</Text> {selectedOrder.employeeName}
+                    </div>
+                  )}
+              
 
-                  <Space.Compact style={{ width: '100%' }}>
-                    <InputNumber
-                      style={{ width: '100%' }}
-                      placeholder="Nhập customerId"
-                      value={customerIdInput as number | null}
-                      onChange={(value) => setCustomerIdInput(value as number | null)}
-                    />
-                    <Button onClick={handleAssignCustomer}>Gán khách</Button>
-                    <Button onClick={() => setCustomerIdInput(null)} danger>
-                      Bỏ khách
-                    </Button>
-                  </Space.Compact>
+                  <Space direction="vertical" style={{ width: '100%' }} size={8}>
+                    <Text strong>Mã giảm giá:</Text>
+                    <Space.Compact style={{ width: '100%' }}>
+                      <Select
+                        showSearch
+                        allowClear
+                        style={{ width: '100%' }}
+                        placeholder="Chọn hoặc nhập mã giảm giá"
+                        value={voucherCodeInput || undefined}
+                        onSelect={(value) => setVoucherCodeInput(value)}
+                        onSearch={(value) => setVoucherCodeInput(value)}
+                        onChange={(value) => setVoucherCodeInput(value || '')}
+                        filterOption={(input, option) =>
+                          (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                        }
+                        options={availableVouchers.map((v) => ({ label: buildVoucherLabel(v), value: v.code }))}
+                        disabled={!!appliedVoucherCode}
+                        loading={loadingVouchers}
+                      />
+                      <Button type="primary" onClick={handleApplyVoucher} disabled={!!appliedVoucherCode || !voucherCodeInput}>
+                        Áp dụng
+                      </Button>
+                    </Space.Compact>
+                    {appliedVoucherCode && (
+                      <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                        <Text type="success">Đã áp dụng: <Tag color="green">{appliedVoucherCode}</Tag></Text>
+                        <Button type="link" danger onClick={handleRemoveVoucher}>
+                          Hủy voucher
+                        </Button>
+                      </Space>
+                    )}
+                  </Space>
+
 
                   <Table
                     rowKey="itemId"
