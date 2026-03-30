@@ -7,7 +7,7 @@ import lombok.Data;
 @Data
 public class PosUpdateItemRequest {
 
-    @NotNull(message = "quantity không được để trống")
-    @Min(value = 1, message = "quantity phải lớn hơn 0")
+    @NotNull(message = "Số lượng không được để trống")
+    @Min(value = 1, message = "Số lượng phải lớn hơn 0")
     private Integer quantity;
 }

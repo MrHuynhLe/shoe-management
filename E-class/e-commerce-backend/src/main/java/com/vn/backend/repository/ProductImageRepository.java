@@ -48,6 +48,7 @@ public interface ProductImageRepository extends JpaRepository<ProductImage, Long
     """)
     void resetPrimaryVariantImage(@Param("variantId") Long variantId);
 
-    Optional<ProductImage> findFirstByProductVariant_IdOrderByIsPrimaryDescDisplayOrderAsc(Long variantId);
+    Optional<ProductImage> findFirstByProductVariant_IdOrderByIsPrimaryDescDisplayOrderAsc(Long productVariantId);
+
     Optional<ProductImage> findFirstByProduct_IdOrderByIsPrimaryDescDisplayOrderAsc(Long productId);
 }

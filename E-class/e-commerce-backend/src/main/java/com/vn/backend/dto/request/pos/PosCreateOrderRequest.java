@@ -7,12 +7,12 @@ import lombok.Data;
 public class PosCreateOrderRequest {
 
     @NotNull(message = "employeeId không được để trống")
-    private Integer employeeId;
+    private Long employeeId;
 
-    private Integer customerId;
+    private Long customerId;
 
     @NotNull(message = "storeId không được để trống")
-    private Integer storeId;
+    private Long storeId;
 
     private String note;
 }
