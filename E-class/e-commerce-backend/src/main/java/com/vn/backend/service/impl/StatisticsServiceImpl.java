@@ -72,7 +72,24 @@ public class StatisticsServiceImpl implements StatisticsService {
 
     @Override
     public List<RevenueChartItemResponse> getRevenue(String groupBy, StatisticsQuery query) {
-        return Collections.emptyList();
+        String fromDate = query.getFrom() != null ? query.getFrom().toString() : null;
+        String toDate = query.getTo() != null ? query.getTo().toString() : null;
+
+        List<Object[]> rows;
+
+        switch (groupBy == null ? "day" : groupBy.toLowerCase()) {
+            case "week" -> rows = statisticsRepository.getRevenueByWeek(fromDate, toDate);
+            case "month" -> rows = statisticsRepository.getRevenueByMonth(fromDate, toDate);
+            default -> rows = statisticsRepository.getRevenueByDay(fromDate, toDate);
+        }
+
+        return rows.stream().map(row -> new RevenueChartItemResponse(
+                row[0] != null ? row[0].toString() : "",
+                row[1] != null ? ((Number) row[1]).longValue() : 0L,
+                row[2] != null ? new BigDecimal(row[2].toString()) : BigDecimal.ZERO,
+                row[3] != null ? ((Number) row[3]).longValue() : 0L,
+                row[4] != null ? new BigDecimal(row[4].toString()) : BigDecimal.ZERO
+        )).toList();
     }
 
     @Override

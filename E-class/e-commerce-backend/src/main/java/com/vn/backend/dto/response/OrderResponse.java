@@ -21,4 +21,6 @@ public class OrderResponse {
     private OffsetDateTime createdAt;
     private CustomerResponse customer;
     private List<OrderItemResponse> items;
+    private String customerName;
+    private String phone;
 }

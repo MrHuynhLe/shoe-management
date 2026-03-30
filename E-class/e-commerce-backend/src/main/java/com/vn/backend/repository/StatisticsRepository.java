@@ -9,8 +9,62 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface StatisticsRepository extends JpaRepository<Order, Integer> {
+import java.util.List;
 
+public interface StatisticsRepository extends JpaRepository<Order, Integer> {
+    @Query(value = """
+    SELECT
+        TO_CHAR(DATE_TRUNC('day', o.created_at), 'YYYY-MM-DD') AS label,
+        COUNT(DISTINCT o.id) AS totalOrders,
+        COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0) AS revenue,
+        COALESCE(SUM(oi.quantity), 0) AS itemsSold,
+        COALESCE(SUM(oi.quantity * (oi.price_at_purchase - oi.cost_price_at_purchase)), 0) AS profit
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.id
+    WHERE o.status = 'COMPLETED'
+      AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
+      AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
+    GROUP BY DATE_TRUNC('day', o.created_at)
+    ORDER BY DATE_TRUNC('day', o.created_at)
+""", nativeQuery = true)
+    List<Object[]> getRevenueByDay(@Param("fromDate") String fromDate,
+                                   @Param("toDate") String toDate);
+
+    @Query(value = """
+    SELECT
+        TO_CHAR(DATE_TRUNC('week', o.created_at), 'YYYY-MM-DD') AS label,
+        COUNT(DISTINCT o.id) AS totalOrders,
+        COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0) AS revenue,
+        COALESCE(SUM(oi.quantity), 0) AS itemsSold,
+        COALESCE(SUM(oi.quantity * (oi.price_at_purchase - oi.cost_price_at_purchase)), 0) AS profit
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.id
+    WHERE o.status = 'COMPLETED'
+      AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
+      AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
+    GROUP BY DATE_TRUNC('week', o.created_at)
+    ORDER BY DATE_TRUNC('week', o.created_at)
+""", nativeQuery = true)
+    List<Object[]> getRevenueByWeek(@Param("fromDate") String fromDate,
+                                    @Param("toDate") String toDate);
+
+    @Query(value = """
+    SELECT
+        TO_CHAR(DATE_TRUNC('month', o.created_at), 'YYYY-MM') AS label,
+        COUNT(DISTINCT o.id) AS totalOrders,
+        COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0) AS revenue,
+        COALESCE(SUM(oi.quantity), 0) AS itemsSold,
+        COALESCE(SUM(oi.quantity * (oi.price_at_purchase - oi.cost_price_at_purchase)), 0) AS profit
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.id
+    WHERE o.status = 'COMPLETED'
+      AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
+      AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
+    GROUP BY DATE_TRUNC('month', o.created_at)
+    ORDER BY DATE_TRUNC('month', o.created_at)
+""", nativeQuery = true)
+    List<Object[]> getRevenueByMonth(@Param("fromDate") String fromDate,
+                                     @Param("toDate") String toDate);
     @Query(value = """
     SELECT
         COUNT(DISTINCT o.id) AS totalOrders,

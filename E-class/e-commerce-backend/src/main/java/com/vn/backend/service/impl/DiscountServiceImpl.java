@@ -77,20 +77,69 @@ public class DiscountServiceImpl implements DiscountService {
             throw new InvalidRequestException("Đơn hàng chưa đạt giá trị tối thiểu để áp dụng khuyến mãi.");
         }
 
-        BigDecimal discountAmount = calculateDiscount(subtotal, promotion.getDiscountType(), promotion.getDiscountValue(), promotion.getMaxDiscountAmount());
+        BigDecimal discountAmount = calculateDiscount(
+                subtotal,
+                promotion.getDiscountType(),
+                promotion.getDiscountValue(),
+                promotion.getMaxDiscountAmount()
+        );
 
-        return new ValidateDiscountResponse(promotion.getCode(), discountAmount, "Áp dụng khuyến mãi thành công.");
+        Integer remainingUsage = null;
+        if (promotion.getUsageLimit() != null) {
+            long totalUsage = couponUsageRepository.countByPromotion_Id(promotion.getId());
+            remainingUsage = Math.max(promotion.getUsageLimit() - (int) totalUsage, 0);
+        }
+
+        ValidateDiscountResponse response = new ValidateDiscountResponse();
+        response.setCode(promotion.getCode());
+        response.setDiscountAmount(discountAmount);
+        response.setMessage("Áp dụng khuyến mãi thành công.");
+        response.setDiscountType(promotion.getDiscountType());
+        response.setDiscountValue(promotion.getDiscountValue());
+        response.setMinOrderValue(promotion.getMinOrderValue());
+        response.setMaxDiscountAmount(promotion.getMaxDiscountAmount());
+        response.setUsageLimit(promotion.getUsageLimit());
+        response.setRemainingUsage(remainingUsage);
+        return response;
     }
 
     private ValidateDiscountResponse validateCoupon(Coupon coupon, Customer customer, BigDecimal subtotal) {
+        if (coupon.getUsageLimit() != null) {
+            long totalUsage = couponUsageRepository.countByCoupon_Id(coupon.getId());
+            if (totalUsage >= coupon.getUsageLimit()) {
+                throw new InvalidRequestException("Mã giảm giá đã hết lượt sử dụng.");
+            }
+        }
+
         long usageCount = couponUsageRepository.countByCoupon_IdAndCustomer_Id(coupon.getId(), customer.getId());
-        if (usageCount >= coupon.getUsageLimit()) {
+        if (coupon.getUsageLimit() != null && usageCount >= coupon.getUsageLimit()) {
             throw new InvalidRequestException("Bạn đã sử dụng hết lượt mã giảm giá này.");
         }
 
-        BigDecimal discountAmount = calculateDiscount(subtotal, coupon.getDiscountType(), coupon.getDiscountValue(), null);
+        BigDecimal discountAmount = calculateDiscount(
+                subtotal,
+                coupon.getDiscountType(),
+                coupon.getDiscountValue(),
+                null
+        );
 
-        return new ValidateDiscountResponse(coupon.getCode(), discountAmount, "Áp dụng mã giảm giá thành công.");
+        Integer remainingUsage = null;
+        if (coupon.getUsageLimit() != null) {
+            long totalUsage = couponUsageRepository.countByCoupon_Id(coupon.getId());
+            remainingUsage = Math.max(coupon.getUsageLimit() - (int) totalUsage, 0);
+        }
+
+        ValidateDiscountResponse response = new ValidateDiscountResponse();
+        response.setCode(coupon.getCode());
+        response.setDiscountAmount(discountAmount);
+        response.setMessage("Áp dụng mã giảm giá thành công.");
+        response.setDiscountType(coupon.getDiscountType());
+        response.setDiscountValue(coupon.getDiscountValue());
+        response.setUsageLimit(coupon.getUsageLimit());
+        response.setRemainingUsage(remainingUsage);
+        response.setMinOrderValue(BigDecimal.ZERO);
+        response.setMaxDiscountAmount(null);
+        return response;
     }
 
     private BigDecimal calculateDiscount(BigDecimal subtotal, String type, BigDecimal value, BigDecimal maxValue) {

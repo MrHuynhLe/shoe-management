@@ -28,9 +28,9 @@ import { orderService } from '@/services/order.service';
 import { useAuth } from '@/services/AuthContext';
 import { discountService } from '@/services/discount.service';
 import { userService } from '@/services/userService';
-import { shippingService } from '@/services/shipping.service'; 
-import { promotionService } from '@/services/promotion.service'; 
-import { couponService } from '@/services/coupon.service'; 
+import { shippingService } from '@/services/shipping.service';
+import { promotionService } from '@/services/promotion.service';
+import { couponService } from '@/services/coupon.service';
 
 interface Address {
   fullName: string;
@@ -52,8 +52,9 @@ const CheckoutPage = () => {
   const [voucherCode, setVoucherCode] = useState('');
   const [discount, setDiscount] = useState(0);
   const [appliedVoucher, setAppliedVoucher] = useState<string | null>(null);
+  const [appliedVoucherInfo, setAppliedVoucherInfo] = useState<any>(null);
   const [availableVouchers, setAvailableVouchers] = useState<any[]>([]);
-  const [shippingFee, setShippingFee] = useState(0); 
+  const [shippingFee, setShippingFee] = useState(0);
   const [isEstimatingShipping, setIsEstimatingShipping] = useState(false);
   const [isBankModalVisible, setIsBankModalVisible] = useState(false);
   const [pendingOrderData, setPendingOrderData] = useState<any>(null);
@@ -65,12 +66,33 @@ const CheckoutPage = () => {
   const { items, subtotal } = location.state || { items: [], subtotal: 0 };
 
   const total = subtotal + shippingFee - discount;
+  const formatMoney = (value?: number | string) =>
+    `${new Intl.NumberFormat('vi-VN').format(Number(value || 0))} ₫`;
+
+  const buildVoucherLabel = (v: any) => {
+    const discountText =
+      v.discountType === 'PERCENTAGE'
+        ? `Giảm ${v.discountValue}%${v.maxDiscountAmount ? `, tối đa ${formatMoney(v.maxDiscountAmount)}` : ''}`
+        : `Giảm ${formatMoney(v.discountValue)}`;
+
+    const minOrderText =
+      v.minOrderValue != null ? `, đơn tối thiểu ${formatMoney(v.minOrderValue)}` : '';
+
+    const remainingText =
+      v.remainingUsage != null
+        ? `, còn ${v.remainingUsage} lượt`
+        : v.usageLimit != null
+          ? `, tổng ${v.usageLimit} lượt`
+          : '';
+
+    return `${v.code || v.name} - ${discountText}${minOrderText}${remainingText}`;
+  };
 
   const generateVietQRUrl = (amount: number, note: string) => {
-    const bankId = "VCB"; 
+    const bankId = "VCB";
     const accountNumber = "1234567890";
     const accountName = "CONG TY TNHH ABC";
-    const template = "compact2"; 
+    const template = "compact2";
     const encodedNote = encodeURIComponent(note);
     const encodedAccountName = encodeURIComponent(accountName);
 
@@ -78,13 +100,29 @@ const CheckoutPage = () => {
   };
 
   useEffect(() => {
+    const fetchVouchers = async () => {
+      try {
+        const promotionsRes = await promotionService.getPublicPromotions({ page: 0, size: 50 });
+        const promotions =
+          promotionsRes.data.content?.map((p: any) => ({ ...p, type: 'PROMOTION' })) || [];
 
-    if (!items || items.length === 0) {
-      message.warning('Không có sản phẩm nào để thanh toán.');
-      navigate('/cart', { replace: true });
-    }
-    estimateShippingCost();
-  }, [items, navigate]);
+        let coupons: any[] = [];
+        if (isAuthenticated) {
+          const couponsRes = await couponService.getMyCoupons();
+          coupons = couponsRes.data?.map((c: any) => ({ ...c, type: 'COUPON' })) || [];
+        }
+
+        const merged = [...promotions, ...coupons];
+
+        setAvailableVouchers(merged);
+      } catch (error) {
+        console.error('Không thể tải danh sách voucher:', error);
+        setAvailableVouchers([]);
+      }
+    };
+
+    fetchVouchers();
+  }, [isAuthenticated]);
 
   const loadUserAddresses = async () => {
     if (addresses.length === 0) {
@@ -145,7 +183,7 @@ const CheckoutPage = () => {
         shippingInfo: {
           province: province,
           district: district,
-          address: address, 
+          address: address,
         },
         items: items.map((item: any) => ({
           variantId: item.variantId,
@@ -171,7 +209,7 @@ const CheckoutPage = () => {
             form.setFieldsValue({
               customerName: profile.fullName,
               phone: profile.phone,
-              province: profile.province, 
+              province: profile.province,
               district: profile.district,
             });
           }
@@ -214,14 +252,20 @@ const CheckoutPage = () => {
       message.warning('Vui lòng nhập mã giảm giá.');
       return;
     }
+
     try {
+      console.log('voucherCode =', voucherCode);
       const response = await discountService.validateVoucher(voucherCode, subtotal);
       const { discountAmount, message: successMessage } = response.data;
+
       setDiscount(discountAmount);
       setAppliedVoucher(voucherCode);
+      setAppliedVoucherInfo(response.data);
+
       message.success(successMessage || `Áp dụng mã "${voucherCode}" thành công!`);
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Mã giảm giá không hợp lệ hoặc đã xảy ra lỗi.';
+      const errorMessage =
+        error.response?.data?.message || 'Mã giảm giá không hợp lệ hoặc đã xảy ra lỗi.';
       message.error(errorMessage);
     }
   };
@@ -232,7 +276,7 @@ const CheckoutPage = () => {
         customerName: values.customerName,
         phone: values.phone,
         address: values.address,
-        province: values.province, 
+        province: values.province,
         district: values.district,
         ward: values.ward,
         note: values.note,
@@ -264,6 +308,12 @@ const CheckoutPage = () => {
     setLoading(true);
     try {
       await orderService.placeOrder(orderData);
+
+      setDiscount(0);
+      setAppliedVoucher(null);
+      setAppliedVoucherInfo(null);
+      setVoucherCode('');
+
       message.success('Đặt hàng thành công!');
       navigate('/cart?tab=pending');
     } catch (error: any) {
@@ -291,7 +341,7 @@ const CheckoutPage = () => {
         <Row gutter={[32, 32]}>
           <Col xs={24} lg={14}>
             <Card title="1. Thông tin giao hàng" bordered={false} style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
-            extra={isEstimatingShipping && <Spin size="small" />}>
+              extra={isEstimatingShipping && <Spin size="small" />}>
               <Form.Item name="customerName" label="Họ và tên người nhận" rules={[{ required: true, message: 'Vui lòng nhập họ tên!' }]}>
                 <Input placeholder="Nguyễn Văn A" />
               </Form.Item>
@@ -331,19 +381,19 @@ const CheckoutPage = () => {
               <Form.Item name="note" label="Ghi chú cho đơn hàng (tùy chọn)">
                 <Input.TextArea rows={2} placeholder="Ghi chú thêm cho người bán hoặc shipper" />
               </Form.Item>
-          <Form.Item name="saveAddress" valuePropName="checked">
-            <Checkbox>Lưu thông tin này cho lần mua sắm tiếp theo</Checkbox>
-          </Form.Item>
+              <Form.Item name="saveAddress" valuePropName="checked">
+                <Checkbox>Lưu thông tin này cho lần mua sắm tiếp theo</Checkbox>
+              </Form.Item>
             </Card>
             <Card title="Địa chỉ giao hàng" bordered={false} style={{ marginTop: 24, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
               {(() => {
                 const values = form.getFieldsValue(['customerName', 'phone', 'province', 'district', 'ward', 'address']);
                 const hasCompleteAddress = values.customerName && values.phone && values.province && values.district && values.ward && values.address;
-                
+
                 if (!hasCompleteAddress) {
                   return <Text type="secondary">Vui lòng nhập thông tin giao hàng đầy đủ</Text>;
                 }
-                
+
                 return (
                   <div style={{ lineHeight: '1.8' }}>
                     <div style={{ marginBottom: '8px' }}>
@@ -374,19 +424,19 @@ const CheckoutPage = () => {
                   value={voucherCode || undefined}
                   onSelect={(value) => { setVoucherCode(value); }}
                   onSearch={(value) => { setVoucherCode(value); }}
-                  onChange={(value) => { 
+                  onChange={(value) => {
                     setVoucherCode(value || '');
                     if (!value) {
                       setDiscount(0);
                       setAppliedVoucher(null);
+                      setAppliedVoucherInfo(null);
                     }
                   }}
                   filterOption={(input, option) =>
                     (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                   }
-                  options={availableVouchers.map(v => ({
-                    label: v.type === 'PROMOTION'
-                      ? `${v.name} (Giảm ${v.discountValue}${v.discountType === 'PERCENTAGE' ? '%' : '₫'})`                      : `${v.name || v.code} (Giảm ${v.discountValue}${v.discountType === 'PERCENTAGE' ? '%' : '₫'})`,
+                  options={availableVouchers.map((v) => ({
+                    label: buildVoucherLabel(v),
                     value: v.code,
                   }))}
                   notFoundContent={isAuthenticated ? "Bạn không có mã giảm giá nào" : "Đăng nhập để xem mã giảm giá của bạn"}
@@ -397,7 +447,14 @@ const CheckoutPage = () => {
               </Space.Compact>
               {appliedVoucher && (
                 <div style={{ marginTop: '12px' }}>
-                  <Text type="success">Đã áp dụng mã: <strong>{appliedVoucher}</strong></Text>
+                  <Text type="success">
+                    Đã áp dụng mã: <strong>{appliedVoucher}</strong>
+                  </Text>
+                  {appliedVoucherInfo && (
+                    <div style={{ marginTop: 8 }}>
+                      <Text type="secondary">{buildVoucherLabel(appliedVoucherInfo)}</Text>
+                    </div>
+                  )}
                 </div>
               )}
             </Card>
@@ -510,7 +567,7 @@ const CheckoutPage = () => {
             <Descriptions.Item label="Ngân hàng">Vietcombank</Descriptions.Item>
             <Descriptions.Item label="Chủ tài khoản">CONG TY TNHH ABC</Descriptions.Item>
             <Descriptions.Item label="Số tài khoản">1234567890</Descriptions.Item>
-            <Descriptions.Item label="Số tiền"><Text strong style={{color: '#c81d1d'}}>{total.toLocaleString('vi-VN')} ₫</Text></Descriptions.Item>
+            <Descriptions.Item label="Số tiền"><Text strong style={{ color: '#c81d1d' }}>{total.toLocaleString('vi-VN')} ₫</Text></Descriptions.Item>
             <Descriptions.Item label="Nội dung chuyển khoản"><Text copyable strong>{`DH ${pendingOrderData?.shippingInfo?.phone}`}</Text></Descriptions.Item>
           </Descriptions>
           <Text type="danger" style={{ marginTop: 16, display: 'block' }}>Lưu ý: Vui lòng nhập chính xác nội dung chuyển khoản để đơn hàng được xác nhận tự động.</Text>

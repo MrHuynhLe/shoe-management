@@ -11,11 +11,13 @@ const { Title, Text } = Typography;
 interface Order {
   id: number;
   code: string;
-  customer: {
-    userProfile: {
-      fullName: string;
+  customer?: {
+    userProfile?: {
+      fullName?: string;
     }
   };
+  customerName?: string;
+  phone?: string;
   totalAmount: number;
   status: string;
   createdAt: string;
@@ -78,6 +80,12 @@ const OrderManagementPage = () => {
     { title: 'ID', dataIndex: 'id', width: 48, search: false },
     { title: 'Mã đơn hàng', dataIndex: 'code', render: (text) => <Text strong>#{text}</Text> },
     { title: 'Tên khách hàng', dataIndex: ['customer', 'userProfile', 'fullName'], key: 'customerName' },
+    {
+      title: 'SĐT',
+      dataIndex: 'phone',
+      key: 'phone',
+      render: (value) => value || 'N/A'
+    },
     {
       title: 'Tổng tiền',
       dataIndex: 'totalAmount',
