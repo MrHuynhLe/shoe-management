@@ -134,18 +134,18 @@ public class PosServiceImpl implements PosService {
                 .toList();
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public PosProductSearchResponse getProductByBarcode(String barcode) {
-        ProductVariant variant = productVariantRepository.findByBarcode(barcode)
-                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy sản phẩm"));
-
-        if (!isSellableVariant(variant)) {
-            throw new IllegalArgumentException("Sản phẩm không khả dụng để bán");
-        }
-
-        return mapToProductSearchResponse(variant);
-    }
+//    @Override
+//    @Transactional(readOnly = true)
+//    public PosProductSearchResponse getProductByBarcode(String barcode) {
+//        ProductVariant variant = (ProductVariant) productVariantRepository.findByBarcode(barcode)
+//                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy sản phẩm"));
+//
+//        if (!isSellableVariant(variant)) {
+//            throw new IllegalArgumentException("Sản phẩm không khả dụng để bán");
+//        }
+//
+//        return mapToProductSearchResponse(variant);
+//    }
 
     @Override
     public PosOrderResponse addItem(Long orderId, PosAddItemRequest request) {
@@ -251,81 +251,81 @@ public class PosServiceImpl implements PosService {
         return mapToOrderResponse(order);
     }
 
-    @Override
-    public PosOrderResponse checkout(Long orderId, PosCheckoutRequest request) {
-        Order order = getDraftOrderOrThrow(orderId);
-
-        List<OrderItem> items = orderItemRepository.findByOrder_Id(orderId);
-        if (items.isEmpty()) {
-            throw new IllegalArgumentException("Hóa đơn chưa có sản phẩm");
-        }
-
-        PaymentMethod paymentMethod = paymentMethodRepository.findById(request.getPaymentMethodId())
-                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy phương thức thanh toán"));
-
-        BigDecimal discountAmount = defaultZero(request.getDiscountAmount());
-        if (discountAmount.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("Giảm giá không hợp lệ");
-        }
-
-        recalculateOrderAmounts(order);
-        BigDecimal totalAmount = defaultZero(order.getTotalAmount());
-
-        if (discountAmount.compareTo(totalAmount) > 0) {
-            throw new IllegalArgumentException("Giảm giá không được lớn hơn tổng tiền hàng");
-        }
-
-        BigDecimal finalAmount = totalAmount.subtract(discountAmount);
-        BigDecimal customerPaid = defaultZero(request.getCustomerPaid());
-
-        if (customerPaid.compareTo(finalAmount) < 0) {
-            throw new IllegalArgumentException("Tiền khách trả không đủ");
-        }
-
-        for (OrderItem item : items) {
-            ProductVariant lockedVariant = productVariantRepository.findByIdForUpdate(item.getProductVariant().getId().longValue())
-                    .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy biến thể sản phẩm"));
-
-            if (lockedVariant.getStockQuantity() == null || lockedVariant.getStockQuantity() < item.getQuantity()) {
-                throw new IllegalArgumentException("Sản phẩm " + lockedVariant.getCode() + " không đủ tồn kho");
-            }
-        }
-
-        order.setDiscountAmount(discountAmount);
-        order.setCustomerPaid(customerPaid);
-        order.setNote(request.getNote() != null ? request.getNote() : order.getNote());
-        order.setStatus(ORDER_STATUS_COMPLETED);
-        orderRepository.save(order);
-
-        Payment payment = Payment.builder()
-                .order(order)
-                .paymentMethod(paymentMethod)
-                .amount(finalAmount)
-                .status(PAYMENT_STATUS_PAID)
-                .build();
-        paymentRepository.save(payment);
-
-        for (OrderItem item : items) {
-            InventoryTransaction transaction = new InventoryTransaction();
-            transaction.setReferenceCode(
-                    generateInventoryTransactionCode(
-                            order.getId().longValue(),
-                            item.getProductVariant().getId().longValue()
-                    )
-            );
-            transaction.setProductVariant(item.getProductVariant());
-            transaction.setStore(order.getStore());
-            transaction.setQuantity(item.getQuantity());
-            transaction.setTransactionType(INVENTORY_OUT);
-            transaction.setCreatedAt(LocalDateTime.now());
-
-            inventoryTransactionRepository.save(transaction);
-        }
-
-        saveOrderStatusHistory(order, ORDER_STATUS_DRAFT, ORDER_STATUS_COMPLETED);
-
-        return mapToOrderResponse(order);
-    }
+//    @Override
+//    public PosOrderResponse checkout(Long orderId, PosCheckoutRequest request) {
+//        Order order = getDraftOrderOrThrow(orderId);
+//
+//        List<OrderItem> items = orderItemRepository.findByOrder_Id(orderId);
+//        if (items.isEmpty()) {
+//            throw new IllegalArgumentException("Hóa đơn chưa có sản phẩm");
+//        }
+//
+//        PaymentMethod paymentMethod = paymentMethodRepository.findById(request.getPaymentMethodId())
+//                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy phương thức thanh toán"));
+//
+//        BigDecimal discountAmount = defaultZero(request.getDiscountAmount());
+//        if (discountAmount.compareTo(BigDecimal.ZERO) < 0) {
+//            throw new IllegalArgumentException("Giảm giá không hợp lệ");
+//        }
+//
+//        recalculateOrderAmounts(order);
+//        BigDecimal totalAmount = defaultZero(order.getTotalAmount());
+//
+//        if (discountAmount.compareTo(totalAmount) > 0) {
+//            throw new IllegalArgumentException("Giảm giá không được lớn hơn tổng tiền hàng");
+//        }
+//
+//        BigDecimal finalAmount = totalAmount.subtract(discountAmount);
+//        BigDecimal customerPaid = defaultZero(request.getCustomerPaid());
+//
+//        if (customerPaid.compareTo(finalAmount) < 0) {
+//            throw new IllegalArgumentException("Tiền khách trả không đủ");
+//        }
+//
+//        for (OrderItem item : items) {
+//            ProductVariant lockedVariant = (ProductVariant) productVariantRepository.findByIdForUpdate(item.getProductVariant().getId().longValue())
+//                    .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy biến thể sản phẩm"));
+//
+//            if (lockedVariant.getStockQuantity() == null || lockedVariant.getStockQuantity() < item.getQuantity()) {
+//                throw new IllegalArgumentException("Sản phẩm " + lockedVariant.getCode() + " không đủ tồn kho");
+//            }
+//        }
+//
+//        order.setDiscountAmount(discountAmount);
+//        order.setCustomerPaid(customerPaid);
+//        order.setNote(request.getNote() != null ? request.getNote() : order.getNote());
+//        order.setStatus(ORDER_STATUS_COMPLETED);
+//        orderRepository.save(order);
+//
+//        Payment payment = Payment.builder()
+//                .order(order)
+//                .paymentMethod(paymentMethod)
+//                .amount(finalAmount)
+//                .status(PAYMENT_STATUS_PAID)
+//                .build();
+//        paymentRepository.save(payment);
+//
+//        for (OrderItem item : items) {
+//            InventoryTransaction transaction = new InventoryTransaction();
+//            transaction.setReferenceCode(
+//                    generateInventoryTransactionCode(
+//                            order.getId().longValue(),
+//                            item.getProductVariant().getId().longValue()
+//                    )
+//            );
+//            transaction.setProductVariant(item.getProductVariant());
+//            transaction.setStore(order.getStore());
+//            transaction.setQuantity(item.getQuantity());
+//            transaction.setTransactionType(INVENTORY_OUT);
+//            transaction.setCreatedAt(LocalDateTime.now());
+//
+//            inventoryTransactionRepository.save(transaction);
+//        }
+//
+//        saveOrderStatusHistory(order, ORDER_STATUS_DRAFT, ORDER_STATUS_COMPLETED);
+//
+//        return mapToOrderResponse(order);
+//    }
 
     @Override
     public void cancelOrder(Long orderId) {

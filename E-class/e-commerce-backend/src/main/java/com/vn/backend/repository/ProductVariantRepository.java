@@ -14,21 +14,21 @@ import java.util.Optional;
 @Repository
 public interface ProductVariantRepository extends JpaRepository<ProductVariant, Long> {
 
-    @Query("""
-            select pv
-            from ProductVariant pv
-            join pv.product p
-            where pv.isActive = true
-              and p.isActive = true
-              and (
-                    lower(p.name) like lower(concat('%', :keyword, '%'))
-                 or lower(p.code) like lower(concat('%', :keyword, '%'))
-                 or lower(pv.code) like lower(concat('%', :keyword, '%'))
-                 or lower(pv.barcode) like lower(concat('%', :keyword, '%'))
-              )
-            order by p.name asc
-            """)
-    List<ProductVariant> searchForPos(String keyword);
+//    @Query("""
+//            select pv
+//            from ProductVariant pv
+//            join pv.product p
+//            where pv.isActive = true
+//              and p.isActive = true
+//              and (
+//                    lower(p.name) like lower(concat('%', :keyword, '%'))
+//                 or lower(p.code) like lower(concat('%', :keyword, '%'))
+//                 or lower(pv.code) like lower(concat('%', :keyword, '%'))
+//                 or lower(pv.barcode) like lower(concat('%', :keyword, '%'))
+//              )
+//            order by p.name asc
+//            """)
+//    List<ProductVariant> searchForPos(String keyword);
 
     @Query("""
         SELECT DISTINCT pv
@@ -86,4 +86,8 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     ORDER BY p.name ASC, pv.code ASC
 """)
     List<ProductVariant> searchForPos(@Param("keyword") String keyword);
+
+//    Optional<Object> findByBarcode(String barcode);
+
+//    Optional<Object> findByIdForUpdate(long l);
 }

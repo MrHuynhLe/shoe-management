@@ -43,7 +43,6 @@ const paymentOptions = [
 
 const currency = (value?: number | null) =>
   new Intl.NumberFormat('vi-VN').format(value ?? 0);
-
 const PosManagement = () => {
   const [draftOrders, setDraftOrders] = useState<PosOrderResponse[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
@@ -65,24 +64,6 @@ const PosManagement = () => {
     note: '',
   });
 
-  const loadDraftOrders = async () => {
-    try {
-      const data = await posService.getDraftOrders();
-      setDraftOrders(data);
-
-      if (data.length > 0) {
-        const stillExists = data.some((o) => o.orderId === selectedOrderId);
-        const nextId = stillExists ? selectedOrderId : data[0].orderId;
-        setSelectedOrderId(nextId ?? null);
-      } else {
-        setSelectedOrderId(null);
-        setSelectedOrder(null);
-      }
-    } catch (error: any) {
-      message.error(error?.response?.data?.message || 'Không tải được hóa đơn nháp');
-    }
-  };
-
   const loadOrderDetail = async (orderId: number) => {
     try {
       setLoadingOrder(true);
@@ -103,7 +84,7 @@ const PosManagement = () => {
   };
 
   useEffect(() => {
-    loadDraftOrders();
+    // No draft orders to load initially, just search products
   handleSearchProducts();
   }, []);
 
@@ -124,7 +105,7 @@ const PosManagement = () => {
       });
 
       message.success('Tạo hóa đơn nháp thành công');
-      await loadDraftOrders();
+      // No need to load draft orders, just set the new one as selected
       setSelectedOrderId(data.orderId);
       setSelectedOrder(data);
     } catch (error: any) {
@@ -158,7 +139,7 @@ const PosManagement = () => {
         quantity: 1,
       });
       setSelectedOrder(data);
-      await loadDraftOrders();
+      // No need to load draft orders, selected order is updated
       message.success('Đã thêm sản phẩm vào hóa đơn');
     } catch (error: any) {
       message.error(error?.response?.data?.message || 'Thêm sản phẩm thất bại');
@@ -171,7 +152,7 @@ const PosManagement = () => {
     try {
       const data = await posService.updateItem(selectedOrderId, item.itemId, { quantity });
       setSelectedOrder(data);
-      await loadDraftOrders();
+      // No need to load draft orders, selected order is updated
     } catch (error: any) {
       message.error(error?.response?.data?.message || 'Cập nhật số lượng thất bại');
     }
@@ -183,7 +164,7 @@ const PosManagement = () => {
     try {
       const data = await posService.removeItem(selectedOrderId, itemId);
       setSelectedOrder(data);
-      await loadDraftOrders();
+      // No need to load draft orders, selected order is updated
       message.success('Đã xóa sản phẩm');
     } catch (error: any) {
       message.error(error?.response?.data?.message || 'Xóa sản phẩm thất bại');
@@ -198,7 +179,7 @@ const PosManagement = () => {
         customerId: customerIdInput,
       });
       setSelectedOrder(data);
-      await loadDraftOrders();
+      // No need to load draft orders, selected order is updated
       message.success('Cập nhật khách hàng thành công');
     } catch (error: any) {
       message.error(error?.response?.data?.message || 'Cập nhật khách hàng thất bại');
@@ -218,7 +199,7 @@ const PosManagement = () => {
 
       message.success('Thanh toán thành công');
       setCheckoutOpen(false);
-      await loadDraftOrders();
+      setSelectedOrder(null); // Clear selected order after checkout
     } catch (error: any) {
       message.error(error?.response?.data?.message || 'Checkout thất bại');
     }
@@ -230,7 +211,7 @@ const PosManagement = () => {
     try {
       await posService.cancelOrder(selectedOrderId);
       message.success('Hủy hóa đơn thành công');
-      await loadDraftOrders();
+      setSelectedOrder(null); // Clear selected order after cancellation
     } catch (error: any) {
       message.error(error?.response?.data?.message || 'Hủy hóa đơn thất bại');
     }
@@ -385,51 +366,19 @@ const PosManagement = () => {
 
   return (
     <div style={{ padding: 20 }}>
-      <Row gutter={16}>
-        <Col span={6}>
-          <Card
-            title="Hóa đơn nháp"
-            extra={
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                loading={creating}
-                onClick={handleCreateOrder}
-              >
-                Tạo hóa đơn
-              </Button>
-            }
+      <Row justify="end" style={{ marginBottom: 16 }}>
+        <Col>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            loading={creating}
+            onClick={handleCreateOrder}
           >
-            {draftOrders.length === 0 ? (
-              <Empty description="Chưa có hóa đơn nháp" />
-            ) : (
-              <List
-                dataSource={draftOrders}
-                renderItem={(item) => (
-                  <List.Item
-                    onClick={() => setSelectedOrderId(item.orderId)}
-                    style={{
-                      cursor: 'pointer',
-                      borderRadius: 8,
-                      padding: 12,
-                      marginBottom: 8,
-                      background: selectedOrderId === item.orderId ? '#e6f4ff' : '#fafafa',
-                      border: '1px solid #f0f0f0',
-                    }}
-                  >
-                    <div style={{ width: '100%' }}>
-                      <div style={{ fontWeight: 600 }}>{item.orderCode}</div>
-                      <div>Khách: {item.customerName || 'Khách lẻ'}</div>
-                      <div>Tổng: {currency(item.finalAmount)} đ</div>
-                      <Tag color="blue">{item.status}</Tag>
-                    </div>
-                  </List.Item>
-                )}
-              />
-            )}
-          </Card>
+            Tạo hóa đơn mới
+          </Button>
         </Col>
-
+      </Row>
+      <Row gutter={16}>
         <Col span={10}>
           <Card
             title="Danh sách sản phẩm"
@@ -463,7 +412,7 @@ const PosManagement = () => {
           </Card>
         </Col>
 
-        <Col span={8}>
+        <Col span={14}>
           <Card
             title={
               <Space>
