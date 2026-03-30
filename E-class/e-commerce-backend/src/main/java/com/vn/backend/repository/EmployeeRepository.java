@@ -8,9 +8,7 @@ import java.util.Optional;
 
 
 public interface EmployeeRepository extends JpaRepository<Employee, Long> {
+    Optional<Employee> findByUserProfile(UserProfile userProfile);
 
-    Employee findTopByOrderByIdDesc();
-
-    Optional<Employee> findByUserProfile(UserProfile profile);
-
+    Optional<Employee> findTopByOrderByIdDesc();
 }

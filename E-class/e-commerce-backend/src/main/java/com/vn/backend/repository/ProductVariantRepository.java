@@ -15,6 +15,22 @@ import java.util.Optional;
 public interface ProductVariantRepository extends JpaRepository<ProductVariant, Long> {
 
     @Query("""
+            select pv
+            from ProductVariant pv
+            join pv.product p
+            where pv.isActive = true
+              and p.isActive = true
+              and (
+                    lower(p.name) like lower(concat('%', :keyword, '%'))
+                 or lower(p.code) like lower(concat('%', :keyword, '%'))
+                 or lower(pv.code) like lower(concat('%', :keyword, '%'))
+                 or lower(pv.barcode) like lower(concat('%', :keyword, '%'))
+              )
+            order by p.name asc
+            """)
+    List<ProductVariant> searchForPos(String keyword);
+
+    @Query("""
         SELECT DISTINCT pv
         FROM ProductVariant pv
         LEFT JOIN FETCH pv.variantAttributeValues vav
@@ -51,9 +67,6 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
 
     boolean existsByBarcodeAndDeletedAtIsNull(String barcode);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select v from ProductVariant v where v.id = :id and v.deletedAt is null")
-    Optional<ProductVariant> findByIdForUpdate(@Param("id") Long id);
     List<ProductVariant> findByProductId(Long productId);
     @Query("""
     SELECT DISTINCT pv

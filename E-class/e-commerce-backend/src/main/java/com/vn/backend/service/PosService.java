@@ -14,23 +14,23 @@ public interface PosService {
 
     PosOrderResponse createOrder(PosCreateOrderRequest request);
 
-    PosOrderResponse getOrder(Long orderId);
-
     List<PosOrderResponse> getDraftOrders();
+
+    PosOrderResponse getOrderDetail(Long orderId);
+
+    List<PosProductSearchResponse> searchProducts(String keyword);
+
+    PosProductSearchResponse getProductByBarcode(String barcode);
 
     PosOrderResponse addItem(Long orderId, PosAddItemRequest request);
 
-    PosOrderResponse addItem(Long orderId, Long variantId);
+    PosOrderResponse updateItem(Long orderId, Long itemId, PosUpdateItemRequest request);
 
-    PosOrderResponse updateItem(Long itemId, PosUpdateItemRequest request);
-
-    void removeItem(Long itemId);
+    PosOrderResponse removeItem(Long orderId, Long itemId);
 
     PosOrderResponse assignCustomer(Long orderId, PosAssignCustomerRequest request);
 
     PosOrderResponse checkout(Long orderId, PosCheckoutRequest request);
 
-    PosOrderResponse cancel(Long orderId);
-
-    List<PosProductSearchResponse> searchProducts(String keyword);
+    void cancelOrder(Long orderId);
 }

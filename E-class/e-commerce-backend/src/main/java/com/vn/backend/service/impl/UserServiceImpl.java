@@ -240,13 +240,13 @@ public class UserServiceImpl implements UserService {
     }
 
     private String generateEmployeeCode() {
+        Optional<Employee> lastEmployeeOpt = employeeRepository.findTopByOrderByIdDesc();
 
-        Employee lastEmployee = employeeRepository.findTopByOrderByIdDesc();
-
-        if (lastEmployee == null) {
+        if (lastEmployeeOpt.isEmpty()) {
             return "NV00001";
         }
 
+        Employee lastEmployee = lastEmployeeOpt.get();
         String lastCode = lastEmployee.getCode();
         int number = Integer.parseInt(lastCode.substring(2));
         number++;
