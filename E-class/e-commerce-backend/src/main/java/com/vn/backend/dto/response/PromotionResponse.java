@@ -20,4 +20,11 @@ public class PromotionResponse {
     private OffsetDateTime endDate;
     private Boolean isActive;
     private OffsetDateTime createdAt;
+
+    // ====== thêm cho admin table ======
+    private Integer issuedQuantity;     // số lượng phát hành
+    private Long usedCount;             // số lượt đã dùng
+    private Integer remainingCount;     // số lượng còn lại
+    private Double usedPercent;         // % đã dùng
+    private Double remainingPercent;    // % còn lại
 }
