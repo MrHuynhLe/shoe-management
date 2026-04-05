@@ -17,6 +17,7 @@ public class PosOrderResponse {
     private Long storeId;
     private BigDecimal totalAmount;
     private BigDecimal discountAmount;
+    private String voucherCode;
     private BigDecimal finalAmount;
     private BigDecimal customerPaid;
     private BigDecimal changeAmount;
