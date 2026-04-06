@@ -39,5 +39,25 @@ public interface CouponRepository extends JpaRepository<Coupon, Long> {
                 )
           )
     """)
-    List<Coupon> findUnusedCouponsForCustomer(@Param("customerId") Long customerId);
+    List<Coupon> findUnusedCouponsForCustomer(Long customerId);
+
+    boolean existsByCode(String code);
+
+    boolean existsByCodeAndIdNot(String code, Long id);
+
+    @Query("""
+    SELECT c
+    FROM Coupon c
+    WHERE c.isActive = true
+    AND (
+        c.usageLimit IS NULL
+        OR (
+            SELECT COUNT(cu)
+            FROM CouponUsage cu
+            WHERE cu.coupon.id = c.id
+            AND cu.customer.id = :customerId
+        ) < c.usageLimit
+    )
+""")
+    List<Coupon> findAvailableCouponsForCustomer(Long customerId);
 }

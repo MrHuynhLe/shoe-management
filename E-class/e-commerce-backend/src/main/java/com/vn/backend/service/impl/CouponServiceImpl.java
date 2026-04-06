@@ -17,6 +17,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.util.Locale;
+
 import java.util.List;
 
 @Service
@@ -42,13 +45,23 @@ public class CouponServiceImpl implements CouponService {
     @Override
     @Transactional
     public CouponResponse create(CouponRequest request) {
+        validateRequest(request);
+
+        String normalizedCode = normalizeCode(request.getCode());
+        String normalizedDiscountType = normalizeDiscountType(request.getDiscountType());
+
+        if (couponRepository.existsByCode(normalizedCode)) {
+            throw new IllegalArgumentException("Mã coupon đã tồn tại");
+        }
+
         Coupon coupon = Coupon.builder()
-                .code(request.getCode())
-                .discountType(request.getDiscountType())
+                .code(normalizedCode)
+                .discountType(normalizedDiscountType)
                 .discountValue(request.getDiscountValue())
                 .usageLimit(request.getUsageLimit() != null ? request.getUsageLimit() : 1)
                 .isActive(request.getIsActive() != null ? request.getIsActive() : true)
                 .build();
+
         Coupon saved = couponRepository.save(coupon);
         return mapToResponse(saved);
     }
@@ -56,11 +69,20 @@ public class CouponServiceImpl implements CouponService {
     @Override
     @Transactional
     public CouponResponse update(Long id, CouponRequest request) {
+        validateRequest(request);
+
+        String normalizedCode = normalizeCode(request.getCode());
+        String normalizedDiscountType = normalizeDiscountType(request.getDiscountType());
+
+        if (couponRepository.existsByCodeAndIdNot(normalizedCode, id)) {
+            throw new IllegalArgumentException("Mã coupon đã tồn tại");
+        }
+
         Coupon coupon = couponRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Coupon not found with id: " + id));
 
-        coupon.setCode(request.getCode());
-        coupon.setDiscountType(request.getDiscountType());
+        coupon.setCode(normalizedCode);
+        coupon.setDiscountType(normalizedDiscountType);
         coupon.setDiscountValue(request.getDiscountValue());
         if (request.getUsageLimit() != null) coupon.setUsageLimit(request.getUsageLimit());
         if (request.getIsActive() != null) coupon.setIsActive(request.getIsActive());
@@ -86,7 +108,7 @@ public class CouponServiceImpl implements CouponService {
         Customer customer = customerRepository.findByUserProfileId(user.getUserProfile().getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng"));
 
-        return couponRepository.findUnusedCouponsForCustomer(customer.getId()).stream()
+        return couponRepository.findAvailableCouponsForCustomer(customer.getId()).stream()
                 .map(this::mapToResponse)
                 .toList();
     }
@@ -109,5 +131,31 @@ public class CouponServiceImpl implements CouponService {
         response.setIsActive(coupon.getIsActive());
         response.setCreatedAt(coupon.getCreatedAt());
         return response;
+    }
+    private String normalizeCode(String code) {
+        return code == null ? null : code.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private void validateRequest(CouponRequest request) {
+        String normalizedDiscountType = normalizeDiscountType(request.getDiscountType());
+        if (request.getDiscountValue() == null || request.getDiscountValue().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Giá trị giảm phải lớn hơn 0");
+        }
+
+        if (!"PERCENTAGE".equals(normalizedDiscountType) && !"FIXED_AMOUNT".equals(normalizedDiscountType)) {
+            throw new IllegalArgumentException("Loại giảm giá không hợp lệ");
+        }
+
+        if ("PERCENTAGE".equals(normalizedDiscountType)
+                && request.getDiscountValue().compareTo(BigDecimal.valueOf(100)) > 0) {
+            throw new IllegalArgumentException("Giảm theo phần trăm không được lớn hơn 100");
+        }
+
+        if (request.getUsageLimit() != null && request.getUsageLimit() <= 0) {
+            throw new IllegalArgumentException("Giới hạn sử dụng phải lớn hơn 0");
+        }
+    }
+    private String normalizeDiscountType(String discountType) {
+        return discountType == null ? null : discountType.trim().toUpperCase(Locale.ROOT);
     }
 }

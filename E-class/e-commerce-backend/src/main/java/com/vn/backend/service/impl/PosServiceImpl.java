@@ -5,6 +5,7 @@ import com.vn.backend.dto.request.pos.PosAssignCustomerRequest;
 import com.vn.backend.dto.request.pos.PosCheckoutRequest;
 import com.vn.backend.dto.request.pos.PosCreateOrderRequest;
 import com.vn.backend.dto.request.pos.PosUpdateItemRequest;
+import com.vn.backend.dto.response.pos.PosAvailableDiscountResponse;
 import com.vn.backend.dto.response.pos.PosOrderItemResponse;
 import com.vn.backend.dto.response.pos.PosOrderResponse;
 import com.vn.backend.dto.response.pos.PosProductSearchResponse;
@@ -38,12 +39,26 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.vn.backend.entity.Coupon;
+import com.vn.backend.entity.CouponUsage;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
+
+import com.vn.backend.entity.Promotion;
+import com.vn.backend.repository.CouponRepository;
+import com.vn.backend.repository.CouponUsageRepository;
+import com.vn.backend.repository.PromotionRepository;
+
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.Comparator;
+
+
+
 
 @Service
 @RequiredArgsConstructor
@@ -68,6 +83,10 @@ public class PosServiceImpl implements PosService {
     private final PaymentRepository paymentRepository;
     private final InventoryTransactionRepository inventoryTransactionRepository;
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
+
+    private final PromotionRepository promotionRepository;
+    private final CouponRepository couponRepository;
+    private final CouponUsageRepository couponUsageRepository;
 
     @Override
     public PosOrderResponse createOrder(PosCreateOrderRequest request) {
@@ -263,13 +282,58 @@ public class PosServiceImpl implements PosService {
         PaymentMethod paymentMethod = paymentMethodRepository.findById(request.getPaymentMethodId())
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy phương thức thanh toán"));
 
-        BigDecimal discountAmount = defaultZero(request.getDiscountAmount());
-        if (discountAmount.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("Giảm giá không hợp lệ");
-        }
-
         recalculateOrderAmounts(order);
         BigDecimal totalAmount = defaultZero(order.getTotalAmount());
+
+        BigDecimal discountAmount = BigDecimal.ZERO;
+        String appliedVoucherCode = null;
+
+        boolean hasCoupon = request.getCouponId() != null;
+        boolean hasPromotion = request.getPromotionId() != null;
+
+        if (hasCoupon && hasPromotion) {
+            throw new IllegalArgumentException("Chỉ được áp dụng một voucher cho mỗi hóa đơn");
+        }
+
+        if (hasCoupon) {
+            if (order.getCustomer() == null) {
+                throw new IllegalArgumentException("Hóa đơn phải có khách hàng để dùng coupon");
+            }
+
+            Coupon coupon = couponRepository.findById(request.getCouponId())
+                    .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy coupon"));
+
+            if (!isCouponApplicable(coupon, order, totalAmount)) {
+                throw new IllegalArgumentException("Coupon không còn hợp lệ hoặc không đủ điều kiện áp dụng");
+            }
+
+            discountAmount = calculateDiscountAmount(
+                    totalAmount,
+                    coupon.getDiscountType(),
+                    coupon.getDiscountValue(),
+                    null
+            );
+
+            appliedVoucherCode = coupon.getCode();
+        }
+
+        if (hasPromotion) {
+            Promotion promotion = promotionRepository.findById(request.getPromotionId())
+                    .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy chương trình khuyến mãi"));
+
+            if (!isPromotionApplicable(promotion, order, totalAmount)) {
+                throw new IllegalArgumentException("Khuyến mãi không còn hợp lệ hoặc không đủ điều kiện áp dụng");
+            }
+
+            discountAmount = calculateDiscountAmount(
+                    totalAmount,
+                    promotion.getDiscountType(),
+                    promotion.getDiscountValue(),
+                    promotion.getMaxDiscountAmount()
+            );
+
+            appliedVoucherCode = promotion.getCode();
+        }
 
         if (discountAmount.compareTo(totalAmount) > 0) {
             throw new IllegalArgumentException("Giảm giá không được lớn hơn tổng tiền hàng");
@@ -292,6 +356,7 @@ public class PosServiceImpl implements PosService {
         }
 
         order.setDiscountAmount(discountAmount);
+        order.setVoucherCode(appliedVoucherCode);
         order.setCustomerPaid(customerPaid);
         order.setNote(request.getNote() != null ? request.getNote() : order.getNote());
         order.setStatus(ORDER_STATUS_COMPLETED);
@@ -304,6 +369,8 @@ public class PosServiceImpl implements PosService {
                 .status(PAYMENT_STATUS_PAID)
                 .build();
         paymentRepository.save(payment);
+
+        saveVoucherUsage(order, request);
 
         for (OrderItem item : items) {
             InventoryTransaction transaction = new InventoryTransaction();
@@ -415,6 +482,7 @@ public class PosServiceImpl implements PosService {
                 .finalAmount(finalAmount)
                 .customerPaid(customerPaid)
                 .changeAmount(changeAmount)
+                .voucherCode(order.getVoucherCode())
                 .orderType(order.getOrderType())
                 .note(order.getNote())
                 .items(items.stream().map(this::mapToOrderItemResponse).toList())
@@ -519,5 +587,274 @@ public class PosServiceImpl implements PosService {
 
     private String generateInventoryTransactionCode(Long orderId, Long variantId) {
         return "PX-POS-" + orderId + "-" + variantId + "-" + System.currentTimeMillis();
+    }
+    private boolean isPromotionApplicable(Promotion promotion, Order order, BigDecimal subtotal) {
+        if (promotion == null || Boolean.FALSE.equals(promotion.getIsActive())) {
+            return false;
+        }
+
+        if (promotion.getMinOrderValue() != null
+                && subtotal.compareTo(promotion.getMinOrderValue()) < 0) {
+            return false;
+        }
+
+        if (promotion.getUsageLimit() != null && promotion.getUsageLimit() > 0) {
+            long usedCount = couponUsageRepository.countByPromotion_Id(promotion.getId());
+            if (usedCount >= promotion.getUsageLimit()) {
+                return false;
+            }
+        }
+
+        if (promotion.getUsageLimitPerCustomer() != null
+                && promotion.getUsageLimitPerCustomer() > 0
+                && order.getCustomer() != null) {
+            long customerUsedCount = couponUsageRepository
+                    .countByPromotion_IdAndCustomer_Id(promotion.getId(), order.getCustomer().getId());
+
+            if (customerUsedCount >= promotion.getUsageLimitPerCustomer()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PosAvailableDiscountResponse> getAvailableDiscounts(Long orderId) {
+        Order order = getDraftOrderOrThrow(orderId);
+
+        List<OrderItem> items = orderItemRepository.findByOrder_Id(orderId);
+        BigDecimal subtotal = items.stream()
+                .map(item -> defaultZero(item.getPriceAtPurchase())
+                        .multiply(BigDecimal.valueOf(item.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        if (subtotal.compareTo(BigDecimal.ZERO) <= 0) {
+            return List.of();
+        }
+
+        OffsetDateTime now = OffsetDateTime.now();
+        List<PosAvailableDiscountResponse> results = new ArrayList<>();
+
+        List<Promotion> promotions = promotionRepository.findAllAvailableForPos(now);
+        for (Promotion promotion : promotions) {
+            if (!isPromotionApplicable(promotion, order, subtotal)) {
+                continue;
+            }
+            results.add(mapPromotionToPosDiscountResponse(promotion, order, subtotal));
+        }
+
+        if (order.getCustomer() != null) {
+            Long customerId = order.getCustomer().getId();
+
+            List<Coupon> coupons = couponRepository.findAvailableCouponsForCustomer(customerId);
+            for (Coupon coupon : coupons) {
+                if (!isCouponApplicable(coupon, order, subtotal)) {
+                    continue;
+                }
+                results.add(mapCouponToPosDiscountResponse(coupon, order, subtotal));
+            }
+        }
+
+        results.sort(
+                Comparator.comparing(
+                                PosAvailableDiscountResponse::getEstimatedDiscountAmount,
+                                Comparator.nullsLast(BigDecimal::compareTo)
+                        ).reversed()
+                        .thenComparing(
+                                PosAvailableDiscountResponse::getEndDate,
+                                Comparator.nullsLast(OffsetDateTime::compareTo)
+                        )
+        );
+
+        for (int i = 0; i < results.size(); i++) {
+            results.get(i).setBestVoucher(i == 0);
+        }
+
+        return results;
+    }
+
+
+    private boolean isCouponApplicable(Coupon coupon, Order order, BigDecimal subtotal) {
+        if (coupon == null || order.getCustomer() == null) {
+            return false;
+        }
+
+        if (Boolean.FALSE.equals(coupon.getIsActive())) {
+            return false;
+        }
+
+        long usedCountByCustomer = couponUsageRepository
+                .countByCoupon_IdAndCustomer_Id(coupon.getId(), order.getCustomer().getId());
+
+        return coupon.getUsageLimit() == null || usedCountByCustomer < coupon.getUsageLimit();
+    }
+
+    private PosAvailableDiscountResponse mapCouponToPosDiscountResponse(
+            Coupon coupon,
+            Order order,
+            BigDecimal subtotal
+    ) {
+        long usedCountByCustomer = couponUsageRepository
+                .countByCoupon_IdAndCustomer_Id(coupon.getId(), order.getCustomer().getId());
+
+        int issuedQuantity = coupon.getUsageLimit() != null ? coupon.getUsageLimit() : 0;
+        int remainingCount = coupon.getUsageLimit() != null
+                ? Math.max(coupon.getUsageLimit() - (int) usedCountByCustomer, 0)
+                : 0;
+
+        double usedPercent = 0.0;
+        double remainingPercent = 0.0;
+
+        if (issuedQuantity > 0) {
+            usedPercent = BigDecimal.valueOf(usedCountByCustomer)
+                    .multiply(BigDecimal.valueOf(100))
+                    .divide(BigDecimal.valueOf(issuedQuantity), 2, RoundingMode.HALF_UP)
+                    .doubleValue();
+
+            remainingPercent = BigDecimal.valueOf(remainingCount)
+                    .multiply(BigDecimal.valueOf(100))
+                    .divide(BigDecimal.valueOf(issuedQuantity), 2, RoundingMode.HALF_UP)
+                    .doubleValue();
+        }
+
+        return PosAvailableDiscountResponse.builder()
+                .voucherType("COUPON")
+                .id(coupon.getId())
+                .code(coupon.getCode())
+                .name(coupon.getCode())
+                .discountType(coupon.getDiscountType())
+                .discountValue(coupon.getDiscountValue())
+                .minOrderValue(BigDecimal.ZERO)
+                .maxDiscountAmount(null)
+                .issuedQuantity(issuedQuantity)
+                .usedCount(usedCountByCustomer)
+                .remainingCount(remainingCount)
+                .usedPercent(usedPercent)
+                .remainingPercent(remainingPercent)
+                .startDate(null)
+                .endDate(null)
+                .isActive(coupon.getIsActive())
+                .estimatedDiscountAmount(calculateDiscountAmount(
+                        subtotal,
+                        coupon.getDiscountType(),
+                        coupon.getDiscountValue(),
+                        null
+                ))
+                .bestVoucher(false)
+                .build();
+    }
+
+    private BigDecimal calculateDiscountAmount(
+            BigDecimal subtotal,
+            String discountType,
+            BigDecimal discountValue,
+            BigDecimal maxDiscountAmount
+    ) {
+        if (subtotal == null || discountType == null || discountValue == null) {
+            return BigDecimal.ZERO;
+        }
+
+        String normalizedDiscountType = discountType.trim().toUpperCase();
+
+        BigDecimal discountAmount = BigDecimal.ZERO;
+
+        if ("PERCENTAGE".equals(normalizedDiscountType)) {
+            discountAmount = subtotal.multiply(discountValue)
+                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+
+            if (maxDiscountAmount != null && discountAmount.compareTo(maxDiscountAmount) > 0) {
+                discountAmount = maxDiscountAmount;
+            }
+        } else if ("FIXED_AMOUNT".equals(normalizedDiscountType)) {
+            discountAmount = discountValue;
+        }
+
+        if (discountAmount.compareTo(subtotal) > 0) {
+            return subtotal;
+        }
+
+        return discountAmount;
+    }
+
+    private PosAvailableDiscountResponse mapPromotionToPosDiscountResponse(
+            Promotion promotion,
+            Order order,
+            BigDecimal subtotal
+    ) {
+        long usedCount = couponUsageRepository.countByPromotion_Id(promotion.getId());
+
+        int issuedQuantity = promotion.getUsageLimit() != null ? promotion.getUsageLimit() : 0;
+        int remainingCount = promotion.getUsageLimit() != null
+                ? Math.max(promotion.getUsageLimit() - (int) usedCount, 0)
+                : 0;
+
+        double usedPercent = 0.0;
+        double remainingPercent = 0.0;
+
+        if (issuedQuantity > 0) {
+            usedPercent = BigDecimal.valueOf(usedCount)
+                    .multiply(BigDecimal.valueOf(100))
+                    .divide(BigDecimal.valueOf(issuedQuantity), 2, RoundingMode.HALF_UP)
+                    .doubleValue();
+
+            remainingPercent = BigDecimal.valueOf(remainingCount)
+                    .multiply(BigDecimal.valueOf(100))
+                    .divide(BigDecimal.valueOf(issuedQuantity), 2, RoundingMode.HALF_UP)
+                    .doubleValue();
+        }
+
+        return PosAvailableDiscountResponse.builder()
+                .voucherType("PROMOTION")
+                .id(promotion.getId())
+                .code(promotion.getCode())
+                .name(promotion.getName())
+                .discountType(promotion.getDiscountType())
+                .discountValue(promotion.getDiscountValue())
+                .minOrderValue(promotion.getMinOrderValue())
+                .maxDiscountAmount(promotion.getMaxDiscountAmount())
+                .issuedQuantity(issuedQuantity)
+                .usedCount(usedCount)
+                .remainingCount(remainingCount)
+                .usedPercent(usedPercent)
+                .remainingPercent(remainingPercent)
+                .startDate(promotion.getStartDate())
+                .endDate(promotion.getEndDate())
+                .isActive(promotion.getIsActive())
+                .estimatedDiscountAmount(calculateDiscountAmount(
+                        subtotal,
+                        promotion.getDiscountType(),
+                        promotion.getDiscountValue(),
+                        promotion.getMaxDiscountAmount()
+                ))
+                .bestVoucher(false)
+                .build();
+    }
+
+
+    private void saveVoucherUsage(Order order, PosCheckoutRequest request) {
+        if (request.getCouponId() == null && request.getPromotionId() == null) {
+            return;
+        }
+
+        CouponUsage.CouponUsageBuilder builder = CouponUsage.builder()
+                .customer(order.getCustomer())
+                .order(order)
+                .usedAt(OffsetDateTime.now());
+
+        if (request.getCouponId() != null) {
+            Coupon coupon = couponRepository.findById(request.getCouponId())
+                    .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy coupon"));
+            builder.coupon(coupon);
+        }
+
+        if (request.getPromotionId() != null) {
+            Promotion promotion = promotionRepository.findById(request.getPromotionId())
+                    .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy chương trình khuyến mãi"));
+            builder.promotion(promotion);
+        }
+
+        couponUsageRepository.save(builder.build());
     }
 }

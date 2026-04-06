@@ -12,7 +12,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import com.vn.backend.repository.CouponUsageRepository;
 import java.time.OffsetDateTime;
 
 @Service
@@ -20,6 +20,7 @@ import java.time.OffsetDateTime;
 public class PromotionServiceImpl implements PromotionService {
     private final CouponUsageRepository couponUsageRepository;
     private final PromotionRepository promotionRepository;
+    private final CouponUsageRepository couponUsageRepository;
 
     @Override
     public Page<PromotionResponse> getAll(Pageable pageable) {
@@ -94,6 +95,28 @@ public class PromotionServiceImpl implements PromotionService {
         response.setEndDate(promotion.getEndDate());
         response.setIsActive(promotion.getIsActive());
         response.setCreatedAt(promotion.getCreatedAt());
+
+        // ====== thống kê usage cho admin ======
+        long usedCount = couponUsageRepository.countByPromotion_Id(promotion.getId());
+        Integer issuedQuantity = promotion.getUsageLimit();
+        Integer remainingCount = null;
+        Double usedPercent = null;
+        Double remainingPercent = null;
+
+        if (issuedQuantity != null && issuedQuantity > 0) {
+            int remaining = Math.max(issuedQuantity - (int) usedCount, 0);
+            remainingCount = remaining;
+
+            usedPercent = (usedCount * 100.0) / issuedQuantity;
+            remainingPercent = (remaining * 100.0) / issuedQuantity;
+        }
+
+        response.setIssuedQuantity(issuedQuantity);
+        response.setUsedCount(usedCount);
+        response.setRemainingCount(remainingCount);
+        response.setUsedPercent(usedPercent);
+        response.setRemainingPercent(remainingPercent);
+
         return response;
     }
 

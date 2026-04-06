@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.vn.backend.dto.response.pos.PosAvailableDiscountResponse;
 
 import java.util.List;
 
@@ -103,5 +104,12 @@ public class PosController {
     ) {
         posService.cancelOrder(orderId);
         return ResponseEntity.ok("Hủy hóa đơn thành công");
+    }
+
+    @GetMapping("/orders/{orderId}/discounts/available")
+    public ResponseEntity<List<PosAvailableDiscountResponse>> getAvailableDiscounts(
+            @PathVariable Long orderId
+    ) {
+        return ResponseEntity.ok(posService.getAvailableDiscounts(orderId));
     }
 }

@@ -23,4 +23,12 @@ public interface PromotionRepository extends JpaRepository<Promotion, Long> {
         AND (p.endDate IS NULL OR p.endDate >= :now)
     """)
     Page<Promotion> findActivePromotions(OffsetDateTime now, Pageable pageable);
+
+    @Query("""
+    SELECT p FROM Promotion p
+    WHERE p.isActive = true
+    AND (p.startDate IS NULL OR p.startDate <= :now)
+    AND (p.endDate IS NULL OR p.endDate >= :now)
+""")
+    List<Promotion> findAllAvailableForPos(OffsetDateTime now);
 }

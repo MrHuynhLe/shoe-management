@@ -16,7 +16,8 @@ public class PosCheckoutRequest {
     @DecimalMin(value = "0.0", inclusive = true, message = "Tiền khách trả phải >= 0")
     private BigDecimal customerPaid;
 
-    private BigDecimal discountAmount;
+    private Long couponId;
+    private Long promotionId;
 
     private String note;
 }

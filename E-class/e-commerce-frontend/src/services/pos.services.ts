@@ -1,6 +1,5 @@
 import { axiosClient } from "./axiosClient";
 
-
 export interface PosOrderItemResponse {
   itemId: number;
   productVariantId: number;
@@ -27,6 +26,7 @@ export interface PosOrderResponse {
   storeId?: number | null;
   totalAmount: number;
   discountAmount: number;
+  voucherCode?: string | null;
   finalAmount: number;
   customerPaid: number;
   changeAmount: number;
@@ -47,6 +47,27 @@ export interface PosProductSearchResponse {
   sellingPrice: number;
   stockQuantity: number;
   imageUrl?: string | null;
+}
+
+export interface PosAvailableDiscountResponse {
+  voucherType: "PROMOTION" | "COUPON";
+  id: number;
+  code: string;
+  name: string;
+  discountType: string;
+  discountValue: number;
+  minOrderValue?: number | null;
+  maxDiscountAmount?: number | null;
+  issuedQuantity: number;
+  usedCount: number;
+  remainingCount: number;
+  usedPercent: number;
+  remainingPercent: number;
+  startDate?: string | null;
+  endDate?: string | null;
+  isActive: boolean;
+  estimatedDiscountAmount: number;
+  bestVoucher: boolean;
 }
 
 export interface PosCreateOrderRequest {
@@ -73,18 +94,17 @@ export interface PosAssignCustomerRequest {
 export interface PosCheckoutRequest {
   paymentMethodId: number;
   customerPaid: number;
-  discountAmount: number;
+  couponId?: number | null;
+  promotionId?: number | null;
   note?: string;
 }
 
-export interface PosApplyVoucherRequest {
-  voucherCode: string;
-}
-
-const POS_BASE = '/v1/pos';
+const POS_BASE = "/v1/pos";
 
 export const posService = {
-  createOrder: async (payload: PosCreateOrderRequest): Promise<PosOrderResponse> => {
+  createOrder: async (
+    payload: PosCreateOrderRequest,
+  ): Promise<PosOrderResponse> => {
     const res = await axiosClient.post(`${POS_BASE}/orders`, payload);
     return res.data;
   },
@@ -99,68 +119,90 @@ export const posService = {
     return res.data;
   },
 
-  searchProducts: async (keyword: string): Promise<PosProductSearchResponse[]> => {
+  getAvailableDiscounts: async (
+    orderId: number,
+  ): Promise<PosAvailableDiscountResponse[]> => {
+    const res = await axiosClient.get(
+      `${POS_BASE}/orders/${orderId}/discounts/available`,
+    );
+    return res.data;
+  },
+
+  searchProducts: async (
+    keyword: string,
+  ): Promise<PosProductSearchResponse[]> => {
     const res = await axiosClient.get(`${POS_BASE}/products/search`, {
       params: { keyword },
     });
     return res.data;
   },
 
-  getProductByBarcode: async (barcode: string): Promise<PosProductSearchResponse> => {
-    const res = await axiosClient.get(`${POS_BASE}/products/barcode/${barcode}`);
+  getProductByBarcode: async (
+    barcode: string,
+  ): Promise<PosProductSearchResponse> => {
+    const res = await axiosClient.get(
+      `${POS_BASE}/products/barcode/${barcode}`,
+    );
     return res.data;
   },
 
-  addItem: async (orderId: number, payload: PosAddItemRequest): Promise<PosOrderResponse> => {
-    const res = await axiosClient.post(`${POS_BASE}/orders/${orderId}/items`, payload);
+  addItem: async (
+    orderId: number,
+    payload: PosAddItemRequest,
+  ): Promise<PosOrderResponse> => {
+    const res = await axiosClient.post(
+      `${POS_BASE}/orders/${orderId}/items`,
+      payload,
+    );
     return res.data;
   },
 
   updateItem: async (
     orderId: number,
     itemId: number,
-    payload: PosUpdateItemRequest
+    payload: PosUpdateItemRequest,
   ): Promise<PosOrderResponse> => {
-    const res = await axiosClient.put(`${POS_BASE}/orders/${orderId}/items/${itemId}`, payload);
+    const res = await axiosClient.put(
+      `${POS_BASE}/orders/${orderId}/items/${itemId}`,
+      payload,
+    );
     return res.data;
   },
 
-  removeItem: async (orderId: number, itemId: number): Promise<PosOrderResponse> => {
-    const res = await axiosClient.delete(`${POS_BASE}/orders/${orderId}/items/${itemId}`);
+  removeItem: async (
+    orderId: number,
+    itemId: number,
+  ): Promise<PosOrderResponse> => {
+    const res = await axiosClient.delete(
+      `${POS_BASE}/orders/${orderId}/items/${itemId}`,
+    );
     return res.data;
   },
 
   assignCustomer: async (
     orderId: number,
-    payload: PosAssignCustomerRequest
+    payload: PosAssignCustomerRequest,
   ): Promise<PosOrderResponse> => {
-    const res = await axiosClient.put(`${POS_BASE}/orders/${orderId}/customer`, payload);
+    const res = await axiosClient.put(
+      `${POS_BASE}/orders/${orderId}/customer`,
+      payload,
+    );
     return res.data;
   },
 
   checkout: async (
     orderId: number,
-    payload: PosCheckoutRequest
+    payload: PosCheckoutRequest,
   ): Promise<PosOrderResponse> => {
-    const res = await axiosClient.post(`${POS_BASE}/orders/${orderId}/checkout`, payload);
+    const res = await axiosClient.post(
+      `${POS_BASE}/orders/${orderId}/checkout`,
+      payload,
+    );
     return res.data;
   },
 
   cancelOrder: async (orderId: number): Promise<string> => {
     const res = await axiosClient.post(`${POS_BASE}/orders/${orderId}/cancel`);
-    return res.data;
-  },
-
-  applyVoucher: async (
-    orderId: number,
-    payload: PosApplyVoucherRequest
-  ): Promise<PosOrderResponse> => {
-    const res = await axiosClient.put(`${POS_BASE}/orders/${orderId}/voucher`, payload);
-    return res.data;
-  },
-
-  removeVoucher: async (orderId: number): Promise<PosOrderResponse> => {
-    const res = await axiosClient.delete(`${POS_BASE}/orders/${orderId}/voucher`);
     return res.data;
   },
 };
