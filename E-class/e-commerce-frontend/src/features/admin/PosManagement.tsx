@@ -35,7 +35,6 @@ import {
 
 const { Title, Text } = Typography;
 
-const DEFAULT_EMPLOYEE_ID = 2;
 const DEFAULT_STORE_ID = 1;
 
 const paymentOptions = [
@@ -48,6 +47,8 @@ const currency = (value?: number | null) =>
   new Intl.NumberFormat("vi-VN").format(value ?? 0);
 
 const PosManagement = () => {
+  const { user } = useAuth(); // Get user from AuthContext
+
   const [draftOrders, setDraftOrders] = useState<PosOrderResponse[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<PosOrderResponse | null>(
@@ -62,6 +63,10 @@ const PosManagement = () => {
   const [loadingOrder, setLoadingOrder] = useState(false);
 
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [availableVouchers, setAvailableVouchers] = useState<any[]>([]);
+  const [loadingVouchers, setLoadingVouchers] = useState(false);
+  const [voucherCodeInput, setVoucherCodeInput] = useState<string>('');
+  const [appliedVoucherCode, setAppliedVoucherCode] = useState<string | null>(null);
   const [customerIdInput, setCustomerIdInput] = useState<number | null>(1);
 
   const [availableDiscounts, setAvailableDiscounts] = useState<
@@ -161,13 +166,22 @@ const softBoxStyle: React.CSSProperties = {
     if (selectedOrderId) {
       loadOrderDetail(selectedOrderId);
     }
-  }, [selectedOrderId]);
+    setAppliedVoucherCode(selectedOrder?.voucherCode || null);
+  }, [selectedOrderId, selectedOrder?.voucherCode]); 
 
   const handleCreateOrder = async () => {
+    setVoucherCodeInput('');
+    setAppliedVoucherCode(null);
+
     try {
+      if (!user?.userId) {
+        message.error('Không tìm thấy thông tin nhân viên. Vui lòng đăng nhập lại.');
+        return;
+      }
+
       setCreating(true);
       const data = await posService.createOrder({
-        employeeId: DEFAULT_EMPLOYEE_ID,
+        employeeId: user.userId, 
         customerId: 1,
         storeId: DEFAULT_STORE_ID,
         note: "Khách mua tại quầy",
@@ -177,6 +191,8 @@ const softBoxStyle: React.CSSProperties = {
       await loadDraftOrders();
       setSelectedOrderId(data.orderId);
       setSelectedOrder(data);
+      fetchAndFilterVouchers(); 
+      message.success('Tạo hóa đơn tại quầy thành công');
     } catch (error: any) {
       message.error(error?.response?.data?.message || "Không tạo được hóa đơn");
     } finally {
@@ -188,7 +204,9 @@ const softBoxStyle: React.CSSProperties = {
     try {
       setSearching(true);
       const data = await posService.searchProducts(keyword);
-      setProducts(data);
+      const sortedData = data.sort((a, b) => b.stockQuantity - a.stockQuantity);
+      setProducts(sortedData); 
+
     } catch (error: any) {
       message.error(
         error?.response?.data?.message || "Không tìm được sản phẩm",
@@ -228,7 +246,7 @@ const softBoxStyle: React.CSSProperties = {
         quantity,
       });
       setSelectedOrder(data);
-      await loadDraftOrders();
+      // No need to load draft orders, selected order is updated
     } catch (error: any) {
       message.error(
         error?.response?.data?.message || "Cập nhật số lượng thất bại",
@@ -248,9 +266,8 @@ const softBoxStyle: React.CSSProperties = {
       message.error(error?.response?.data?.message || "Xóa sản phẩm thất bại");
     }
   };
-
   const handleAssignCustomer = async () => {
-    if (!selectedOrderId) return;
+    if (!selectedOrderId) return; 
 
     try {
       const data = await posService.assignCustomer(selectedOrderId, {
@@ -330,6 +347,43 @@ const softBoxStyle: React.CSSProperties = {
       message.error(error?.response?.data?.message || "Hủy hóa đơn thất bại");
     }
   };
+
+  const handleApplyVoucher = async () => {
+    if (!selectedOrder?.orderId) {
+      message.warning('Hãy tạo hoặc chọn hóa đơn trước');
+      return;
+    }
+    if (!voucherCodeInput) {
+      message.warning('Vui lòng nhập mã giảm giá');
+      return;
+    }
+    try {
+      const data = await posService.applyVoucher(selectedOrder.orderId, {
+        voucherCode: voucherCodeInput,
+      });
+      setSelectedOrder(data);
+      setAppliedVoucherCode(voucherCodeInput);
+      message.success(`Áp dụng mã giảm giá "${voucherCodeInput}" thành công!`);
+    } catch (error: any) {
+      message.error(error?.response?.data?.message || 'Áp dụng mã giảm giá thất bại');
+    }
+  };
+
+  const handleRemoveVoucher = async () => {
+    if (!selectedOrder?.orderId) return;
+
+    try {
+      const data = await posService.removeVoucher(selectedOrder.orderId);
+      setSelectedOrder(data);
+      setAppliedVoucherCode(null);
+      setVoucherCodeInput('');
+      message.success('Đã hủy mã giảm giá');
+    } catch (error: any) {
+      message.error(error?.response?.data?.message || 'Hủy mã giảm giá thất bại');
+    }
+  };
+
+
 
   const orderColumns = [
     {

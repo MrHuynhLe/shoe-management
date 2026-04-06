@@ -50,12 +50,12 @@ public class PosController {
         return ResponseEntity.ok(posService.searchProducts(keyword));
     }
 
-    @GetMapping("/products/barcode/{barcode}")
-    public ResponseEntity<PosProductSearchResponse> getProductByBarcode(
-            @PathVariable String barcode
-    ) {
-        return ResponseEntity.ok(posService.getProductByBarcode(barcode));
-    }
+//    @GetMapping("/products/barcode/{barcode}")
+//    public ResponseEntity<PosProductSearchResponse> getProductByBarcode(
+//            @PathVariable String barcode
+//    ) {
+//        return ResponseEntity.ok(posService.getProductByBarcode(barcode));
+//    }
 
     @PostMapping("/orders/{orderId}/items")
     public ResponseEntity<PosOrderResponse> addItem(

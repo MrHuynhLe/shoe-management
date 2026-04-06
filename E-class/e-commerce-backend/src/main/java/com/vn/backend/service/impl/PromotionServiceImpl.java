@@ -3,6 +3,7 @@ package com.vn.backend.service.impl;
 import com.vn.backend.dto.request.PromotionRequest;
 import com.vn.backend.dto.response.PromotionResponse;
 import com.vn.backend.entity.Promotion;
+import com.vn.backend.repository.CouponUsageRepository;
 import com.vn.backend.repository.PromotionRepository;
 import com.vn.backend.exception.ResourceNotFoundException;
 import com.vn.backend.service.PromotionService;
@@ -17,7 +18,7 @@ import java.time.OffsetDateTime;
 @Service
 @RequiredArgsConstructor
 public class PromotionServiceImpl implements PromotionService {
-
+    private final CouponUsageRepository couponUsageRepository;
     private final PromotionRepository promotionRepository;
     private final CouponUsageRepository couponUsageRepository;
 
@@ -81,6 +82,14 @@ public class PromotionServiceImpl implements PromotionService {
         response.setMinOrderValue(promotion.getMinOrderValue());
         response.setMaxDiscountAmount(promotion.getMaxDiscountAmount());
         response.setUsageLimit(promotion.getUsageLimit());
+
+        long usedCount = couponUsageRepository.countByPromotion_Id(promotion.getId());
+        if (promotion.getUsageLimit() != null) {
+            response.setRemainingUsage(Math.max(promotion.getUsageLimit() - (int) usedCount, 0));
+        } else {
+            response.setRemainingUsage(null);
+        }
+
         response.setUsageLimitPerCustomer(promotion.getUsageLimitPerCustomer());
         response.setStartDate(promotion.getStartDate());
         response.setEndDate(promotion.getEndDate());

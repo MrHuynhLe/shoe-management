@@ -22,6 +22,7 @@ export interface PosOrderResponse {
   customerId?: number | null;
   customerName?: string | null;
   employeeId?: number | null;
+  employeeName?: string | null; 
   storeId?: number | null;
   totalAmount: number;
   discountAmount: number;
@@ -31,6 +32,7 @@ export interface PosOrderResponse {
   changeAmount: number;
   orderType?: string | null;
   note?: string | null;
+  voucherCode?: string | null; 
   items: PosOrderItemResponse[];
 }
 
@@ -72,6 +74,7 @@ export interface PosCreateOrderRequest {
   employeeId: number;
   customerId?: number | null;
   storeId: number;
+  orderType: string; 
   note?: string;
 }
 

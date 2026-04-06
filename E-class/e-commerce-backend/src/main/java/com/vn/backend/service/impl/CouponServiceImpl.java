@@ -6,6 +6,7 @@ import com.vn.backend.entity.Customer;
 import com.vn.backend.entity.Coupon;
 import com.vn.backend.entity.User;
 import com.vn.backend.exception.ResourceNotFoundException;
+import com.vn.backend.repository.CouponUsageRepository;
 import com.vn.backend.repository.CustomerRepository;
 import com.vn.backend.repository.CouponRepository;
 import com.vn.backend.repository.UserRepository;
@@ -24,7 +25,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class CouponServiceImpl implements CouponService {
-
+    private final CouponUsageRepository couponUsageRepository;
     private final CouponRepository couponRepository;
     private final UserRepository userRepository;
     private final CustomerRepository customerRepository;
@@ -119,6 +120,14 @@ public class CouponServiceImpl implements CouponService {
         response.setDiscountType(coupon.getDiscountType());
         response.setDiscountValue(coupon.getDiscountValue());
         response.setUsageLimit(coupon.getUsageLimit());
+
+        long usedCount = couponUsageRepository.countByCoupon_Id(coupon.getId());
+        if (coupon.getUsageLimit() != null) {
+            response.setRemainingUsage(Math.max(coupon.getUsageLimit() - (int) usedCount, 0));
+        } else {
+            response.setRemainingUsage(null);
+        }
+
         response.setIsActive(coupon.getIsActive());
         response.setCreatedAt(coupon.getCreatedAt());
         return response;

@@ -1,6 +1,6 @@
 export interface StatisticsQuery {
-  fromDate?: string;
-  toDate?: string;
+  from?: string;
+  to?: string;
   page?: number;
   size?: number;
 }
@@ -20,6 +20,14 @@ export interface TopProductItem {
   categoryName: string;
   totalSold: number;
   revenue: number;
+  profit: number;
+}
+
+export interface RevenueChartItem {
+  label: string;
+  totalOrders: number;
+  revenue: number;
+  itemsSold: number;
   profit: number;
 }
 

@@ -17,7 +17,8 @@ interface Coupon {
   code: string;
   discountType: "PERCENTAGE" | "FIXED_AMOUNT";
   discountValue: number;
-  usageLimit: number;
+  usageLimit: number | null;
+  remainingUsage?: number | null;
   isActive: boolean;
 }
 

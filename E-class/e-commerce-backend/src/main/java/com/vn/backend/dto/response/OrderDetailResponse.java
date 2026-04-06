@@ -28,6 +28,8 @@ public class OrderDetailResponse {
     private String voucherCode;
     private BigDecimal discountAmount;
     private BigDecimal shippingFee;
-
+    private String orderType; 
+    private Long employeeId;
+    private String employeeName; 
     private List<OrderItemResponse> items;
 }

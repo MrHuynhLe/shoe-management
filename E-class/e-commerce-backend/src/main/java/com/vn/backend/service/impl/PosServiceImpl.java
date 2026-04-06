@@ -153,18 +153,18 @@ public class PosServiceImpl implements PosService {
                 .toList();
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public PosProductSearchResponse getProductByBarcode(String barcode) {
-        ProductVariant variant = productVariantRepository.findByBarcode(barcode)
-                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy sản phẩm"));
-
-        if (!isSellableVariant(variant)) {
-            throw new IllegalArgumentException("Sản phẩm không khả dụng để bán");
-        }
-
-        return mapToProductSearchResponse(variant);
-    }
+//    @Override
+//    @Transactional(readOnly = true)
+//    public PosProductSearchResponse getProductByBarcode(String barcode) {
+//        ProductVariant variant = (ProductVariant) productVariantRepository.findByBarcode(barcode)
+//                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy sản phẩm"));
+//
+//        if (!isSellableVariant(variant)) {
+//            throw new IllegalArgumentException("Sản phẩm không khả dụng để bán");
+//        }
+//
+//        return mapToProductSearchResponse(variant);
+//    }
 
     @Override
     public PosOrderResponse addItem(Long orderId, PosAddItemRequest request) {
@@ -347,7 +347,7 @@ public class PosServiceImpl implements PosService {
         }
 
         for (OrderItem item : items) {
-            ProductVariant lockedVariant = productVariantRepository.findByIdForUpdate(item.getProductVariant().getId().longValue())
+            ProductVariant lockedVariant = (ProductVariant) productVariantRepository.findByIdForUpdate(item.getProductVariant().getId().longValue())
                     .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy biến thể sản phẩm"));
 
             if (lockedVariant.getStockQuantity() == null || lockedVariant.getStockQuantity() < item.getQuantity()) {

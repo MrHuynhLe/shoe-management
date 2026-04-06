@@ -11,14 +11,17 @@ const { Title, Text } = Typography;
 interface Order {
   id: number;
   code: string;
-  customer: {
-    userProfile: {
-      fullName: string;
+  customer?: {
+    userProfile?: {
+      fullName?: string;
     }
   };
+  customerName?: string;
+  phone?: string;
   totalAmount: number;
   status: string;
   createdAt: string;
+  orderType?: string | null; 
 }
 
 const OrderManagementPage = () => {
@@ -79,6 +82,12 @@ const OrderManagementPage = () => {
     { title: 'Mã đơn hàng', dataIndex: 'code', render: (text) => <Text strong>#{text}</Text> },
     { title: 'Tên khách hàng', dataIndex: ['customer', 'userProfile', 'fullName'], key: 'customerName' },
     {
+      title: 'SĐT',
+      dataIndex: 'phone',
+      key: 'phone',
+      render: (value) => value || 'N/A'
+    },
+    {
       title: 'Tổng tiền',
       dataIndex: 'totalAmount',
       search: false,
@@ -101,6 +110,12 @@ const OrderManagementPage = () => {
         CANCELLED: { text: 'Đã hủy', status: 'Error' },
       },
       render: (_, record) => getStatusTag(record.status),
+    },
+    {
+      title: 'Loại đơn hàng',
+      dataIndex: 'orderType',
+      key: 'orderType',
+      render: (_, record) => record.orderType === 'POS' ? <Tag color="blue">Tại quầy</Tag> : <Tag color="geekblue">Online</Tag>,
     },
     {
       title: 'Thao tác',
