@@ -1,10 +1,10 @@
 package com.vn.backend.controller;
-
 import com.vn.backend.dto.request.pos.PosAddItemRequest;
 import com.vn.backend.dto.request.pos.PosAssignCustomerRequest;
 import com.vn.backend.dto.request.pos.PosCheckoutRequest;
 import com.vn.backend.dto.request.pos.PosCreateOrderRequest;
 import com.vn.backend.dto.request.pos.PosUpdateItemRequest;
+import com.vn.backend.dto.response.pos.PosAvailableDiscountResponse;
 import com.vn.backend.dto.response.pos.PosOrderResponse;
 import com.vn.backend.dto.response.pos.PosProductSearchResponse;
 import com.vn.backend.service.PosService;
@@ -12,104 +12,52 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import com.vn.backend.dto.response.pos.PosAvailableDiscountResponse;
-
 import java.util.List;
-
-@RestController
-@RequestMapping("/v1/pos")
-@RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:5173")
+@RestController @RequestMapping("/v1/pos")
+@RequiredArgsConstructor @CrossOrigin(origins = "http://localhost:5173")
 public class PosController {
-
     private final PosService posService;
-
     @PostMapping("/orders")
-    public ResponseEntity<PosOrderResponse> createOrder(
-            @Valid @RequestBody PosCreateOrderRequest request
-    ) {
+    public ResponseEntity<PosOrderResponse> createOrder( @Valid @RequestBody PosCreateOrderRequest request ) {
         return ResponseEntity.ok(posService.createOrder(request));
     }
-
     @GetMapping("/orders/drafts")
     public ResponseEntity<List<PosOrderResponse>> getDraftOrders() {
         return ResponseEntity.ok(posService.getDraftOrders());
     }
-
     @GetMapping("/orders/{orderId}")
-    public ResponseEntity<PosOrderResponse> getOrderDetail(
-            @PathVariable Long orderId
-    ) {
+    public ResponseEntity<PosOrderResponse> getOrderDetail( @PathVariable Long orderId ) {
         return ResponseEntity.ok(posService.getOrderDetail(orderId));
     }
-
     @GetMapping("/products/search")
-    public ResponseEntity<List<PosProductSearchResponse>> searchProducts(
-            @RequestParam(defaultValue = "") String keyword
-    ) {
+    public ResponseEntity<List<PosProductSearchResponse>> searchProducts( @RequestParam(defaultValue = "") String keyword ) {
         return ResponseEntity.ok(posService.searchProducts(keyword));
     }
-
-//    @GetMapping("/products/barcode/{barcode}")
-//    public ResponseEntity<PosProductSearchResponse> getProductByBarcode(
-//            @PathVariable String barcode
-//    ) {
-//        return ResponseEntity.ok(posService.getProductByBarcode(barcode));
-//    }
-
     @PostMapping("/orders/{orderId}/items")
-    public ResponseEntity<PosOrderResponse> addItem(
-            @PathVariable Long orderId,
-            @Valid @RequestBody PosAddItemRequest request
-    ) {
+    public ResponseEntity<PosOrderResponse> addItem( @PathVariable Long orderId, @Valid @RequestBody PosAddItemRequest request ) {
         return ResponseEntity.ok(posService.addItem(orderId, request));
     }
-
     @PutMapping("/orders/{orderId}/items/{itemId}")
-    public ResponseEntity<PosOrderResponse> updateItem(
-            @PathVariable Long orderId,
-            @PathVariable Long itemId,
-            @Valid @RequestBody PosUpdateItemRequest request
-    ) {
+    public ResponseEntity<PosOrderResponse> updateItem( @PathVariable Long orderId, @PathVariable Long itemId, @Valid @RequestBody PosUpdateItemRequest request ) {
         return ResponseEntity.ok(posService.updateItem(orderId, itemId, request));
     }
-
     @DeleteMapping("/orders/{orderId}/items/{itemId}")
-    public ResponseEntity<PosOrderResponse> removeItem(
-            @PathVariable Long orderId,
-            @PathVariable Long itemId
-    ) {
+    public ResponseEntity<PosOrderResponse> removeItem( @PathVariable Long orderId, @PathVariable Long itemId ) {
         return ResponseEntity.ok(posService.removeItem(orderId, itemId));
     }
-
     @PutMapping("/orders/{orderId}/customer")
-    public ResponseEntity<PosOrderResponse> assignCustomer(
-            @PathVariable Long orderId,
-            @RequestBody PosAssignCustomerRequest request
-    ) {
+    public ResponseEntity<PosOrderResponse> assignCustomer( @PathVariable Long orderId, @RequestBody PosAssignCustomerRequest request ) {
         return ResponseEntity.ok(posService.assignCustomer(orderId, request));
     }
-
     @PostMapping("/orders/{orderId}/checkout")
-    public ResponseEntity<PosOrderResponse> checkout(
-            @PathVariable Long orderId,
-            @Valid @RequestBody PosCheckoutRequest request
-    ) {
+    public ResponseEntity<PosOrderResponse> checkout( @PathVariable Long orderId, @Valid @RequestBody PosCheckoutRequest request ) {
         return ResponseEntity.ok(posService.checkout(orderId, request));
     }
-
     @PostMapping("/orders/{orderId}/cancel")
-    public ResponseEntity<String> cancelOrder(
-            @PathVariable Long orderId
-    ) {
-        posService.cancelOrder(orderId);
-        return ResponseEntity.ok("Hủy hóa đơn thành công");
+    public ResponseEntity<String> cancelOrder( @PathVariable Long orderId ) {
+        posService.cancelOrder(orderId); return ResponseEntity.ok("Hủy hóa đơn thành công");
     }
-
     @GetMapping("/orders/{orderId}/discounts/available")
-    public ResponseEntity<List<PosAvailableDiscountResponse>> getAvailableDiscounts(
-            @PathVariable Long orderId
-    ) {
-        return ResponseEntity.ok(posService.getAvailableDiscounts(orderId));
-    }
+    public ResponseEntity<List<PosAvailableDiscountResponse>> getAvailableDiscounts( @PathVariable Long orderId ) {
+        return ResponseEntity.ok(posService.getAvailableDiscounts(orderId)); }
 }

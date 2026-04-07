@@ -2,13 +2,13 @@ package com.vn.backend.service.impl;
 
 import com.vn.backend.dto.request.CouponRequest;
 import com.vn.backend.dto.response.CouponResponse;
-import com.vn.backend.entity.Customer;
 import com.vn.backend.entity.Coupon;
+import com.vn.backend.entity.Customer;
 import com.vn.backend.entity.User;
 import com.vn.backend.exception.ResourceNotFoundException;
+import com.vn.backend.repository.CouponRepository;
 import com.vn.backend.repository.CouponUsageRepository;
 import com.vn.backend.repository.CustomerRepository;
-import com.vn.backend.repository.CouponRepository;
 import com.vn.backend.repository.UserRepository;
 import com.vn.backend.service.CouponService;
 import lombok.RequiredArgsConstructor;
@@ -18,15 +18,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.Locale;
-
+import java.math.RoundingMode;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
 public class CouponServiceImpl implements CouponService {
-    private final CouponUsageRepository couponUsageRepository;
+
     private final CouponRepository couponRepository;
+    private final CouponUsageRepository couponUsageRepository;
     private final UserRepository userRepository;
     private final CustomerRepository customerRepository;
 
@@ -84,8 +85,14 @@ public class CouponServiceImpl implements CouponService {
         coupon.setCode(normalizedCode);
         coupon.setDiscountType(normalizedDiscountType);
         coupon.setDiscountValue(request.getDiscountValue());
-        if (request.getUsageLimit() != null) coupon.setUsageLimit(request.getUsageLimit());
-        if (request.getIsActive() != null) coupon.setIsActive(request.getIsActive());
+
+        if (request.getUsageLimit() != null) {
+            coupon.setUsageLimit(request.getUsageLimit());
+        }
+
+        if (request.getIsActive() != null) {
+            coupon.setIsActive(request.getIsActive());
+        }
 
         Coupon updated = couponRepository.save(coupon);
         return mapToResponse(updated);
@@ -113,6 +120,7 @@ public class CouponServiceImpl implements CouponService {
                 .toList();
     }
 
+
     private CouponResponse mapToResponse(Coupon coupon) {
         CouponResponse response = new CouponResponse();
         response.setId(coupon.getId());
@@ -120,24 +128,43 @@ public class CouponServiceImpl implements CouponService {
         response.setDiscountType(coupon.getDiscountType());
         response.setDiscountValue(coupon.getDiscountValue());
         response.setUsageLimit(coupon.getUsageLimit());
-
-        long usedCount = couponUsageRepository.countByCoupon_Id(coupon.getId());
-        if (coupon.getUsageLimit() != null) {
-            response.setRemainingUsage(Math.max(coupon.getUsageLimit() - (int) usedCount, 0));
-        } else {
-            response.setRemainingUsage(null);
-        }
-
         response.setIsActive(coupon.getIsActive());
         response.setCreatedAt(coupon.getCreatedAt());
+
+        long usedCount = couponUsageRepository.countByCoupon_Id(coupon.getId());
+        Integer issuedQuantity = coupon.getUsageLimit();
+        Integer remainingCount = null;
+        Double usedPercent = null;
+        Double remainingPercent = null;
+
+        if (issuedQuantity != null && issuedQuantity > 0) {
+            remainingCount = Math.max(issuedQuantity - (int) usedCount, 0);
+            usedPercent = BigDecimal.valueOf(usedCount)
+                    .multiply(BigDecimal.valueOf(100))
+                    .divide(BigDecimal.valueOf(issuedQuantity), 2, RoundingMode.HALF_UP)
+                    .doubleValue();
+            remainingPercent = BigDecimal.valueOf(remainingCount)
+                    .multiply(BigDecimal.valueOf(100))
+                    .divide(BigDecimal.valueOf(issuedQuantity), 2, RoundingMode.HALF_UP)
+                    .doubleValue();
+        }
+
+        response.setIssuedQuantity(issuedQuantity);
+        response.setUsedCount(usedCount);
+        response.setRemainingCount(remainingCount);
+        response.setUsedPercent(usedPercent);
+        response.setRemainingPercent(remainingPercent);
+
         return response;
     }
+
     private String normalizeCode(String code) {
         return code == null ? null : code.trim().toUpperCase(Locale.ROOT);
     }
 
     private void validateRequest(CouponRequest request) {
         String normalizedDiscountType = normalizeDiscountType(request.getDiscountType());
+
         if (request.getDiscountValue() == null || request.getDiscountValue().compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Giá trị giảm phải lớn hơn 0");
         }
@@ -152,9 +179,10 @@ public class CouponServiceImpl implements CouponService {
         }
 
         if (request.getUsageLimit() != null && request.getUsageLimit() <= 0) {
-            throw new IllegalArgumentException("Giới hạn sử dụng phải lớn hơn 0");
+            throw new IllegalArgumentException("Số lượng phát hành phải lớn hơn 0");
         }
     }
+
     private String normalizeDiscountType(String discountType) {
         return discountType == null ? null : discountType.trim().toUpperCase(Locale.ROOT);
     }

@@ -685,10 +685,17 @@ public class PosServiceImpl implements PosService {
             return false;
         }
 
+        long totalUsedCount = couponUsageRepository.countByCoupon_Id(coupon.getId());
+        if (coupon.getUsageLimit() != null
+                && coupon.getUsageLimit() > 0
+                && totalUsedCount >= coupon.getUsageLimit()) {
+            return false;
+        }
+
         long usedCountByCustomer = couponUsageRepository
                 .countByCoupon_IdAndCustomer_Id(coupon.getId(), order.getCustomer().getId());
 
-        return coupon.getUsageLimit() == null || usedCountByCustomer < coupon.getUsageLimit();
+        return usedCountByCustomer == 0;
     }
 
     private PosAvailableDiscountResponse mapCouponToPosDiscountResponse(
@@ -696,19 +703,18 @@ public class PosServiceImpl implements PosService {
             Order order,
             BigDecimal subtotal
     ) {
-        long usedCountByCustomer = couponUsageRepository
-                .countByCoupon_IdAndCustomer_Id(coupon.getId(), order.getCustomer().getId());
+        long totalUsedCount = couponUsageRepository.countByCoupon_Id(coupon.getId());
 
         int issuedQuantity = coupon.getUsageLimit() != null ? coupon.getUsageLimit() : 0;
         int remainingCount = coupon.getUsageLimit() != null
-                ? Math.max(coupon.getUsageLimit() - (int) usedCountByCustomer, 0)
+                ? Math.max(coupon.getUsageLimit() - (int) totalUsedCount, 0)
                 : 0;
 
         double usedPercent = 0.0;
         double remainingPercent = 0.0;
 
         if (issuedQuantity > 0) {
-            usedPercent = BigDecimal.valueOf(usedCountByCustomer)
+            usedPercent = BigDecimal.valueOf(totalUsedCount)
                     .multiply(BigDecimal.valueOf(100))
                     .divide(BigDecimal.valueOf(issuedQuantity), 2, RoundingMode.HALF_UP)
                     .doubleValue();
@@ -729,7 +735,7 @@ public class PosServiceImpl implements PosService {
                 .minOrderValue(BigDecimal.ZERO)
                 .maxDiscountAmount(null)
                 .issuedQuantity(issuedQuantity)
-                .usedCount(usedCountByCustomer)
+                .usedCount(totalUsedCount)
                 .remainingCount(remainingCount)
                 .usedPercent(usedPercent)
                 .remainingPercent(remainingPercent)

@@ -20,7 +20,6 @@ import java.time.OffsetDateTime;
 public class PromotionServiceImpl implements PromotionService {
     private final CouponUsageRepository couponUsageRepository;
     private final PromotionRepository promotionRepository;
-    private final CouponUsageRepository couponUsageRepository;
 
     @Override
     public Page<PromotionResponse> getAll(Pageable pageable) {
@@ -83,7 +82,7 @@ public class PromotionServiceImpl implements PromotionService {
         response.setMaxDiscountAmount(promotion.getMaxDiscountAmount());
         response.setUsageLimit(promotion.getUsageLimit());
 
-        long usedCount = couponUsageRepository.countByPromotion_Id(promotion.getId());
+        long usedCount = couponUsageRepository.countByPromotion_Id(promotion.getId());  // Khai báo usedCount chỉ một lần
         if (promotion.getUsageLimit() != null) {
             response.setRemainingUsage(Math.max(promotion.getUsageLimit() - (int) usedCount, 0));
         } else {
@@ -97,7 +96,6 @@ public class PromotionServiceImpl implements PromotionService {
         response.setCreatedAt(promotion.getCreatedAt());
 
         // ====== thống kê usage cho admin ======
-        long usedCount = couponUsageRepository.countByPromotion_Id(promotion.getId());
         Integer issuedQuantity = promotion.getUsageLimit();
         Integer remainingCount = null;
         Double usedPercent = null;
