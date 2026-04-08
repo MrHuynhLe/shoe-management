@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import com.vn.backend.dto.request.pos.PosQuickCreateCustomerRequest;
 @RestController @RequestMapping("/v1/pos")
 @RequiredArgsConstructor @CrossOrigin(origins = "http://localhost:5173")
 public class PosController {
@@ -60,4 +61,12 @@ public class PosController {
     @GetMapping("/orders/{orderId}/discounts/available")
     public ResponseEntity<List<PosAvailableDiscountResponse>> getAvailableDiscounts( @PathVariable Long orderId ) {
         return ResponseEntity.ok(posService.getAvailableDiscounts(orderId)); }
+
+    @PostMapping("/orders/{orderId}/customer/quick-create")
+    public ResponseEntity<PosOrderResponse> quickCreateCustomerAndAssign(
+            @PathVariable Long orderId,
+            @Valid @RequestBody PosQuickCreateCustomerRequest request
+    ) {
+        return ResponseEntity.ok(posService.quickCreateCustomerAndAssign(orderId, request));
+    }
 }

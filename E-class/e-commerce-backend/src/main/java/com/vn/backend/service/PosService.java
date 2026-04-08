@@ -1,10 +1,6 @@
 package com.vn.backend.service;
 
-import com.vn.backend.dto.request.pos.PosAddItemRequest;
-import com.vn.backend.dto.request.pos.PosAssignCustomerRequest;
-import com.vn.backend.dto.request.pos.PosCheckoutRequest;
-import com.vn.backend.dto.request.pos.PosCreateOrderRequest;
-import com.vn.backend.dto.request.pos.PosUpdateItemRequest;
+import com.vn.backend.dto.request.pos.*;
 import com.vn.backend.dto.response.pos.PosOrderResponse;
 import com.vn.backend.dto.response.pos.PosProductSearchResponse;
 import com.vn.backend.dto.response.pos.PosAvailableDiscountResponse;
@@ -36,4 +32,7 @@ public interface PosService {
     void cancelOrder(Long orderId);
 
     List<PosAvailableDiscountResponse> getAvailableDiscounts(Long orderId);
+
+    PosOrderResponse quickCreateCustomerAndAssign(Long orderId, PosQuickCreateCustomerRequest request);
+
 }

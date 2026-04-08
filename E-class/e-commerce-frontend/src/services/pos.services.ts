@@ -88,6 +88,12 @@ export interface PosAssignCustomerRequest {
   customerId: number | null;
 }
 
+export interface PosQuickCreateCustomerRequest {
+  fullName: string;
+  phone: string;
+  address?: string;
+}
+
 export interface PosCheckoutRequest {
   paymentMethodId: number;
   customerPaid: number;
@@ -182,6 +188,17 @@ export const posService = {
   ): Promise<PosOrderResponse> => {
     const res = await axiosClient.put(
       `${POS_BASE}/orders/${orderId}/customer`,
+      payload,
+    );
+    return res.data;
+  },
+
+  quickCreateCustomerAndAssign: async (
+    orderId: number,
+    payload: PosQuickCreateCustomerRequest,
+  ): Promise<PosOrderResponse> => {
+    const res = await axiosClient.post(
+      `${POS_BASE}/orders/${orderId}/customer/quick-create`,
       payload,
     );
     return res.data;

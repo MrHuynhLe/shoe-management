@@ -57,6 +57,9 @@ import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
 
+import com.vn.backend.dto.request.pos.PosQuickCreateCustomerRequest;
+import com.vn.backend.entity.UserProfile;
+import com.vn.backend.repository.UserProfileRepository;
 
 
 
@@ -70,7 +73,6 @@ public class PosServiceImpl implements PosService {
     private static final String ORDER_STATUS_CANCELLED = "CANCELLED";
     private static final String ORDER_TYPE_POS = "POS";
     private static final String PAYMENT_STATUS_PAID = "PAID";
-    private static final String INVENTORY_OUT = "OUT";
 
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
@@ -87,6 +89,10 @@ public class PosServiceImpl implements PosService {
     private final PromotionRepository promotionRepository;
     private final CouponRepository couponRepository;
     private final CouponUsageRepository couponUsageRepository;
+    private final UserProfileRepository userProfileRepository;
+
+    private static final String INVENTORY_IN = "IN";
+    private static final String INVENTORY_OUT = "OUT";
 
     @Override
     public PosOrderResponse createOrder(PosCreateOrderRequest request) {
@@ -144,7 +150,7 @@ public class PosServiceImpl implements PosService {
         String safeKeyword = keyword == null ? "" : keyword.trim();
 
         List<ProductVariant> variants = safeKeyword.isBlank()
-                ? productVariantRepository.findAll()
+                ? productVariantRepository.findAllActiveWithAttributes()
                 : productVariantRepository.searchForPos(safeKeyword);
 
         return variants.stream()
@@ -167,18 +173,24 @@ public class PosServiceImpl implements PosService {
 //    }
 
     @Override
+    @Transactional
     public PosOrderResponse addItem(Long orderId, PosAddItemRequest request) {
         Order order = getDraftOrderOrThrow(orderId);
 
-        ProductVariant variant = productVariantRepository.findById(request.getProductVariantId())
-                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy biến thể sản phẩm"));
+        int addQty = request.getQuantity() == null ? 0 : request.getQuantity();
+        if (addQty <= 0) {
+            throw new IllegalArgumentException("Số lượng thêm phải lớn hơn 0");
+        }
+
+        ProductVariant variant = getLockedVariantOrThrow(request.getProductVariantId());
 
         if (!isSellableVariant(variant)) {
             throw new IllegalArgumentException("Sản phẩm không khả dụng để bán");
         }
 
-        if (variant.getStockQuantity() == null || variant.getStockQuantity() < request.getQuantity()) {
-            throw new IllegalArgumentException("Số lượng tồn kho không đủ");
+        Integer currentStock = variant.getStockQuantity() == null ? 0 : variant.getStockQuantity();
+        if (currentStock < addQty) {
+            throw new IllegalArgumentException("Sản phẩm đang hết hàng hoặc không đủ tồn kho");
         }
 
         Optional<OrderItem> existingItemOpt =
@@ -186,25 +198,27 @@ public class PosServiceImpl implements PosService {
 
         if (existingItemOpt.isPresent()) {
             OrderItem existingItem = existingItemOpt.get();
-            int newQuantity = existingItem.getQuantity() + request.getQuantity();
-
-            if (variant.getStockQuantity() < newQuantity) {
-                throw new IllegalArgumentException("Số lượng tồn kho không đủ");
-            }
-
-            existingItem.setQuantity(newQuantity);
+            existingItem.setQuantity(existingItem.getQuantity() + addQty);
             orderItemRepository.save(existingItem);
         } else {
             OrderItem newItem = OrderItem.builder()
                     .order(order)
                     .productVariant(variant)
-                    .quantity(request.getQuantity())
+                    .quantity(addQty)
                     .priceAtPurchase(variant.getSellingPrice())
                     .costPriceAtPurchase(variant.getCostPrice())
                     .build();
 
             orderItemRepository.save(newItem);
         }
+
+        createInventoryTransaction(
+                variant,
+                order.getStore(),
+                addQty,
+                INVENTORY_OUT,
+                "POS-RESERVE-ADD-" + order.getId()
+        );
 
         recalculateOrderAmounts(order);
         orderRepository.save(order);
@@ -213,6 +227,7 @@ public class PosServiceImpl implements PosService {
     }
 
     @Override
+    @Transactional
     public PosOrderResponse updateItem(Long orderId, Long itemId, PosUpdateItemRequest request) {
         Order order = getDraftOrderOrThrow(orderId);
 
@@ -221,14 +236,40 @@ public class PosServiceImpl implements PosService {
 
         validateItemBelongsToOrder(item, orderId);
 
-        ProductVariant variant = productVariantRepository.findById(item.getProductVariant().getId().longValue())
-                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy biến thể sản phẩm"));
-
-        if (variant.getStockQuantity() == null || variant.getStockQuantity() < request.getQuantity()) {
-            throw new IllegalArgumentException("Số lượng tồn kho không đủ");
+        int newQty = request.getQuantity() == null ? 0 : request.getQuantity();
+        if (newQty <= 0) {
+            throw new IllegalArgumentException("Số lượng phải lớn hơn 0");
         }
 
-        item.setQuantity(request.getQuantity());
+        ProductVariant variant = getLockedVariantOrThrow(item.getProductVariant().getId());
+
+        int oldQty = item.getQuantity();
+        int delta = newQty - oldQty;
+
+        if (delta > 0) {
+            Integer currentStock = variant.getStockQuantity() == null ? 0 : variant.getStockQuantity();
+            if (currentStock < delta) {
+                throw new IllegalArgumentException("Sản phẩm đang hết hàng hoặc không đủ tồn kho");
+            }
+
+            createInventoryTransaction(
+                    variant,
+                    order.getStore(),
+                    delta,
+                    INVENTORY_OUT,
+                    "POS-RESERVE-UP-" + order.getId()
+            );
+        } else if (delta < 0) {
+            createInventoryTransaction(
+                    variant,
+                    order.getStore(),
+                    Math.abs(delta),
+                    INVENTORY_IN,
+                    "POS-RESERVE-DOWN-" + order.getId()
+            );
+        }
+
+        item.setQuantity(newQty);
         orderItemRepository.save(item);
 
         recalculateOrderAmounts(order);
@@ -238,6 +279,7 @@ public class PosServiceImpl implements PosService {
     }
 
     @Override
+    @Transactional
     public PosOrderResponse removeItem(Long orderId, Long itemId) {
         Order order = getDraftOrderOrThrow(orderId);
 
@@ -245,6 +287,16 @@ public class PosServiceImpl implements PosService {
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy sản phẩm trong hóa đơn"));
 
         validateItemBelongsToOrder(item, orderId);
+
+        ProductVariant variant = getLockedVariantOrThrow(item.getProductVariant().getId());
+
+        createInventoryTransaction(
+                variant,
+                order.getStore(),
+                item.getQuantity(),
+                INVENTORY_IN,
+                "POS-RESERVE-REMOVE-" + order.getId()
+        );
 
         orderItemRepository.delete(item);
 
@@ -267,6 +319,73 @@ public class PosServiceImpl implements PosService {
         }
 
         orderRepository.save(order);
+        return mapToOrderResponse(order);
+    }
+
+    @Override
+    public PosOrderResponse quickCreateCustomerAndAssign(
+            Long orderId,
+            PosQuickCreateCustomerRequest request
+    ) {
+        Order order = getDraftOrderOrThrow(orderId);
+
+        String fullName = safeTrim(request.getFullName());
+        String phone = normalizePhone(request.getPhone());
+        String address = safeTrim(request.getAddress());
+
+        if (fullName == null || fullName.isBlank()) {
+            throw new IllegalArgumentException("Tên khách hàng không được để trống");
+        }
+
+        if (phone == null || phone.isBlank()) {
+            throw new IllegalArgumentException("Số điện thoại không được để trống");
+        }
+
+        UserProfile userProfile = userProfileRepository.findByPhone(phone)
+                .map(existingProfile -> {
+                    boolean changed = false;
+
+                    if (existingProfile.getFullName() == null || existingProfile.getFullName().isBlank()) {
+                        existingProfile.setFullName(fullName);
+                        changed = true;
+                    }
+
+                    if (address != null && !address.isBlank()) {
+                        if (existingProfile.getAddress() == null || !address.equals(existingProfile.getAddress())) {
+                            existingProfile.setAddress(address);
+                            changed = true;
+                        }
+                    }
+
+                    if (existingProfile.getIsActive() == null || !existingProfile.getIsActive()) {
+                        existingProfile.setIsActive(true);
+                        changed = true;
+                    }
+
+                    return changed ? userProfileRepository.save(existingProfile) : existingProfile;
+                })
+                .orElseGet(() -> userProfileRepository.save(
+                        UserProfile.builder()
+                                .fullName(fullName)
+                                .phone(phone)
+                                .address(address)
+                                .isActive(true)
+                                .build()
+                ));
+
+        Customer customer = customerRepository.findByUserProfileId(userProfile.getId())
+                .orElseGet(() -> customerRepository.save(
+                        Customer.builder()
+                                .userProfile(userProfile)
+                                .code(generateCustomerCode())
+                                .loyaltyPoints(0)
+                                .customerType("RETAIL")
+                                .build()
+                ));
+
+        order.setCustomer(customer);
+        orderRepository.save(order);
+
         return mapToOrderResponse(order);
     }
 
@@ -346,15 +465,6 @@ public class PosServiceImpl implements PosService {
             throw new IllegalArgumentException("Tiền khách trả không đủ");
         }
 
-        for (OrderItem item : items) {
-            ProductVariant lockedVariant = (ProductVariant) productVariantRepository.findByIdForUpdate(item.getProductVariant().getId().longValue())
-                    .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy biến thể sản phẩm"));
-
-            if (lockedVariant.getStockQuantity() == null || lockedVariant.getStockQuantity() < item.getQuantity()) {
-                throw new IllegalArgumentException("Sản phẩm " + lockedVariant.getCode() + " không đủ tồn kho");
-            }
-        }
-
         order.setDiscountAmount(discountAmount);
         order.setVoucherCode(appliedVoucherCode);
         order.setCustomerPaid(customerPaid);
@@ -371,32 +481,30 @@ public class PosServiceImpl implements PosService {
         paymentRepository.save(payment);
 
         saveVoucherUsage(order, request);
-
-        for (OrderItem item : items) {
-            InventoryTransaction transaction = new InventoryTransaction();
-            transaction.setReferenceCode(
-                    generateInventoryTransactionCode(
-                            order.getId().longValue(),
-                            item.getProductVariant().getId().longValue()
-                    )
-            );
-            transaction.setProductVariant(item.getProductVariant());
-            transaction.setStore(order.getStore());
-            transaction.setQuantity(item.getQuantity());
-            transaction.setTransactionType(INVENTORY_OUT);
-            transaction.setCreatedAt(LocalDateTime.now());
-
-            inventoryTransactionRepository.save(transaction);
-        }
-
         saveOrderStatusHistory(order, ORDER_STATUS_DRAFT, ORDER_STATUS_COMPLETED);
 
         return mapToOrderResponse(order);
     }
 
     @Override
+    @Transactional
     public void cancelOrder(Long orderId) {
         Order order = getDraftOrderOrThrow(orderId);
+
+        List<OrderItem> items = orderItemRepository.findByOrder_Id(orderId);
+
+        for (OrderItem item : items) {
+            ProductVariant variant = getLockedVariantOrThrow(item.getProductVariant().getId());
+
+            createInventoryTransaction(
+                    variant,
+                    order.getStore(),
+                    item.getQuantity(),
+                    INVENTORY_IN,
+                    "POS-RESERVE-CANCEL-" + order.getId()
+            );
+        }
+
         order.setStatus(ORDER_STATUS_CANCELLED);
         orderRepository.save(order);
 
@@ -496,12 +604,17 @@ public class PosServiceImpl implements PosService {
         BigDecimal price = defaultZero(item.getPriceAtPurchase());
         BigDecimal lineTotal = price.multiply(BigDecimal.valueOf(item.getQuantity()));
 
+        String color = extractAttributeValue(variant, "COLOR");
+        String size = extractAttributeValue(variant, "SIZE");
+
         return PosOrderItemResponse.builder()
                 .itemId(item.getId())
                 .productVariantId(variant.getId())
                 .variantCode(variant.getCode())
                 .barcode(variant.getBarcode())
                 .productName(product != null ? product.getName() : null)
+                .color(color)
+                .size(size)
                 .price(price)
                 .quantity(item.getQuantity())
                 .lineTotal(lineTotal)
@@ -513,12 +626,17 @@ public class PosServiceImpl implements PosService {
     private PosProductSearchResponse mapToProductSearchResponse(ProductVariant variant) {
         Product product = variant.getProduct();
 
+        String color = extractAttributeValue(variant, "COLOR");
+        String size = extractAttributeValue(variant, "SIZE");
+
         return PosProductSearchResponse.builder()
                 .productVariantId(variant.getId())
                 .variantCode(variant.getCode())
                 .barcode(variant.getBarcode())
                 .productCode(product != null ? product.getCode() : null)
                 .productName(product != null ? product.getName() : null)
+                .color(color)
+                .size(size)
                 .sellingPrice(defaultZero(variant.getSellingPrice()))
                 .stockQuantity(variant.getStockQuantity())
                 .imageUrl(getImageUrl(variant))
@@ -588,6 +706,39 @@ public class PosServiceImpl implements PosService {
     private String generateInventoryTransactionCode(Long orderId, Long variantId) {
         return "PX-POS-" + orderId + "-" + variantId + "-" + System.currentTimeMillis();
     }
+
+    private String safeTrim(String value) {
+        return value == null ? null : value.trim();
+    }
+
+    private String normalizePhone(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        return value.replaceAll("\\s+", "").trim();
+    }
+
+    private String generateCustomerCode() {
+        Optional<Customer> lastCustomerOpt = customerRepository.findTopByOrderByIdDesc();
+
+        if (lastCustomerOpt.isEmpty()) {
+            return "KH0001";
+        }
+
+        String lastCode = lastCustomerOpt.get().getCode();
+
+        try {
+            if (lastCode != null && lastCode.startsWith("KH")) {
+                int number = Integer.parseInt(lastCode.substring(2));
+                return String.format("KH%04d", number + 1);
+            }
+        } catch (Exception ignored) {
+        }
+
+        return "KH" + System.currentTimeMillis();
+    }
+
     private boolean isPromotionApplicable(Promotion promotion, Order order, BigDecimal subtotal) {
         if (promotion == null || Boolean.FALSE.equals(promotion.getIsActive())) {
             return false;
@@ -862,5 +1013,29 @@ public class PosServiceImpl implements PosService {
         }
 
         couponUsageRepository.save(builder.build());
+    }
+
+
+    private ProductVariant getLockedVariantOrThrow(Long variantId) {
+        return productVariantRepository.findByIdForUpdate(variantId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy biến thể sản phẩm"));
+    }
+
+    private void createInventoryTransaction(
+            ProductVariant variant,
+            Store store,
+            int quantity,
+            String transactionType,
+            String codePrefix
+    ) {
+        InventoryTransaction transaction = new InventoryTransaction();
+        transaction.setReferenceCode(codePrefix + "-" + System.currentTimeMillis());
+        transaction.setProductVariant(variant);
+        transaction.setStore(store);
+        transaction.setQuantity(quantity);
+        transaction.setTransactionType(transactionType);
+        transaction.setCreatedAt(LocalDateTime.now());
+
+        inventoryTransactionRepository.save(transaction);
     }
 }

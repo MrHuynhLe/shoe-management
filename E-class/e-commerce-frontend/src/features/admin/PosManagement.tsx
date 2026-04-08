@@ -63,6 +63,54 @@ const formatUsagePercent = (value?: number | null) => {
   return `${Number(value).toFixed(1)}%`;
 };
 
+const buildVariantText = (
+  color?: string | null,
+  size?: string | null,
+  variantCode?: string | null,
+  barcode?: string | null,
+) => {
+  const meta: string[] = [];
+
+  if (color) meta.push(`Màu: ${color}`);
+  if (size) meta.push(`Size: ${size}`);
+
+  const variantInfo = meta.join(" | ");
+
+  if (variantInfo && barcode) {
+    return `${variantInfo} • Barcode: ${barcode}`;
+  }
+
+  if (variantInfo && variantCode) {
+    return `${variantInfo} • Mã: ${variantCode}`;
+  }
+
+  if (variantInfo) {
+    return variantInfo;
+  }
+
+  if (barcode) {
+    return `Barcode: ${barcode}`;
+  }
+
+  if (variantCode) {
+    return `Mã: ${variantCode}`;
+  }
+
+  return "-";
+};
+
+const getStockTextStyle = (stockQuantity?: number | null): CSSProperties => {
+  if ((stockQuantity ?? 0) <= 0) {
+    return { color: "#ff4d4f", fontWeight: 600 };
+  }
+
+  if ((stockQuantity ?? 0) <= 5) {
+    return { color: "#fa8c16", fontWeight: 600 };
+  }
+
+  return {};
+};
+
 const panelCardStyle: CSSProperties = {
   borderRadius: 16,
   boxShadow: "0 6px 18px rgba(15, 23, 42, 0.06)",
@@ -88,7 +136,13 @@ const PosManagement = () => {
   const [loadingOrder, setLoadingOrder] = useState(false);
 
   const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const [customerIdInput, setCustomerIdInput] = useState<number | null>(1);
+  const [quickCustomerOpen, setQuickCustomerOpen] = useState(false);
+  const [creatingCustomer, setCreatingCustomer] = useState(false);
+  const [quickCustomerData, setQuickCustomerData] = useState({
+    fullName: "",
+    phone: "",
+    address: "",
+  });
 
   const [availableDiscounts, setAvailableDiscounts] = useState<
     PosAvailableDiscountResponse[]
@@ -131,7 +185,6 @@ const PosManagement = () => {
       const data = await posService.getOrderDetail(orderId);
 
       setSelectedOrder(data);
-      setCustomerIdInput(data.customerId ?? null);
       setCheckoutData((prev) => ({
         ...prev,
         customerPaid: data.finalAmount ?? 0,
@@ -196,7 +249,7 @@ const PosManagement = () => {
 
       const data = await posService.createOrder({
         employeeId: DEFAULT_EMPLOYEE_ID,
-        customerId: 1,
+        customerId: null,
         storeId: DEFAULT_STORE_ID,
         note: "Khách mua tại quầy",
       });
@@ -226,26 +279,31 @@ const PosManagement = () => {
     }
   };
 
-  const handleAddProduct = async (productVariantId: number) => {
-    if (!selectedOrderId) {
-      message.warning("Hãy tạo hoặc chọn hóa đơn trước");
-      return;
-    }
+  const handleAddProduct = async (product: PosProductSearchResponse) => {
+  if (!selectedOrderId) {
+    message.warning("Hãy tạo hoặc chọn hóa đơn trước");
+    return;
+  }
 
-    try {
-      const data = await posService.addItem(selectedOrderId, {
-        productVariantId,
-        quantity: 1,
-      });
+  if ((product.stockQuantity ?? 0) <= 0) {
+    message.warning("Sản phẩm đang hết hàng");
+    return;
+  }
 
-      setSelectedOrder(data);
-      await loadDraftOrders();
-      await loadAvailableDiscounts(selectedOrderId);
-      message.success("Đã thêm sản phẩm vào hóa đơn");
-    } catch (error: any) {
-      message.error(error?.response?.data?.message || "Thêm sản phẩm thất bại");
-    }
-  };
+  try {
+    const data = await posService.addItem(selectedOrderId, {
+      productVariantId: product.productVariantId,
+      quantity: 1,
+    });
+
+    setSelectedOrder(data);
+    await loadDraftOrders();
+    await loadAvailableDiscounts(selectedOrderId);
+    message.success("Đã thêm sản phẩm vào hóa đơn");
+  } catch (error: any) {
+    message.error(error?.response?.data?.message || "Thêm sản phẩm thất bại");
+  }
+};
 
   const handleUpdateQuantity = async (
     item: PosOrderItemResponse,
@@ -287,25 +345,74 @@ const PosManagement = () => {
     }
   };
 
-  const handleAssignCustomer = async () => {
+  const resetQuickCustomerForm = () => {
+    setQuickCustomerData({
+      fullName: "",
+      phone: "",
+      address: "",
+    });
+  };
+
+  const handleOpenQuickCustomerModal = () => {
+    resetQuickCustomerForm();
+    setQuickCustomerOpen(true);
+  };
+
+  const handleQuickCreateCustomer = async () => {
+    if (!selectedOrderId) {
+      message.warning("Chưa chọn hóa đơn");
+      return;
+    }
+
+    try {
+      setCreatingCustomer(true);
+
+      const data = await posService.quickCreateCustomerAndAssign(
+        selectedOrderId,
+        {
+          fullName: quickCustomerData.fullName,
+          phone: quickCustomerData.phone,
+          address: quickCustomerData.address,
+        },
+      );
+
+      setSelectedOrder(data);
+      setQuickCustomerOpen(false);
+      resetQuickCustomerForm();
+      setSelectedDiscount(null);
+
+      await loadDraftOrders();
+      await loadAvailableDiscounts(selectedOrderId);
+
+      message.success("Đã tạo và gắn khách hàng vào hóa đơn");
+    } catch (error: any) {
+      message.error(
+        error?.response?.data?.message || "Tạo khách hàng thất bại",
+      );
+    } finally {
+      setCreatingCustomer(false);
+    }
+  };
+
+  const handleClearCustomer = async () => {
     if (!selectedOrderId) {
       return;
     }
 
     try {
       const data = await posService.assignCustomer(selectedOrderId, {
-        customerId: customerIdInput,
+        customerId: null,
       });
 
       setSelectedOrder(data);
       setSelectedDiscount(null);
+
       await loadDraftOrders();
       await loadAvailableDiscounts(selectedOrderId);
-      message.success("Cập nhật khách hàng thành công");
+
+      message.success("Đã bỏ khách khỏi hóa đơn");
     } catch (error: any) {
-      message.error(
-        error?.response?.data?.message || "Cập nhật khách hàng thất bại",
-      );
+      message.error(error?.response?.data?.message || "Bỏ khách thất bại");
     }
   };
 
@@ -397,11 +504,14 @@ const PosManagement = () => {
           />
           <div>
             <div style={{ fontWeight: 600 }}>{record.productName}</div>
-            <div>Mã: {record.variantCode}</div>
-            <div>Barcode: {record.barcode || "-"}</div>
-            <div>
-              {record.color ? `Màu: ${record.color}` : ""}
-              {record.size ? ` - Size: ${record.size}` : ""}
+
+            <div style={{ fontSize: 12, color: "#595959", marginTop: 2 }}>
+              {buildVariantText(
+                record.color,
+                record.size,
+                record.variantCode,
+                record.barcode,
+              )}
             </div>
           </div>
         </Space>
@@ -432,6 +542,9 @@ const PosManagement = () => {
       dataIndex: "stockQuantity",
       key: "stockQuantity",
       width: 80,
+      render: (value: number) => (
+        <span style={getStockTextStyle(value)}>{value}</span>
+      ),
     },
     {
       title: "Thành tiền",
@@ -470,6 +583,7 @@ const PosManagement = () => {
             height: 56,
             objectFit: "cover",
             borderRadius: 8,
+            border: "1px solid #f0f0f0",
           }}
         />
       ),
@@ -481,8 +595,15 @@ const PosManagement = () => {
       render: (_: any, record: PosProductSearchResponse) => (
         <div>
           <div style={{ fontWeight: 600 }}>{record.productName}</div>
-          <div>{record.variantCode}</div>
-          <div>Barcode: {record.barcode || "-"}</div>
+
+          <div style={{ fontSize: 12, color: "#595959", marginTop: 2 }}>
+            {buildVariantText(
+              record.color,
+              record.size,
+              record.variantCode,
+              record.barcode,
+            )}
+          </div>
         </div>
       ),
     },
@@ -491,6 +612,9 @@ const PosManagement = () => {
       dataIndex: "stockQuantity",
       key: "stockQuantity",
       width: 80,
+      render: (value: number) => (
+        <span style={getStockTextStyle(value)}>{value}</span>
+      ),
     },
     {
       title: "Giá",
@@ -502,14 +626,15 @@ const PosManagement = () => {
     {
       title: "",
       key: "action",
-      width: 90,
+      width: 110,
       render: (_: any, record: PosProductSearchResponse) => (
         <Button
           type="primary"
           icon={<PlusOutlined />}
-          onClick={() => handleAddProduct(record.productVariantId)}
+          onClick={() => handleAddProduct(record)}
+          disabled={(record.stockQuantity ?? 0) <= 0}
         >
-          Thêm
+          {(record.stockQuantity ?? 0) <= 0 ? "Hết hàng" : "Thêm"}
         </Button>
       ),
     },
@@ -559,7 +684,9 @@ const PosManagement = () => {
                       padding: 12,
                       marginBottom: 8,
                       background:
-                        selectedOrderId === item.orderId ? "#e6f4ff" : "#fafafa",
+                        selectedOrderId === item.orderId
+                          ? "#e6f4ff"
+                          : "#fafafa",
                       border: "1px solid #f0f0f0",
                     }}
                   >
@@ -634,20 +761,40 @@ const PosManagement = () => {
                   {selectedOrder.customerName || "Khách lẻ"}
                 </div>
 
-                <Space.Compact style={{ width: "100%" }}>
-                  <InputNumber
+                <Card size="small" style={{ borderRadius: 12 }}>
+                  <Space
+                    direction="vertical"
                     style={{ width: "100%" }}
-                    placeholder="Nhập customerId"
-                    value={customerIdInput as number | null}
-                    onChange={(value) =>
-                      setCustomerIdInput(value as number | null)
-                    }
-                  />
-                  <Button onClick={handleAssignCustomer}>Gán khách</Button>
-                  <Button onClick={() => setCustomerIdInput(null)} danger>
-                    Bỏ khách
-                  </Button>
-                </Space.Compact>
+                    size={10}
+                  >
+                    <div>
+                      <Text strong>Khách hàng:</Text>{" "}
+                      {selectedOrder.customerName || "Khách lẻ"}
+                    </div>
+
+                    <Space wrap>
+                      <Button
+                        type="primary"
+                        onClick={handleOpenQuickCustomerModal}
+                      >
+                        + Khách mới
+                      </Button>
+
+                      <Button
+                        danger
+                        onClick={handleClearCustomer}
+                        disabled={!selectedOrder.customerId}
+                      >
+                        Bỏ khách
+                      </Button>
+                    </Space>
+
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Tạo nhanh khách bằng tên và số điện thoại, hệ thống sẽ tự
+                      gắn vào hóa đơn.
+                    </Text>
+                  </Space>
+                </Card>
 
                 <Table
                   rowKey="itemId"
@@ -735,9 +882,7 @@ const PosManagement = () => {
                                 <Text type="secondary">
                                   Giảm dự kiến:{" "}
                                   <Text strong>
-                                    {currency(
-                                      discount.estimatedDiscountAmount,
-                                    )}{" "}
+                                    {currency(discount.estimatedDiscountAmount)}{" "}
                                     đ
                                   </Text>
                                 </Text>
@@ -856,6 +1001,66 @@ const PosManagement = () => {
           </Card>
         </Col>
       </Row>
+
+      <Modal
+        title="Thêm khách hàng mới"
+        open={quickCustomerOpen}
+        onCancel={() => {
+          setQuickCustomerOpen(false);
+          resetQuickCustomerForm();
+        }}
+        onOk={handleQuickCreateCustomer}
+        okText="Lưu và gắn vào hóa đơn"
+        confirmLoading={creatingCustomer}
+      >
+        <Space direction="vertical" style={{ width: "100%" }} size={12}>
+          <div>
+            <Text strong>Họ và tên</Text>
+            <Input
+              style={{ marginTop: 6 }}
+              placeholder="Nhập tên khách hàng"
+              value={quickCustomerData.fullName}
+              onChange={(e) =>
+                setQuickCustomerData((prev) => ({
+                  ...prev,
+                  fullName: e.target.value,
+                }))
+              }
+            />
+          </div>
+
+          <div>
+            <Text strong>Số điện thoại</Text>
+            <Input
+              style={{ marginTop: 6 }}
+              placeholder="Nhập số điện thoại"
+              value={quickCustomerData.phone}
+              onChange={(e) =>
+                setQuickCustomerData((prev) => ({
+                  ...prev,
+                  phone: e.target.value,
+                }))
+              }
+            />
+          </div>
+
+          <div>
+            <Text strong>Địa chỉ</Text>
+            <Input.TextArea
+              rows={3}
+              style={{ marginTop: 6 }}
+              placeholder="Nhập địa chỉ (không bắt buộc)"
+              value={quickCustomerData.address}
+              onChange={(e) =>
+                setQuickCustomerData((prev) => ({
+                  ...prev,
+                  address: e.target.value,
+                }))
+              }
+            />
+          </div>
+        </Space>
+      </Modal>
 
       <Modal
         title="Thanh toán hóa đơn"
