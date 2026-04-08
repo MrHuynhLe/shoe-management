@@ -205,4 +205,9 @@ public class StatisticsController {
                 .header("Content-Type", "application/pdf")
                 .body(bytes);
     }
+
+    @GetMapping("/payment-methods")
+    public ResponseEntity<List<PaymentMethodRevenueResponse>> getRevenueByPaymentMethod(StatisticsQuery query) {
+        return ResponseEntity.ok(statisticsService.getRevenueByPaymentMethod(query));
+    }
 }

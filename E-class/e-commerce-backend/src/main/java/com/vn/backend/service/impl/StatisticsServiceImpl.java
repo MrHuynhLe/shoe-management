@@ -42,16 +42,20 @@ public class StatisticsServiceImpl implements StatisticsService {
     @Override
     public DashboardResponse getDashboard(StatisticsQuery query) {
         OverviewStatisticsResponse overview = getOverview(query);
+        BigDecimal totalProfit = getRevenue("day", query).stream()
+                .map(RevenueChartItemResponse::profit)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         return new DashboardResponse(
                 overview.getTotalOrders() != null ? overview.getTotalOrders() : 0L,
                 BigDecimal.valueOf(overview.getTotalRevenue() != null ? overview.getTotalRevenue() : 0.0),
                 overview.getTotalProductsSold() != null ? overview.getTotalProductsSold() : 0L,
-                BigDecimal.ZERO,
+                totalProfit,
                 0L,
                 0L
         );
     }
+
 
     @Override
     public DashboardCompareResponse getDashboardCompare(StatisticsQuery query) {
@@ -106,6 +110,7 @@ public class StatisticsServiceImpl implements StatisticsService {
         response.setSize(pageData.getSize());
         response.setTotalElements(pageData.getTotalElements());
         response.setTotalPages(pageData.getTotalPages());
+        response.setLast(pageData.isLast());
 
         return response;
     }
@@ -127,14 +132,38 @@ public class StatisticsServiceImpl implements StatisticsService {
 
     @Override
     public List<OrderStatusResponse> getOrderStatusStatistics(StatisticsQuery query) {
-        return Collections.emptyList();
-    }
+        String fromDate = query.getFrom() != null ? query.getFrom().toString() : null;
+        String toDate = query.getTo() != null ? query.getTo().toString() : null;
 
+        return statisticsRepository.getOrderStatusStatistics(fromDate, toDate)
+                .stream()
+                .map(row -> new OrderStatusResponse(
+                        row[0] != null ? row[0].toString() : "UNKNOWN",
+                        row[1] != null ? ((Number) row[1]).longValue() : 0L,
+                        row[2] != null ? new BigDecimal(row[2].toString()) : BigDecimal.ZERO
+                ))
+                .toList();
+    }
     @Override
     public PageResponse<TopRatedProductResponse> getTopRatedProducts(StatisticsQuery query, int page, int size) {
         return new PageResponse<>();
     }
 
+    @Override
+    public List<PaymentMethodRevenueResponse> getRevenueByPaymentMethod(StatisticsQuery query) {
+        String fromDate = query.getFrom() != null ? query.getFrom().toString() : null;
+        String toDate = query.getTo() != null ? query.getTo().toString() : null;
+
+        return statisticsRepository.getRevenueByPaymentMethod(fromDate, toDate)
+                .stream()
+                .map(row -> new PaymentMethodRevenueResponse(
+                        row[0] != null ? row[0].toString() : "UNKNOWN",
+                        row[1] != null ? row[1].toString() : "Khác",
+                        row[2] != null ? ((Number) row[2]).longValue() : 0L,
+                        row[3] != null ? new BigDecimal(row[3].toString()) : BigDecimal.ZERO
+                ))
+                .toList();
+    }
     private Long toLong(Object value) {
         if (value == null) return 0L;
         if (value instanceof Number number) {
@@ -150,4 +179,8 @@ public class StatisticsServiceImpl implements StatisticsService {
         }
         return Double.parseDouble(value.toString());
     }
+
+
+
+
 }

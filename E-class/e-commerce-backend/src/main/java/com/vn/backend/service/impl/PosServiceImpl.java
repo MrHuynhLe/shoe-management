@@ -196,6 +196,8 @@ public class PosServiceImpl implements PosService {
         Optional<OrderItem> existingItemOpt =
                 orderItemRepository.findByOrder_IdAndProductVariant_Id(orderId, request.getProductVariantId());
 
+        decreaseVariantStock(variant, addQty);
+
         if (existingItemOpt.isPresent()) {
             OrderItem existingItem = existingItemOpt.get();
             existingItem.setQuantity(existingItem.getQuantity() + addQty);
@@ -252,6 +254,8 @@ public class PosServiceImpl implements PosService {
                 throw new IllegalArgumentException("Sản phẩm đang hết hàng hoặc không đủ tồn kho");
             }
 
+            decreaseVariantStock(variant, delta);
+
             createInventoryTransaction(
                     variant,
                     order.getStore(),
@@ -260,10 +264,14 @@ public class PosServiceImpl implements PosService {
                     "POS-RESERVE-UP-" + order.getId()
             );
         } else if (delta < 0) {
+            int returnQty = Math.abs(delta);
+
+            increaseVariantStock(variant, returnQty);
+
             createInventoryTransaction(
                     variant,
                     order.getStore(),
-                    Math.abs(delta),
+                    returnQty,
                     INVENTORY_IN,
                     "POS-RESERVE-DOWN-" + order.getId()
             );
@@ -289,6 +297,8 @@ public class PosServiceImpl implements PosService {
         validateItemBelongsToOrder(item, orderId);
 
         ProductVariant variant = getLockedVariantOrThrow(item.getProductVariant().getId());
+
+        increaseVariantStock(variant, item.getQuantity());
 
         createInventoryTransaction(
                 variant,
@@ -495,6 +505,8 @@ public class PosServiceImpl implements PosService {
 
         for (OrderItem item : items) {
             ProductVariant variant = getLockedVariantOrThrow(item.getProductVariant().getId());
+
+            increaseVariantStock(variant, item.getQuantity());
 
             createInventoryTransaction(
                     variant,
@@ -1019,6 +1031,32 @@ public class PosServiceImpl implements PosService {
     private ProductVariant getLockedVariantOrThrow(Long variantId) {
         return productVariantRepository.findByIdForUpdate(variantId)
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy biến thể sản phẩm"));
+    }
+
+    private void decreaseVariantStock(ProductVariant variant, int quantity) {
+        int currentStock = variant.getStockQuantity() == null ? 0 : variant.getStockQuantity();
+
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("Số lượng phải lớn hơn 0");
+        }
+
+        if (currentStock < quantity) {
+            throw new IllegalArgumentException("Sản phẩm đang hết hàng hoặc không đủ tồn kho");
+        }
+
+        variant.setStockQuantity(currentStock - quantity);
+        productVariantRepository.save(variant);
+    }
+
+    private void increaseVariantStock(ProductVariant variant, int quantity) {
+        int currentStock = variant.getStockQuantity() == null ? 0 : variant.getStockQuantity();
+
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("Số lượng phải lớn hơn 0");
+        }
+
+        variant.setStockQuantity(currentStock + quantity);
+        productVariantRepository.save(variant);
     }
 
     private void createInventoryTransaction(

@@ -299,6 +299,7 @@ const PosManagement = () => {
     setSelectedOrder(data);
     await loadDraftOrders();
     await loadAvailableDiscounts(selectedOrderId);
+    await handleSearchProducts();
     message.success("Đã thêm sản phẩm vào hóa đơn");
   } catch (error: any) {
     message.error(error?.response?.data?.message || "Thêm sản phẩm thất bại");
@@ -321,6 +322,7 @@ const PosManagement = () => {
       setSelectedOrder(data);
       await loadDraftOrders();
       await loadAvailableDiscounts(selectedOrderId);
+      await handleSearchProducts();
     } catch (error: any) {
       message.error(
         error?.response?.data?.message || "Cập nhật số lượng thất bại",
@@ -339,6 +341,7 @@ const PosManagement = () => {
       setSelectedOrder(data);
       await loadDraftOrders();
       await loadAvailableDiscounts(selectedOrderId);
+      await handleSearchProducts();
       message.success("Đã xóa sản phẩm");
     } catch (error: any) {
       message.error(error?.response?.data?.message || "Xóa sản phẩm thất bại");
@@ -479,6 +482,8 @@ const PosManagement = () => {
       await posService.cancelOrder(selectedOrderId);
       message.success("Hủy hóa đơn thành công");
       await loadDraftOrders();
+      await handleSearchProducts();
+      
     } catch (error: any) {
       message.error(error?.response?.data?.message || "Hủy hóa đơn thất bại");
     }
