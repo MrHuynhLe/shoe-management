@@ -102,6 +102,22 @@ export interface PosCheckoutRequest {
   note?: string;
 }
 
+export interface PosVnpayCreateResponse {
+  orderId: number;
+  orderCode: string;
+  paymentUrl: string;
+  txnRef: string;
+}
+
+export interface PosVnpayReturnResponse {
+  success: boolean;
+  message: string;
+  txnRef?: string;
+  transactionNo?: string;
+  responseCode?: string;
+  orderId?: number;
+}
+
 const POS_BASE = "/v1/pos";
 
 export const posService = {
@@ -217,6 +233,24 @@ export const posService = {
 
   cancelOrder: async (orderId: number): Promise<string> => {
     const res = await axiosClient.post(`${POS_BASE}/orders/${orderId}/cancel`);
+    return res.data;
+  },
+
+  createVnpayPayment: async (
+    orderId: number,
+    payload: PosCheckoutRequest,
+  ): Promise<PosVnpayCreateResponse> => {
+    const res = await axiosClient.post(
+      `${POS_BASE}/orders/${orderId}/checkout/vnpay`,
+      payload,
+    );
+    return res.data;
+  },
+
+  getVnpayReturnResult: async (
+    params: Record<string, string>,
+  ): Promise<PosVnpayReturnResponse> => {
+    const res = await axiosClient.get(`${POS_BASE}/vnpay/return`, { params });
     return res.data;
   },
 };

@@ -13,70 +13,128 @@ import java.util.List;
 
 public interface StatisticsRepository extends JpaRepository<Order, Integer> {
     @Query(value = """
+    WITH order_summary AS (
+        SELECT
+            o.id AS order_id,
+            DATE_TRUNC('day', o.created_at) AS bucket,
+            COALESCE(SUM(oi.quantity), 0) AS items_sold,
+            COALESCE(SUM(oi.quantity * (oi.price_at_purchase - oi.cost_price_at_purchase)), 0) AS profit,
+            GREATEST(
+                COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0) - COALESCE(o.discount_amount, 0),
+                0
+            ) AS revenue
+        FROM orders o
+        JOIN order_items oi ON oi.order_id = o.id
+        WHERE o.status = 'COMPLETED'
+          AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
+          AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
+        GROUP BY o.id, DATE_TRUNC('day', o.created_at), o.discount_amount
+    )
     SELECT
-        TO_CHAR(DATE_TRUNC('day', o.created_at), 'YYYY-MM-DD') AS label,
-        COUNT(DISTINCT o.id) AS totalOrders,
-        COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0) AS revenue,
-        COALESCE(SUM(oi.quantity), 0) AS itemsSold,
-        COALESCE(SUM(oi.quantity * (oi.price_at_purchase - oi.cost_price_at_purchase)), 0) AS profit
-    FROM orders o
-    JOIN order_items oi ON oi.order_id = o.id
-    WHERE o.status = 'COMPLETED'
-      AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
-      AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
-    GROUP BY DATE_TRUNC('day', o.created_at)
-    ORDER BY DATE_TRUNC('day', o.created_at)
+        TO_CHAR(bucket, 'YYYY-MM-DD') AS label,
+        COUNT(order_id) AS totalOrders,
+        COALESCE(SUM(revenue), 0) AS revenue,
+        COALESCE(SUM(items_sold), 0) AS itemsSold,
+        COALESCE(SUM(profit), 0) AS profit
+    FROM order_summary
+    GROUP BY bucket
+    ORDER BY bucket
 """, nativeQuery = true)
-    List<Object[]> getRevenueByDay(@Param("fromDate") String fromDate,
-                                   @Param("toDate") String toDate);
+    List<Object[]> getRevenueByDay(
+            @Param("fromDate") String fromDate,
+            @Param("toDate") String toDate
+    );
 
     @Query(value = """
+    WITH order_summary AS (
+        SELECT
+            o.id AS order_id,
+            DATE_TRUNC('week', o.created_at) AS bucket,
+            COALESCE(SUM(oi.quantity), 0) AS items_sold,
+            COALESCE(SUM(oi.quantity * (oi.price_at_purchase - oi.cost_price_at_purchase)), 0) AS profit,
+            GREATEST(
+                COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0) - COALESCE(o.discount_amount, 0),
+                0
+            ) AS revenue
+        FROM orders o
+        JOIN order_items oi ON oi.order_id = o.id
+        WHERE o.status = 'COMPLETED'
+          AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
+          AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
+        GROUP BY o.id, DATE_TRUNC('week', o.created_at), o.discount_amount
+    )
     SELECT
-        TO_CHAR(DATE_TRUNC('week', o.created_at), 'YYYY-MM-DD') AS label,
-        COUNT(DISTINCT o.id) AS totalOrders,
-        COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0) AS revenue,
-        COALESCE(SUM(oi.quantity), 0) AS itemsSold,
-        COALESCE(SUM(oi.quantity * (oi.price_at_purchase - oi.cost_price_at_purchase)), 0) AS profit
-    FROM orders o
-    JOIN order_items oi ON oi.order_id = o.id
-    WHERE o.status = 'COMPLETED'
-      AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
-      AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
-    GROUP BY DATE_TRUNC('week', o.created_at)
-    ORDER BY DATE_TRUNC('week', o.created_at)
+        TO_CHAR(bucket, 'YYYY-MM-DD') AS label,
+        COUNT(order_id) AS totalOrders,
+        COALESCE(SUM(revenue), 0) AS revenue,
+        COALESCE(SUM(items_sold), 0) AS itemsSold,
+        COALESCE(SUM(profit), 0) AS profit
+    FROM order_summary
+    GROUP BY bucket
+    ORDER BY bucket
 """, nativeQuery = true)
-    List<Object[]> getRevenueByWeek(@Param("fromDate") String fromDate,
-                                    @Param("toDate") String toDate);
+    List<Object[]> getRevenueByWeek(
+            @Param("fromDate") String fromDate,
+            @Param("toDate") String toDate
+    );
 
     @Query(value = """
+    WITH order_summary AS (
+        SELECT
+            o.id AS order_id,
+            DATE_TRUNC('month', o.created_at) AS bucket,
+            COALESCE(SUM(oi.quantity), 0) AS items_sold,
+            COALESCE(SUM(oi.quantity * (oi.price_at_purchase - oi.cost_price_at_purchase)), 0) AS profit,
+            GREATEST(
+                COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0) - COALESCE(o.discount_amount, 0),
+                0
+            ) AS revenue
+        FROM orders o
+        JOIN order_items oi ON oi.order_id = o.id
+        WHERE o.status = 'COMPLETED'
+          AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
+          AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
+        GROUP BY o.id, DATE_TRUNC('month', o.created_at), o.discount_amount
+    )
     SELECT
-        TO_CHAR(DATE_TRUNC('month', o.created_at), 'YYYY-MM') AS label,
-        COUNT(DISTINCT o.id) AS totalOrders,
-        COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0) AS revenue,
-        COALESCE(SUM(oi.quantity), 0) AS itemsSold,
-        COALESCE(SUM(oi.quantity * (oi.price_at_purchase - oi.cost_price_at_purchase)), 0) AS profit
-    FROM orders o
-    JOIN order_items oi ON oi.order_id = o.id
-    WHERE o.status = 'COMPLETED'
-      AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
-      AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
-    GROUP BY DATE_TRUNC('month', o.created_at)
-    ORDER BY DATE_TRUNC('month', o.created_at)
+        TO_CHAR(bucket, 'YYYY-MM') AS label,
+        COUNT(order_id) AS totalOrders,
+        COALESCE(SUM(revenue), 0) AS revenue,
+        COALESCE(SUM(items_sold), 0) AS itemsSold,
+        COALESCE(SUM(profit), 0) AS profit
+    FROM order_summary
+    GROUP BY bucket
+    ORDER BY bucket
 """, nativeQuery = true)
-    List<Object[]> getRevenueByMonth(@Param("fromDate") String fromDate,
-                                     @Param("toDate") String toDate);
+    List<Object[]> getRevenueByMonth(
+            @Param("fromDate") String fromDate,
+            @Param("toDate") String toDate
+    );
+
     @Query(value = """
+    WITH order_summary AS (
+        SELECT
+            o.id AS order_id,
+            o.customer_id AS customer_id,
+            COALESCE(SUM(oi.quantity), 0) AS total_products_sold,
+            GREATEST(
+                COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0) - COALESCE(o.discount_amount, 0),
+                0
+            ) AS total_revenue
+        FROM orders o
+        JOIN order_items oi ON oi.order_id = o.id
+        WHERE o.status = 'COMPLETED'
+          AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
+          AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
+        GROUP BY o.id, o.customer_id, o.discount_amount
+    )
     SELECT
-        COUNT(DISTINCT o.id) AS totalOrders,
-        COALESCE(SUM(oi.quantity), 0) AS totalProductsSold,
-        COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0) AS totalRevenue,
-        COUNT(DISTINCT o.customer_id) AS totalCustomers
-    FROM orders o
-    JOIN order_items oi ON oi.order_id = o.id
-    WHERE o.status = 'COMPLETED'
-      AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
-      AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
-    """, nativeQuery = true)
+        COUNT(order_id) AS totalOrders,
+        COALESCE(SUM(total_products_sold), 0) AS totalProductsSold,
+        COALESCE(SUM(total_revenue), 0) AS totalRevenue,
+        COUNT(DISTINCT customer_id) AS totalCustomers
+    FROM order_summary
+""", nativeQuery = true)
     OverviewStatisticsProjection getOverviewStatistics(
             @Param("fromDate") String fromDate,
             @Param("toDate") String toDate

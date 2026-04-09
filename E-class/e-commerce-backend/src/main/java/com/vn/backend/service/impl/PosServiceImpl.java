@@ -411,6 +411,16 @@ public class PosServiceImpl implements PosService {
         PaymentMethod paymentMethod = paymentMethodRepository.findById(request.getPaymentMethodId())
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy phương thức thanh toán"));
 
+        String paymentCode = paymentMethod.getCode() == null
+                ? ""
+                : paymentMethod.getCode().trim().toUpperCase();
+
+        if (!"CASH".equals(paymentCode)) {
+            throw new IllegalArgumentException(
+                    "Checkout mặc định chỉ dùng cho thanh toán tiền mặt. VNPAY dùng endpoint riêng."
+            );
+        }
+
         recalculateOrderAmounts(order);
         BigDecimal totalAmount = defaultZero(order.getTotalAmount());
 
@@ -442,7 +452,6 @@ public class PosServiceImpl implements PosService {
                     coupon.getDiscountValue(),
                     null
             );
-
             appliedVoucherCode = coupon.getCode();
         }
 
@@ -460,7 +469,6 @@ public class PosServiceImpl implements PosService {
                     promotion.getDiscountValue(),
                     promotion.getMaxDiscountAmount()
             );
-
             appliedVoucherCode = promotion.getCode();
         }
 
@@ -487,6 +495,9 @@ public class PosServiceImpl implements PosService {
                 .paymentMethod(paymentMethod)
                 .amount(finalAmount)
                 .status(PAYMENT_STATUS_PAID)
+                .transactionCode("CASH-" + order.getId() + "-" + System.currentTimeMillis())
+                .paidAt(OffsetDateTime.now())
+                .note("Thanh toán tiền mặt tại quầy")
                 .build();
         paymentRepository.save(payment);
 

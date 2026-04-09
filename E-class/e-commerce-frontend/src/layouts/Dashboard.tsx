@@ -211,6 +211,32 @@ const DashboardPage = () => {
     return name || "Khác";
   };
 
+  const normalizePieData = (
+    data: { name: string; value: number }[],
+    maxSlices = 6,
+  ) => {
+    const sorted = [...data]
+      .filter((item) => Number(item.value || 0) > 0)
+      .sort((a, b) => b.value - a.value);
+
+    if (sorted.length <= maxSlices) {
+      return sorted;
+    }
+
+    const mainItems = sorted.slice(0, maxSlices - 1);
+    const otherItems = sorted.slice(maxSlices - 1);
+
+    const otherValue = otherItems.reduce((sum, item) => sum + item.value, 0);
+
+    return [
+      ...mainItems,
+      {
+        name: "Khác",
+        value: otherValue,
+      },
+    ];
+  };
+
   const PIE_COLORS = [
     "#1677ff",
     "#52c41a",
@@ -224,8 +250,8 @@ const DashboardPage = () => {
     "#a0d911",
   ];
 
-  const revenuePieData = revenueData
-    .map((item) => ({
+  const revenuePieData = normalizePieData(
+    revenueData.map((item) => ({
       name:
         groupBy === "day"
           ? dayjs(item.label).format("DD/MM")
@@ -233,68 +259,70 @@ const DashboardPage = () => {
             ? `Tuần ${dayjs(item.label).format("DD/MM")}`
             : dayjs(`${item.label}-01`).format("MM/YYYY"),
       value: Number(item.revenue || 0),
-    }))
-    .filter((item) => item.value > 0);
+    })),
+    6,
+  );
 
-  const orderStatusPieData = orderStatusData
-    .map((item) => ({
+  const orderStatusPieData = normalizePieData(
+    orderStatusData.map((item) => ({
       name: mapStatusLabel(item.status),
       value: Number(item.totalOrders || 0),
-    }))
-    .filter((item) => item.value > 0);
-
-  const paymentPieData = paymentMethodData
-    .map((item) => ({
+    })),
+    6,
+  );
+  const paymentPieData = normalizePieData(
+    paymentMethodData.map((item) => ({
       name: shortPaymentName(item),
       value: Number(item.revenue || 0),
-    }))
-    .filter((item) => item.value > 0);
+    })),
+    6,
+  );
 
   const renderPieChart = (
-  data: { name: string; value: number }[],
-  emptyText: string,
-  valueFormatter: (value: number) => string = (value) => String(value),
-) => {
-  if (!data.length) {
-    return <Empty description={emptyText} />;
-  }
+    data: { name: string; value: number }[],
+    emptyText: string,
+    valueFormatter: (value: number) => string = (value) => String(value),
+  ) => {
+    if (!data.length) {
+      return <Empty description={emptyText} />;
+    }
 
-  return (
-    <div style={{ width: "100%", height: 320 }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={data}
-            dataKey="value"
-            nameKey="name"
-            cx="50%"
-            cy="45%"
-            outerRadius={95}
-            label={({ name, percent }: any) =>
-              `${name}: ${((percent || 0) * 100).toFixed(0)}%`
-            }
-          >
-            {data.map((_, index) => (
-              <Cell
-                key={`cell-${index}`}
-                fill={PIE_COLORS[index % PIE_COLORS.length]}
-              />
-            ))}
-          </Pie>
+    return (
+      <div style={{ width: "100%", height: 320 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              dataKey="value"
+              nameKey="name"
+              cx="50%"
+              cy="45%"
+              outerRadius={95}
+              label={({ name, percent }: any) =>
+                `${name}: ${((percent || 0) * 100).toFixed(0)}%`
+              }
+            >
+              {data.map((_, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={PIE_COLORS[index % PIE_COLORS.length]}
+                />
+              ))}
+            </Pie>
 
-          <Tooltip
-            formatter={(value: any, name: any) => [
-              valueFormatter(Number(value || 0)),
-              String(name || ""),
-            ]}
-          />
+            <Tooltip
+              formatter={(value: any, name: any) => [
+                valueFormatter(Number(value || 0)),
+                String(name || ""),
+              ]}
+            />
 
-          <Legend verticalAlign="bottom" />
-        </PieChart>
-      </ResponsiveContainer>
-    </div>
-  );
-};
+            <Legend verticalAlign="bottom" />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  };
 
   const cashRevenue = useMemo(
     () =>

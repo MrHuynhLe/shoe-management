@@ -33,16 +33,17 @@ import {
   posService,
 } from "@/services/pos.services";
 
+import {
+  PaymentMethodResponse,
+  paymentMethodService,
+} from "@/services/paymentMethod.service";
+
 const { Title, Text } = Typography;
 
 const DEFAULT_EMPLOYEE_ID = 2;
 const DEFAULT_STORE_ID = 1;
 
-const paymentOptions = [
-  { label: "Tiền mặt", value: 1 },
-  { label: "Chuyển khoản", value: 2 },
-  { label: "MoMo", value: 3 },
-];
+const POS_PAYMENT_CODES = ["CASH", "VNPAY"];
 
 const currency = (value?: number | null) =>
   new Intl.NumberFormat("vi-VN").format(value ?? 0);
@@ -151,6 +152,10 @@ const PosManagement = () => {
   const [selectedDiscount, setSelectedDiscount] =
     useState<PosAvailableDiscountResponse | null>(null);
 
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodResponse[]>(
+    [],
+  );
+
   const [checkoutData, setCheckoutData] = useState({
     paymentMethodId: 1,
     customerPaid: 0,
@@ -235,6 +240,7 @@ const PosManagement = () => {
   useEffect(() => {
     loadDraftOrders();
     handleSearchProducts();
+    loadPaymentMethods();
   }, []);
 
   useEffect(() => {
@@ -280,31 +286,31 @@ const PosManagement = () => {
   };
 
   const handleAddProduct = async (product: PosProductSearchResponse) => {
-  if (!selectedOrderId) {
-    message.warning("Hãy tạo hoặc chọn hóa đơn trước");
-    return;
-  }
+    if (!selectedOrderId) {
+      message.warning("Hãy tạo hoặc chọn hóa đơn trước");
+      return;
+    }
 
-  if ((product.stockQuantity ?? 0) <= 0) {
-    message.warning("Sản phẩm đang hết hàng");
-    return;
-  }
+    if ((product.stockQuantity ?? 0) <= 0) {
+      message.warning("Sản phẩm đang hết hàng");
+      return;
+    }
 
-  try {
-    const data = await posService.addItem(selectedOrderId, {
-      productVariantId: product.productVariantId,
-      quantity: 1,
-    });
+    try {
+      const data = await posService.addItem(selectedOrderId, {
+        productVariantId: product.productVariantId,
+        quantity: 1,
+      });
 
-    setSelectedOrder(data);
-    await loadDraftOrders();
-    await loadAvailableDiscounts(selectedOrderId);
-    await handleSearchProducts();
-    message.success("Đã thêm sản phẩm vào hóa đơn");
-  } catch (error: any) {
-    message.error(error?.response?.data?.message || "Thêm sản phẩm thất bại");
-  }
-};
+      setSelectedOrder(data);
+      await loadDraftOrders();
+      await loadAvailableDiscounts(selectedOrderId);
+      await handleSearchProducts();
+      message.success("Đã thêm sản phẩm vào hóa đơn");
+    } catch (error: any) {
+      message.error(error?.response?.data?.message || "Thêm sản phẩm thất bại");
+    }
+  };
 
   const handleUpdateQuantity = async (
     item: PosOrderItemResponse,
@@ -440,6 +446,17 @@ const PosManagement = () => {
       customerPaid: selectedOrder?.totalAmount ?? 0,
     }));
   };
+  
+  const loadPaymentMethods = async () => {
+  try {
+    const data = await paymentMethodService.getAll();
+    setPaymentMethods(data);
+  } catch (error: any) {
+    message.error(
+      error?.response?.data?.message || "Không tải được phương thức thanh toán",
+    );
+  }
+};
 
   const handleCheckout = async () => {
     if (!selectedOrderId) {
@@ -447,10 +464,15 @@ const PosManagement = () => {
       return;
     }
 
+    if (!checkoutData.paymentMethodId) {
+      message.warning("Chưa chọn phương thức thanh toán");
+      return;
+    }
+
     try {
-      const data = await posService.checkout(selectedOrderId, {
+      const payload = {
         paymentMethodId: checkoutData.paymentMethodId,
-        customerPaid: checkoutData.customerPaid,
+        customerPaid: isCashPayment ? checkoutData.customerPaid : 0,
         couponId:
           selectedDiscount?.voucherType === "COUPON"
             ? selectedDiscount.id
@@ -460,14 +482,27 @@ const PosManagement = () => {
             ? selectedDiscount.id
             : null,
         note: checkoutData.note,
-      });
+      };
 
-      message.success("Thanh toán thành công");
+      if (isVnpayPayment) {
+        const vnpay = await posService.createVnpayPayment(
+          selectedOrderId,
+          payload,
+        );
+        window.location.href = vnpay.paymentUrl;
+        return;
+      }
+
+      const data = await posService.checkout(selectedOrderId, payload);
+
+      message.success("Thanh toán tiền mặt thành công");
       setCheckoutOpen(false);
       setSelectedDiscount(null);
       setAvailableDiscounts([]);
       setSelectedOrder(data);
+
       await loadDraftOrders();
+      await handleSearchProducts();
     } catch (error: any) {
       message.error(error?.response?.data?.message || "Thanh toán thất bại");
     }
@@ -483,7 +518,6 @@ const PosManagement = () => {
       message.success("Hủy hóa đơn thành công");
       await loadDraftOrders();
       await handleSearchProducts();
-      
     } catch (error: any) {
       message.error(error?.response?.data?.message || "Hủy hóa đơn thất bại");
     }
@@ -657,6 +691,28 @@ const PosManagement = () => {
     };
   }, [selectedOrder, selectedDiscount]);
 
+  const paymentOptions = useMemo(
+    () =>
+      paymentMethods
+        .filter(
+          (item) => item.isActive && POS_PAYMENT_CODES.includes(item.code),
+        )
+        .map((item) => ({
+          label: item.name,
+          value: item.id,
+        })),
+    [paymentMethods],
+  );
+
+  const selectedPaymentMethod = useMemo(
+    () =>
+      paymentMethods.find((item) => item.id === checkoutData.paymentMethodId) ??
+      null,
+    [paymentMethods, checkoutData.paymentMethodId],
+  );
+
+  const isCashPayment = selectedPaymentMethod?.code === "CASH";
+  const isVnpayPayment = selectedPaymentMethod?.code === "VNPAY";
   return (
     <div style={{ padding: 20 }}>
       <Row gutter={[16, 16]} align="top">
@@ -989,11 +1045,21 @@ const PosManagement = () => {
                   <Button
                     type="primary"
                     onClick={() => {
+                      const cashMethod = paymentMethods.find(
+                        (item) => item.code === "CASH",
+                      );
+
                       setCheckoutData((prev) => ({
                         ...prev,
+                        paymentMethodId:
+                          prev.paymentMethodId ??
+                          cashMethod?.id ??
+                          paymentOptions[0]?.value ??
+                          null,
                         customerPaid: summary.final,
                         note: selectedOrder?.note || "",
                       }));
+
                       setCheckoutOpen(true);
                     }}
                     disabled={!selectedOrder.items?.length}
@@ -1108,20 +1174,41 @@ const PosManagement = () => {
             />
           </div>
 
-          <div>
-            <Text strong>Tiền khách đưa</Text>
-            <InputNumber
-              style={{ width: "100%", marginTop: 6 }}
-              min={0}
-              value={checkoutData.customerPaid}
-              onChange={(value) =>
-                setCheckoutData((prev) => ({
-                  ...prev,
-                  customerPaid: Number(value || 0),
-                }))
-              }
-            />
-          </div>
+          {isCashPayment && (
+            <>
+              <div>
+                <Text strong>Tiền khách đưa</Text>
+                <InputNumber
+                  style={{ width: "100%", marginTop: 6 }}
+                  min={0}
+                  value={checkoutData.customerPaid}
+                  onChange={(value) =>
+                    setCheckoutData((prev) => ({
+                      ...prev,
+                      customerPaid: Number(value || 0),
+                    }))
+                  }
+                />
+              </div>
+
+              <div>
+                <Text strong>Tiền thừa:</Text>{" "}
+                {currency(
+                  Math.max((checkoutData.customerPaid || 0) - summary.final, 0),
+                )}{" "}
+                đ
+              </div>
+            </>
+          )}
+
+          {isVnpayPayment && (
+            <div>
+              <Text type="secondary">
+                Khi bấm xác nhận, hệ thống sẽ tạo đúng link thanh toán VNPAY
+                theo số tiền sau giảm giá hiện tại.
+              </Text>
+            </div>
+          )}
 
           <div>
             <Text strong>Ghi chú</Text>

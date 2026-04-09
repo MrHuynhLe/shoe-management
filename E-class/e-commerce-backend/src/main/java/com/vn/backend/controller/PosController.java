@@ -4,20 +4,24 @@ import com.vn.backend.dto.request.pos.PosAssignCustomerRequest;
 import com.vn.backend.dto.request.pos.PosCheckoutRequest;
 import com.vn.backend.dto.request.pos.PosCreateOrderRequest;
 import com.vn.backend.dto.request.pos.PosUpdateItemRequest;
-import com.vn.backend.dto.response.pos.PosAvailableDiscountResponse;
-import com.vn.backend.dto.response.pos.PosOrderResponse;
-import com.vn.backend.dto.response.pos.PosProductSearchResponse;
+import com.vn.backend.dto.response.pos.*;
 import com.vn.backend.service.PosService;
+import com.vn.backend.service.VnpayService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Map;
+
 import com.vn.backend.dto.request.pos.PosQuickCreateCustomerRequest;
 @RestController @RequestMapping("/v1/pos")
 @RequiredArgsConstructor @CrossOrigin(origins = "http://localhost:5173")
 public class PosController {
     private final PosService posService;
+    private final VnpayService vnpayService;
+
     @PostMapping("/orders")
     public ResponseEntity<PosOrderResponse> createOrder( @Valid @RequestBody PosCreateOrderRequest request ) {
         return ResponseEntity.ok(posService.createOrder(request));
@@ -68,5 +72,24 @@ public class PosController {
             @Valid @RequestBody PosQuickCreateCustomerRequest request
     ) {
         return ResponseEntity.ok(posService.quickCreateCustomerAndAssign(orderId, request));
+    }
+
+    @PostMapping("/orders/{orderId}/checkout/vnpay")
+    public ResponseEntity<PosVnpayCreateResponse> createVnpayPayment(
+            @PathVariable Long orderId,
+            @Valid @RequestBody PosCheckoutRequest checkoutRequest,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.ok(vnpayService.createPaymentUrl(orderId, checkoutRequest, request));
+    }
+
+    @GetMapping("/vnpay/return")
+    public ResponseEntity<PosVnpayReturnResponse> vnpayReturn(@RequestParam Map<String, String> params) {
+        return ResponseEntity.ok(vnpayService.handleReturn(params));
+    }
+
+    @GetMapping("/vnpay/ipn")
+    public ResponseEntity<String> vnpayIpn(@RequestParam Map<String, String> params) {
+        return ResponseEntity.ok(vnpayService.handleIpn(params));
     }
 }
