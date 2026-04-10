@@ -28,4 +28,6 @@ public interface StatisticsService {
     List<OrderStatusResponse> getOrderStatusStatistics(StatisticsQuery query);
 
     PageResponse<TopRatedProductResponse> getTopRatedProducts(StatisticsQuery query, int page, int size);
+
+    List<PaymentMethodRevenueResponse> getRevenueByPaymentMethod(StatisticsQuery query);
 }

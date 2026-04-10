@@ -15,7 +15,9 @@ public class OrderResponse {
     private Long id;
     private String code;
     private BigDecimal discountAmount;
+    private BigDecimal discountPercent;
     private String voucherCode;
+    private BigDecimal subtotalAmount;
     private BigDecimal totalAmount;
     private String status;
     private OffsetDateTime createdAt;
@@ -23,6 +25,11 @@ public class OrderResponse {
     private List<OrderItemResponse> items;
     private String customerName;
     private String phone;
+    private String address;
+    private String province;
+    private String district;
+    private String ward;
+    private String fullAddress;
     private String orderType; 
     private Long employeeId; 
     private String employeeName; 

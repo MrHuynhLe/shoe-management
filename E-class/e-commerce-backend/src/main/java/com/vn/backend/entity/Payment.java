@@ -33,6 +33,18 @@ public class Payment {
     @Column(name = "status", length = 50)
     private String status;
 
+    @Column(name = "transaction_code", length = 100)
+    private String transactionCode;
+
+    @Column(name = "provider_txn_ref", length = 100)
+    private String providerTxnRef;
+
+    @Column(name = "paid_at")
+    private OffsetDateTime paidAt;
+
+    @Column(name = "note", columnDefinition = "TEXT")
+    private String note;
+
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;
 

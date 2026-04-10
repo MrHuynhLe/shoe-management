@@ -1,10 +1,22 @@
 import { useEffect, useState } from 'react';
-import { Modal, Spin, message, Typography, Card, Descriptions, Table, Tag, Image } from 'antd';
+import {
+  Modal,
+  Spin,
+  message,
+  Typography,
+  Card,
+  Descriptions,
+  Table,
+  Tag,
+  Image,
+  Timeline,
+  Space,
+  Divider,
+} from 'antd';
 import { orderService } from '@/services/order.service';
 import { AxiosResponse } from 'axios';
 
 const { Title, Text } = Typography;
-
 
 interface OrderItem {
   productId: number;
@@ -17,10 +29,18 @@ interface OrderItem {
   key: React.Key;
 }
 
+interface OrderStatusHistory {
+  id: number;
+  orderId?: number;
+  fromStatus?: string | null;
+  toStatus: string;
+  changedAt: string;
+}
+
 interface OrderDetail {
   id: number;
   code: string;
-  createdAt: string; 
+  createdAt: string;
   status: string;
   customerName: string;
   phone: string;
@@ -28,16 +48,54 @@ interface OrderDetail {
   province?: string;
   district?: string;
   ward?: string;
-  paymentMethodName: string; 
+  fullAddress?: string;
+  paymentMethodName: string;
+  subtotalAmount: number;
   totalAmount: number;
   shippingFee: number;
   voucherCode?: string;
   discountAmount?: number;
-  orderType?: string | null; 
+  discountPercent?: number;
+  orderType?: string | null;
   employeeId?: number | null;
-  employeeName?: string | null; 
+  employeeName?: string | null;
   items: OrderItem[];
+  statusHistory?: OrderStatusHistory[];
 }
+
+const formatCurrency = (value?: number) =>
+  `${Number(value || 0).toLocaleString('vi-VN')} ₫`;
+
+const resolveImageUrl = (imageUrl?: string) => {
+  if (!imageUrl) {
+    return 'https://via.placeholder.com/60';
+  }
+
+  if (/^https?:\/\//i.test(imageUrl)) {
+    return imageUrl;
+  }
+
+  return `http://localhost:8080/api${imageUrl}`;
+};
+
+const getStatusMeta = (status: string) => {
+  const statusMap: Record<string, { color: string; text: string }> = {
+    DRAFT: { color: 'default', text: 'Nháp' },
+    PENDING: { color: 'gold', text: 'Chờ xác nhận' },
+    CONFIRMED: { color: 'lime', text: 'Đã xác nhận' },
+    SHIPPING: { color: 'blue', text: 'Đang giao' },
+    COMPLETED: { color: 'green', text: 'Hoàn thành' },
+    CANCELLED: { color: 'red', text: 'Đã hủy' },
+  };
+
+  return statusMap[status] || { color: 'default', text: status };
+};
+
+const getStatusTag = (status: string) => {
+  const meta = getStatusMeta(status);
+  return <Tag color={meta.color}>{meta.text}</Tag>;
+};
+
 const OrderDetailModal = ({
   orderId,
   visible,
@@ -62,8 +120,8 @@ const OrderDetailModal = ({
           setOrder(response.data);
         })
         .catch((error: any) => {
-          if (error.name !== "AbortError") {
-            message.error("Không thể tải chi tiết đơn hàng.");
+          if (error.name !== 'AbortError') {
+            message.error('Không thể tải chi tiết đơn hàng.');
             onClose();
           }
         })
@@ -75,41 +133,18 @@ const OrderDetailModal = ({
     return () => controller.abort();
   }, [orderId, visible, onClose]);
 
-  const getStatusTag = (status: string) => {
-    const statusMap: {
-      [key: string]: { color: string; text: string };
-    } = {
-      PENDING: { color: "gold", text: "Chờ xác nhận" },
-      CONFIRMED: { color: "lime", text: "Đã xác nhận" },
-      SHIPPING: { color: "blue", text: "Đang giao" },
-      COMPLETED: { color: "green", text: "Hoàn thành" },
-      CANCELLED: { color: "red", text: "Đã hủy" },
-    };
-
-    const { color, text } = statusMap[status] || {
-      color: "default",
-      text: status,
-    };
-
-    return <Tag color={color}>{text}</Tag>;
-  };
-
   const itemColumns = [
     {
-      title: "Sản phẩm",
-      dataIndex: "productName",
-      key: "productName",
+      title: 'Sản phẩm',
+      dataIndex: 'productName',
+      key: 'productName',
       render: (text: string, record: OrderItem) => (
-        <div style={{ display: "flex", alignItems: "center" }}>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
           <Image
             width={60}
-            src={
-              record.imageUrl
-                ? `http://localhost:8080/api${record.imageUrl}`
-                : "https://via.placeholder.com/60"
-            }
+            src={resolveImageUrl(record.imageUrl)}
             preview={false}
-            style={{ marginRight: 12 }}
+            style={{ marginRight: 12, borderRadius: 8, objectFit: 'cover' }}
           />
           <div>
             <Text strong>{text}</Text>
@@ -120,24 +155,23 @@ const OrderDetailModal = ({
       ),
     },
     {
-      title: "Đơn giá",
-      dataIndex: "price",
-      key: "price",
-      render: (price: number) =>
-        price.toLocaleString("vi-VN") + " ₫",
+      title: 'Đơn giá',
+      dataIndex: 'price',
+      key: 'price',
+      render: (price: number) => formatCurrency(price),
     },
     {
-      title: "Số lượng",
-      dataIndex: "quantity",
-      key: "quantity",
+      title: 'Số lượng',
+      dataIndex: 'quantity',
+      key: 'quantity',
     },
     {
-      title: "Thành tiền",
-      dataIndex: "subtotal",
-      key: "subtotal",
+      title: 'Thành tiền',
+      dataIndex: 'subtotal',
+      key: 'subtotal',
       render: (total: number) => (
-        <Text strong style={{ color: "#c81d1d" }}>
-          {total.toLocaleString("vi-VN")} ₫
+        <Text strong style={{ color: '#c81d1d' }}>
+          {formatCurrency(total)}
         </Text>
       ),
     },
@@ -149,7 +183,7 @@ const OrderDetailModal = ({
       open={visible}
       onCancel={onClose}
       footer={null}
-      width={900}
+      width={980}
       destroyOnClose
     >
       <Spin spinning={loading}>
@@ -158,48 +192,41 @@ const OrderDetailModal = ({
             <Descriptions bordered column={1} size="small">
               <Descriptions.Item label="Ngày đặt">
                 {order.createdAt
-                  ? new Date(order.createdAt).toLocaleString("vi-VN")
-                  : "N/A"}
+                  ? new Date(order.createdAt).toLocaleString('vi-VN')
+                  : 'N/A'}
               </Descriptions.Item>
 
-              <Descriptions.Item label="Trạng thái">
+              <Descriptions.Item label="Trạng thái hiện tại">
                 {getStatusTag(order.status)}
               </Descriptions.Item>
 
               <Descriptions.Item label="Loại đơn hàng">
-                {order.orderType === "POS" ? "Tại quầy" : "Online"}
+                {order.orderType === 'POS' ? 'Tại quầy' : 'Online'}
               </Descriptions.Item>
 
-              <Descriptions.Item label="Người nhận">
-                {order.customerName}
+              <Descriptions.Item label="Người nhận / Khách hàng">
+                {order.customerName || 'N/A'}
               </Descriptions.Item>
 
-              {order.orderType === "POS" && (
-                <>
-                  <Descriptions.Item label="ID NV tạo">
-                    {order.employeeId || ""}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Tên NV tạo">
-                    {order.employeeName || ""}
-                  </Descriptions.Item>
-                </>
+              {order.phone && (
+                <Descriptions.Item label="Số điện thoại">
+                  {order.phone}
+                </Descriptions.Item>
               )}
 
-              {order.orderType === "ONLINE" && (
-                <>
-                  <Descriptions.Item label="Số điện thoại">
-                    {order.phone || ""}
-                  </Descriptions.Item>
+              {order.fullAddress && (
+                <Descriptions.Item label="Địa chỉ nhận hàng">
+                  {order.fullAddress}
+                </Descriptions.Item>
+              )}
 
-                  <Descriptions.Item label="Địa chỉ giao hàng">
-                    {`${order.address || ""}${
-                      order.ward ? `, ${order.ward}` : ""
-                    }${order.district ? `, ${order.district}` : ""}${
-                      order.province ? `, ${order.province}` : ""
-                    }`
-                      .replace(/^,\s*/, "")
-                      .replace(/,\s*,/g, ",")
-                      .trim()}
+              {order.orderType === 'POS' && (
+                <>
+                  <Descriptions.Item label="ID NV tạo">
+                    {order.employeeId || ''}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Tên NV tạo">
+                    {order.employeeName || ''}
                   </Descriptions.Item>
                 </>
               )}
@@ -215,60 +242,86 @@ const OrderDetailModal = ({
 
             <Table
               columns={itemColumns}
-              dataSource={order.items.map((item) => ({
+              dataSource={order.items.map((item, index) => ({
                 ...item,
-                key: item.productId,
+                key: `${item.productId}-${item.variantInfo}-${index}`,
               }))}
               pagination={false}
               bordered
             />
 
-            <Descriptions
-              bordered
-              column={1}
-              size="small"
-              style={{ marginTop: 24 }}
-            >
-              {order.discountAmount && order.discountAmount > 0 && (
-                <Descriptions.Item label="Tiền hàng">
-                  {(
-                    order.totalAmount -
-                    order.shippingFee +
-                    order.discountAmount
-                  ).toLocaleString("vi-VN")}{" "}
-                  ₫
-                </Descriptions.Item>
-              )}
+            <Descriptions bordered column={1} size="small" style={{ marginTop: 24 }}>
+              <Descriptions.Item label="Tiền hàng">
+                <Text strong>{formatCurrency(order.subtotalAmount)}</Text>
+              </Descriptions.Item>
 
-              {order.discountAmount && order.discountAmount > 0 && (
-                <Descriptions.Item
-                  label={
-                    <Text type="success">
-                      Giảm giá ({order.voucherCode})
-                    </Text>
-                  }
-                >
-                  <Text strong type="success">
-                    -{order.discountAmount.toLocaleString("vi-VN")} ₫
+              <Descriptions.Item label="% giảm">
+                <Tag color={order.discountAmount && order.discountAmount > 0 ? 'green' : 'default'}>
+                  {Number(order.discountPercent || 0).toFixed(2)}%
+                </Tag>
+              </Descriptions.Item>
+
+              <Descriptions.Item
+                label={
+                  <Text
+                    type={order.discountAmount && order.discountAmount > 0 ? 'success' : 'secondary'}
+                  >
+                    Giảm giá{order.voucherCode ? ` (${order.voucherCode})` : ''}
                   </Text>
-                </Descriptions.Item>
-              )}
-
-              <Descriptions.Item label="Phí vận chuyển">
-                <Text strong>
-                  {order.shippingFee.toLocaleString("vi-VN")} ₫
+                }
+              >
+                <Text
+                  strong
+                  type={order.discountAmount && order.discountAmount > 0 ? 'success' : undefined}
+                >
+                  -{formatCurrency(order.discountAmount)}
                 </Text>
               </Descriptions.Item>
 
+              <Descriptions.Item label="Phí vận chuyển">
+                <Text strong>{formatCurrency(order.shippingFee)}</Text>
+              </Descriptions.Item>
+
               <Descriptions.Item label="Tổng cộng">
-                <Title
-                  level={4}
-                  style={{ color: "#c81d1d", margin: 0 }}
-                >
-                  {order.totalAmount.toLocaleString("vi-VN")} ₫
+                <Title level={4} style={{ color: '#c81d1d', margin: 0 }}>
+                  {formatCurrency(order.totalAmount)}
                 </Title>
               </Descriptions.Item>
             </Descriptions>
+
+            <Divider />
+
+            <Space direction="vertical" size={12} style={{ width: '100%' }}>
+              <Title level={5} style={{ margin: 0 }}>
+                Lịch sử trạng thái
+              </Title>
+
+              {order.statusHistory && order.statusHistory.length > 0 ? (
+                <Timeline
+                  items={order.statusHistory.map((history) => ({
+                    color: getStatusMeta(history.toStatus).color,
+                    children: (
+                      <Space direction="vertical" size={0}>
+                        <Text strong>{getStatusMeta(history.toStatus).text}</Text>
+                        <Text type="secondary">
+                          {history.changedAt
+                            ? new Date(history.changedAt).toLocaleString('vi-VN')
+                            : 'N/A'}
+                        </Text>
+                        {history.fromStatus && (
+                          <Text type="secondary">
+                            Từ {getStatusMeta(history.fromStatus).text} →{' '}
+                            {getStatusMeta(history.toStatus).text}
+                          </Text>
+                        )}
+                      </Space>
+                    ),
+                  }))}
+                />
+              ) : (
+                <Text type="secondary">Chưa có lịch sử trạng thái.</Text>
+              )}
+            </Space>
           </Card>
         )}
       </Spin>

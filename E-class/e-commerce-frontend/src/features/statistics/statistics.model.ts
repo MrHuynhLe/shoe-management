@@ -31,6 +31,20 @@ export interface RevenueChartItem {
   profit: number;
 }
 
+export interface OrderStatusItem {
+  status: string;
+  totalOrders: number;
+  totalAmount: number;
+}
+
+
+export interface PaymentMethodRevenueItem {
+  paymentMethodCode: string;
+  paymentMethodName: string;
+  totalOrders: number;
+  revenue: number;
+}
+
 export interface PageResponse<T> {
   content: T[];
   page: number;

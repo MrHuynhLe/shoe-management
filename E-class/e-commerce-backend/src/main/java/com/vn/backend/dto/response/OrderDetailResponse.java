@@ -24,12 +24,16 @@ public class OrderDetailResponse {
     private String ward;
 
     private String paymentMethodName;
+    private BigDecimal subtotalAmount;
     private BigDecimal totalAmount;
     private String voucherCode;
     private BigDecimal discountAmount;
+    private BigDecimal discountPercent;
     private BigDecimal shippingFee;
+    private String fullAddress;
     private String orderType; 
     private Long employeeId;
     private String employeeName; 
     private List<OrderItemResponse> items;
+    private List<OrderStatusHistoryResponse> statusHistory;
 }

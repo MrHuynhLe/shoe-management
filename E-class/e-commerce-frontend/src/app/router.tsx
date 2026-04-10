@@ -24,6 +24,7 @@ import MaterialManagementPage from "@/features/admin/MaterialManagement";
 import PromotionManagementPage from "@/features/admin/PromotionManagement";
 import CouponManagementPage from "@/features/admin/CouponManagement";
 import PosManagementPage from "@/features/admin/PosManagement";
+import PosVnpayReturn from "@/features/admin/PosVnpayReturn";
 
 import ProfilePage from "@/layouts/components/ProfilePage";
 import CheckoutPage from "@/layouts/components/CheckoutPage";
@@ -70,6 +71,7 @@ export const router = createBrowserRouter([
       { path: "customers", element: <CustomerManagementPage /> },
       { path: "inventory", element: <InventoryManagementPage /> },
       { path: "pos", element: <PosManagementPage /> },
+      { path: "pos/vnpay-return", element: <PosVnpayReturn /> },
       { path: "orders", element: <OrderManagementPage /> },
       
       { path: "revenue", element: <RevenueStatisticPage /> },

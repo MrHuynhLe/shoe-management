@@ -22,7 +22,6 @@ export interface PosOrderResponse {
   customerId?: number | null;
   customerName?: string | null;
   employeeId?: number | null;
-  employeeName?: string | null; 
   storeId?: number | null;
   totalAmount: number;
   discountAmount: number;
@@ -32,7 +31,6 @@ export interface PosOrderResponse {
   changeAmount: number;
   orderType?: string | null;
   note?: string | null;
-  voucherCode?: string | null; 
   items: PosOrderItemResponse[];
 }
 
@@ -58,11 +56,11 @@ export interface PosAvailableDiscountResponse {
   discountValue: number;
   minOrderValue?: number | null;
   maxDiscountAmount?: number | null;
-  issuedQuantity: number;
-  usedCount: number;
-  remainingCount: number;
-  usedPercent: number;
-  remainingPercent: number;
+  issuedQuantity?: number | null;
+  usedCount?: number | null;
+  remainingCount?: number | null;
+  usedPercent?: number | null;
+  remainingPercent?: number | null;
   startDate?: string | null;
   endDate?: string | null;
   isActive: boolean;
@@ -74,7 +72,6 @@ export interface PosCreateOrderRequest {
   employeeId: number;
   customerId?: number | null;
   storeId: number;
-  orderType: string; 
   note?: string;
 }
 
@@ -91,12 +88,34 @@ export interface PosAssignCustomerRequest {
   customerId: number | null;
 }
 
+export interface PosQuickCreateCustomerRequest {
+  fullName: string;
+  phone: string;
+  address?: string;
+}
+
 export interface PosCheckoutRequest {
   paymentMethodId: number;
   customerPaid: number;
   couponId?: number | null;
   promotionId?: number | null;
   note?: string;
+}
+
+export interface PosVnpayCreateResponse {
+  orderId: number;
+  orderCode: string;
+  paymentUrl: string;
+  txnRef: string;
+}
+
+export interface PosVnpayReturnResponse {
+  success: boolean;
+  message: string;
+  txnRef?: string;
+  transactionNo?: string;
+  responseCode?: string;
+  orderId?: number;
 }
 
 const POS_BASE = "/v1/pos";
@@ -190,6 +209,17 @@ export const posService = {
     return res.data;
   },
 
+  quickCreateCustomerAndAssign: async (
+    orderId: number,
+    payload: PosQuickCreateCustomerRequest,
+  ): Promise<PosOrderResponse> => {
+    const res = await axiosClient.post(
+      `${POS_BASE}/orders/${orderId}/customer/quick-create`,
+      payload,
+    );
+    return res.data;
+  },
+
   checkout: async (
     orderId: number,
     payload: PosCheckoutRequest,
@@ -203,6 +233,24 @@ export const posService = {
 
   cancelOrder: async (orderId: number): Promise<string> => {
     const res = await axiosClient.post(`${POS_BASE}/orders/${orderId}/cancel`);
+    return res.data;
+  },
+
+  createVnpayPayment: async (
+    orderId: number,
+    payload: PosCheckoutRequest,
+  ): Promise<PosVnpayCreateResponse> => {
+    const res = await axiosClient.post(
+      `${POS_BASE}/orders/${orderId}/checkout/vnpay`,
+      payload,
+    );
+    return res.data;
+  },
+
+  getVnpayReturnResult: async (
+    params: Record<string, string>,
+  ): Promise<PosVnpayReturnResponse> => {
+    const res = await axiosClient.get(`${POS_BASE}/vnpay/return`, { params });
     return res.data;
   },
 };
