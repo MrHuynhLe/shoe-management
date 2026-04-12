@@ -25,6 +25,7 @@ import PromotionManagementPage from "@/features/admin/PromotionManagement";
 import CouponManagementPage from "@/features/admin/CouponManagement";
 import PosManagementPage from "@/features/admin/PosManagement";
 import PosVnpayReturn from "@/features/admin/PosVnpayReturn";
+import OnlineVnpayReturn from "@/layouts/components/OnlineVnpayReturn";
 
 import ProfilePage from "@/layouts/components/ProfilePage";
 import CheckoutPage from "@/layouts/components/CheckoutPage";
@@ -39,6 +40,7 @@ export const router = createBrowserRouter([
       { path: "cart", element: <CartPage /> },
       { path: "account", element: <AccountPage /> },
       { path: "checkout", element: <CheckoutPage /> },
+      { path: "checkout/vnpay-return", element: <OnlineVnpayReturn /> },
     ],
   },
   {

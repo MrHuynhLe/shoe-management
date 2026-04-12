@@ -15,16 +15,42 @@ interface OrderItem {
   quantity: number;
 }
 
-interface PlaceOrderDTO {
+export interface PlaceOrderDTO {
   shippingInfo: ShippingInfo;
   paymentMethodCode: string;
   items: OrderItem[];
   voucherCode?: string | null;
 }
 
+export interface OnlineVnpayCreateResponse {
+  orderId: number;
+  orderCode: string;
+  txnRef: string;
+  paymentUrl: string;
+}
+
+export interface OnlineVnpayReturnResponse {
+  success: boolean;
+  message: string;
+  txnRef?: string;
+  transactionNo?: string;
+  responseCode?: string;
+  orderId?: number;
+}
+
 export const orderService = {
   placeOrder: (orderData: PlaceOrderDTO) => {
     return axiosClient.post('/v1/orders', orderData);
+  },
+
+  createOnlineVnpayPayment: (orderId: number) => {
+    return axiosClient.post<OnlineVnpayCreateResponse>(`/v1/orders/${orderId}/vnpay`);
+  },
+
+  getOnlineVnpayReturnResult: (params: Record<string, string>) => {
+    return axiosClient.get<OnlineVnpayReturnResponse>("/v1/orders/vnpay/return", {
+      params,
+    });
   },
 
   getMyOrders: (params?: any) => {

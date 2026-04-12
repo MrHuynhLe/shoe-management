@@ -58,16 +58,28 @@ public class SecurityConfig {
                         .hasAnyRole("CUSTOMER","ADMIN")
 
                         .requestMatchers(HttpMethod.POST, "/v1/orders")
-                        .hasAnyRole("CUSTOMER","ADMIN")
+                        .hasAnyRole("CUSTOMER", "ADMIN")
+
+                        .requestMatchers(HttpMethod.POST, "/v1/orders/*/vnpay")
+                        .hasAnyRole("CUSTOMER", "ADMIN")
 
                         .requestMatchers(HttpMethod.GET, "/v1/orders/my-orders")
-                        .hasAnyRole("CUSTOMER","ADMIN")
+                        .hasAnyRole("CUSTOMER", "ADMIN")
 
                         .requestMatchers(HttpMethod.GET, "/v1/orders/*")
-                        .hasAnyRole("CUSTOMER","ADMIN")
+                        .hasAnyRole("CUSTOMER", "ADMIN")
+
+                        .requestMatchers(HttpMethod.GET, "/v1/orders/shipping-addresses")
+                        .hasAnyRole("CUSTOMER", "ADMIN")
+
+                        .requestMatchers(HttpMethod.GET, "/v1/orders/vnpay/return")
+                        .permitAll()
+
+                        .requestMatchers(HttpMethod.GET, "/v1/orders/vnpay/ipn")
+                        .permitAll()
 
                         .requestMatchers(HttpMethod.PUT, "/v1/orders/*/cancel")
-                        .hasAnyRole("CUSTOMER","ADMIN")
+                        .hasAnyRole("CUSTOMER", "ADMIN")
 
                         .requestMatchers(HttpMethod.GET, "/v1/coupons/my-coupons")
                         .authenticated()

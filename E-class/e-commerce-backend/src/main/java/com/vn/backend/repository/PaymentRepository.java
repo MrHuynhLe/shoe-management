@@ -14,4 +14,9 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     Optional<Payment> findByProviderTxnRef(String providerTxnRef);
 
     boolean existsByProviderTxnRef(String providerTxnRef);
+
+    Optional<Payment> findTopByOrder_IdAndPaymentMethod_CodeOrderByIdDesc(
+            Long orderId,
+            String paymentMethodCode
+    );
 }

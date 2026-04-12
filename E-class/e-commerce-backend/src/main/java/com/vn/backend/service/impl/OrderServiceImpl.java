@@ -75,24 +75,51 @@ public class OrderServiceImpl implements OrderService {
 
         BigDecimal subTotal = BigDecimal.ZERO;
         List<OrderItem> orderItems = new ArrayList<>();
+
         List<Long> requestedVariantIds = request.getItems().stream()
                 .map(OrderItemRequest::getVariantId)
                 .toList();
 
-        Map<Long, ProductVariant> variantsMap = productVariantRepository.findAllById(requestedVariantIds)
+        Map<Long, Integer> requestedQuantityByVariantId = new HashMap<>();
+        for (OrderItemRequest itemRequest : request.getItems()) {
+            requestedQuantityByVariantId.merge(
+                    itemRequest.getVariantId(),
+                    itemRequest.getQuantity(),
+                    Integer::sum
+            );
+        }
+
+        Map<Long, ProductVariant> variantsMap = productVariantRepository.findAllById(requestedQuantityByVariantId.keySet())
                 .stream()
                 .collect(Collectors.toMap(ProductVariant::getId, variant -> variant));
 
-        for (OrderItemRequest itemRequest : request.getItems()) {
-            ProductVariant variant = variantsMap.get(itemRequest.getVariantId());
+        for (Map.Entry<Long, Integer> entry : requestedQuantityByVariantId.entrySet()) {
+            Long variantId = entry.getKey();
+            Integer requestedQuantity = entry.getValue();
+
+            ProductVariant variant = variantsMap.get(variantId);
             if (variant == null) {
-                throw new ResourceNotFoundException("Product variant not found with id: " + itemRequest.getVariantId());
-            }
-            if (variant.getStockQuantity() < itemRequest.getQuantity()) {
-                throw new InvalidRequestException("Not enough stock for product: " + variant.getProduct().getName());
+                throw new ResourceNotFoundException("Product variant not found with id: " + variantId);
             }
 
-            BigDecimal itemSubTotal = variant.getSellingPrice().multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
+            if (variant.getStockQuantity() == null || variant.getStockQuantity() < requestedQuantity) {
+                throw new InvalidRequestException(
+                        "Không đủ tồn kho cho sản phẩm: "
+                                + variant.getProduct().getName()
+                                + " - "
+                                + variant.getCode()
+                );
+            }
+
+            variant.setStockQuantity(variant.getStockQuantity() - requestedQuantity);
+            productVariantRepository.save(variant);
+        }
+
+        for (OrderItemRequest itemRequest : request.getItems()) {
+            ProductVariant variant = variantsMap.get(itemRequest.getVariantId());
+
+            BigDecimal itemSubTotal = variant.getSellingPrice()
+                    .multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
             subTotal = subTotal.add(itemSubTotal);
 
             OrderItem orderItem = OrderItem.builder()
@@ -101,6 +128,7 @@ public class OrderServiceImpl implements OrderService {
                     .costPriceAtPurchase(variant.getCostPrice())
                     .priceAtPurchase(variant.getSellingPrice())
                     .build();
+
             orderItems.add(orderItem);
         }
 
@@ -178,7 +206,14 @@ public class OrderServiceImpl implements OrderService {
 
         saveOrderStatusHistory(savedOrder, null, ORDER_STATUS_PENDING);
 
-        if (appliedPromotion != null || appliedCoupon != null) {
+        PaymentMethod paymentMethod = paymentMethodRepository.findByCode(request.getPaymentMethodCode())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Phương thức thanh toán không hợp lệ: " + request.getPaymentMethodCode()
+                ));
+
+        boolean isVnpayPayment = "VNPAY".equalsIgnoreCase(paymentMethod.getCode());
+
+        if (!isVnpayPayment && (appliedPromotion != null || appliedCoupon != null)) {
             CouponUsage usage = CouponUsage.builder()
                     .order(savedOrder)
                     .customer(customer)
@@ -188,16 +223,14 @@ public class OrderServiceImpl implements OrderService {
             couponUsageRepository.save(usage);
         }
 
-        PaymentMethod paymentMethod = paymentMethodRepository.findByCode(request.getPaymentMethodCode())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Phương thức thanh toán không hợp lệ: " + request.getPaymentMethodCode()
-                ));
-
         Payment payment = Payment.builder()
                 .order(savedOrder)
                 .paymentMethod(paymentMethod)
                 .amount(savedOrder.getTotalAmount())
                 .status("PENDING")
+                .note(isVnpayPayment
+                        ? "Chờ thanh toán VNPAY cho đơn online"
+                        : "Thanh toán khi nhận hàng (COD)")
                 .build();
 
         paymentRepository.save(payment);
@@ -336,7 +369,8 @@ public class OrderServiceImpl implements OrderService {
             throw new InvalidRequestException("Không thể cập nhật trạng thái từ đơn hàng đã kết thúc.");
         }
 
-        if (ORDER_STATUS_SHIPPING.equals(normalizedStatus)) {
+        if (ORDER_STATUS_SHIPPING.equals(normalizedStatus)
+                && !ORDER_TYPE_ONLINE.equalsIgnoreCase(order.getOrderType())) {
             for (OrderItem item : order.getItems()) {
                 ProductVariant variant = item.getProductVariant();
                 if (variant.getStockQuantity() < item.getQuantity()) {
@@ -377,6 +411,11 @@ public class OrderServiceImpl implements OrderService {
         }
 
         String previousStatus = order.getStatus();
+
+        if (ORDER_TYPE_ONLINE.equalsIgnoreCase(order.getOrderType())) {
+            restoreStockForOrder(order);
+        }
+
         order.setStatus(ORDER_STATUS_CANCELLED);
 
         couponUsageRepository.deleteByOrder_Id(order.getId());
@@ -466,6 +505,24 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal discountAmount = defaultZero(order.getDiscountAmount());
         BigDecimal discountPercent = calculateDiscountPercent(subtotalAmount, discountAmount);
 
+        Payment latestPayment = paymentRepository.findByOrder_Id(order.getId())
+                .stream()
+                .max(Comparator.comparing(Payment::getId))
+                .orElse(null);
+
+        String paymentStatus = latestPayment != null ? latestPayment.getStatus() : null;
+        String paymentMethodCode = latestPayment != null && latestPayment.getPaymentMethod() != null
+                ? latestPayment.getPaymentMethod().getCode()
+                : null;
+        String paymentMethodName = latestPayment != null && latestPayment.getPaymentMethod() != null
+                ? latestPayment.getPaymentMethod().getName()
+                : null;
+
+        boolean canRetryVnpay = ORDER_TYPE_ONLINE.equalsIgnoreCase(order.getOrderType())
+                && ORDER_STATUS_PENDING.equalsIgnoreCase(order.getStatus())
+                && "VNPAY".equalsIgnoreCase(paymentMethodCode)
+                && (paymentStatus == null || !"PAID".equalsIgnoreCase(paymentStatus));
+
         return OrderResponse.builder()
                 .id(order.getId())
                 .code(order.getCode())
@@ -488,6 +545,10 @@ public class OrderServiceImpl implements OrderService {
                 .orderType(order.getOrderType())
                 .employeeId(employeeId)
                 .employeeName(employeeName)
+                .paymentStatus(paymentStatus)
+                .paymentMethodCode(paymentMethodCode)
+                .paymentMethodName(paymentMethodName)
+                .canRetryVnpay(canRetryVnpay)
                 .build();
     }
 
@@ -551,6 +612,23 @@ public class OrderServiceImpl implements OrderService {
 
     private BigDecimal defaultZero(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private void restoreStockForOrder(Order order) {
+        if (order == null || order.getItems() == null) {
+            return;
+        }
+
+        for (OrderItem item : order.getItems()) {
+            ProductVariant variant = item.getProductVariant();
+            if (variant == null) {
+                continue;
+            }
+
+            int currentStock = variant.getStockQuantity() == null ? 0 : variant.getStockQuantity();
+            variant.setStockQuantity(currentStock + item.getQuantity());
+            productVariantRepository.save(variant);
+        }
     }
 
     private Customer resolveCustomer(Long userId) {

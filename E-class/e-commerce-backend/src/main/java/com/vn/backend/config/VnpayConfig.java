@@ -22,4 +22,10 @@ public class VnpayConfig {
 
     @Value("${vnpay.ipn-url}")
     private String ipnUrl;
+
+    @Value("${vnpay.pos-return-url:${vnpay.return-url}}")
+    private String posReturnUrl;
+
+    @Value("${vnpay.online-return-url:${vnpay.return-url}}")
+    private String onlineReturnUrl;
 }

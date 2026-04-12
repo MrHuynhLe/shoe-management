@@ -4,8 +4,12 @@ import com.vn.backend.dto.request.PlaceOrderRequest;
 import com.vn.backend.dto.response.OrderDetailResponse;
 import com.vn.backend.dto.response.OrderResponse;
 import com.vn.backend.dto.response.OrderShippingAddressResponse;
+import com.vn.backend.dto.response.pos.PosVnpayCreateResponse;
+import com.vn.backend.dto.response.pos.PosVnpayReturnResponse;
 import com.vn.backend.security.CustomUserDetails;
 import com.vn.backend.service.OrderService;
+import com.vn.backend.service.VnpayService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -16,6 +20,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/v1/orders")
@@ -24,10 +29,36 @@ import java.util.List;
 public class OrderController {
 
     private final OrderService orderService;
+    private final VnpayService vnpayService;
 
     @PostMapping
     public ResponseEntity<OrderResponse> placeOrder(@Valid @RequestBody PlaceOrderRequest request, @AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.status(HttpStatus.CREATED).body(orderService.placeOrder(userDetails.getUserId(), request));
+    }
+
+    @PostMapping("/{orderId}/vnpay")
+    public ResponseEntity<PosVnpayCreateResponse> createOnlineVnpayPayment(
+            @PathVariable Long orderId,
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.ok(
+                vnpayService.createOnlinePaymentUrl(orderId, userDetails.getUserId(), request)
+        );
+    }
+
+    @GetMapping("/vnpay/return")
+    public ResponseEntity<PosVnpayReturnResponse> onlineVnpayReturn(
+            @RequestParam Map<String, String> params
+    ) {
+        return ResponseEntity.ok(vnpayService.handleOnlineReturn(params));
+    }
+
+    @GetMapping("/vnpay/ipn")
+    public ResponseEntity<String> onlineVnpayIpn(
+            @RequestParam Map<String, String> params
+    ) {
+        return ResponseEntity.ok(vnpayService.handleOnlineIpn(params));
     }
 
     @GetMapping("/my-orders")
@@ -40,9 +71,11 @@ public class OrderController {
     @GetMapping("/{id}")
     public ResponseEntity<OrderDetailResponse> getOrderDetails(
             @PathVariable Long id,
-            @AuthenticationPrincipal CustomUserDetails userDetails) {
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
         return ResponseEntity.ok(orderService.getOrderDetailsById(id, userDetails.getUserId()));
     }
+
     @GetMapping
     public ResponseEntity<Page<OrderResponse>> getAllOrders(Pageable pageable) {
         return ResponseEntity.ok(orderService.getAllOrders(pageable));
