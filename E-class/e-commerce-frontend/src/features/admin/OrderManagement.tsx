@@ -101,8 +101,67 @@ const OrderManagementPage = () => {
     }
   };
 
+  const normalizeStatus = (status?: string) => {
+    const raw = String(status ?? '').trim().toUpperCase();
+
+    if (['DRAFT'].includes(raw)) return 'DRAFT';
+    if (['PENDING', 'WAITING_CONFIRM'].includes(raw)) return 'PENDING';
+    if (['CONFIRMED', 'PROCESSING'].includes(raw)) return 'CONFIRMED';
+    if (['SHIPPING', 'DELIVERING'].includes(raw)) return 'SHIPPING';
+    if (['COMPLETED', 'DONE', 'DELIVERED', 'SUCCESS'].includes(raw)) return 'COMPLETED';
+    if (['CANCELLED', 'CANCELED'].includes(raw)) return 'CANCELLED';
+
+    return raw;
+  };
+
+  const normalizeOrderType = (order: Order): 'POS' | 'ONLINE' => {
+    const raw = String(order.orderType ?? '').trim().toUpperCase();
+
+    if (['POS', 'OFFLINE', 'COUNTER', 'AT_COUNTER'].includes(raw)) {
+      return 'POS';
+    }
+
+    if (['ONLINE', 'DELIVERY', 'WEB', 'ECOMMERCE'].includes(raw)) {
+      return 'ONLINE';
+    }
+
+    const hasShippingAddress = Boolean(
+      order.fullAddress ||
+      order.address ||
+      order.province ||
+      order.district ||
+      order.ward
+    );
+
+    if (hasShippingAddress) {
+      return 'ONLINE';
+    }
+
+    return 'POS';
+  };
+
+  const getDisplayAddress = (order: Order) => {
+    if (normalizeOrderType(order) === 'POS') {
+      return 'Bán tại quầy';
+    }
+
+    if (order.fullAddress) {
+      return order.fullAddress;
+    }
+
+    const parts = [order.address, order.ward, order.district, order.province]
+      .filter(Boolean)
+      .map((item) => String(item).trim());
+
+    if (parts.length > 0) {
+      return parts.join(', ');
+    }
+
+    return 'Chưa có địa chỉ';
+  };
+
   const getStatusTag = (status: string) => {
-    switch (status) {
+    switch (normalizeStatus(status)) {
       case 'DRAFT':
         return <Tag color="default">Nháp</Tag>;
       case 'PENDING':
@@ -120,14 +179,16 @@ const OrderManagementPage = () => {
     }
   };
 
-  const getOrderTypeTag = (orderType?: string | null) => {
-    switch (orderType) {
+  const getOrderTypeTag = (order: Order) => {
+    const type = normalizeOrderType(order);
+
+    switch (type) {
       case 'POS':
         return <Tag color="blue">Tại quầy</Tag>;
       case 'ONLINE':
         return <Tag color="geekblue">Online</Tag>;
       default:
-        return <Tag>Không xác định</Tag>;
+        return <Tag color="geekblue">Online</Tag>;
     }
   };
 
@@ -135,6 +196,8 @@ const OrderManagementPage = () => {
 
   const baseFilteredOrders = useMemo(() => {
     return allOrders.filter((order) => {
+      const displayAddress = getDisplayAddress(order);
+
       const matchesKeyword =
         !normalizedKeyword ||
         [
@@ -144,11 +207,18 @@ const OrderManagementPage = () => {
           order.phone,
           order.fullAddress,
           order.address,
+          order.province,
+          order.district,
+          order.ward,
+          displayAddress,
+          normalizeOrderType(order) === 'POS' ? 'bán tại quầy' : 'online',
+          normalizeOrderType(order) === 'POS' ? 'tại quầy' : 'bán online',
         ]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(normalizedKeyword));
 
-      const matchesOrderType = !orderTypeFilter || order.orderType === orderTypeFilter;
+      const matchesOrderType =
+        !orderTypeFilter || normalizeOrderType(order) === orderTypeFilter;
 
       const matchesDateRange = (() => {
         if (!dateRange || !dateRange[0] || !dateRange[1] || !order.createdAt) {
@@ -201,15 +271,17 @@ const OrderManagementPage = () => {
       key: 'fullAddress',
       width: 320,
       render: (_, record) => {
-        if (record.orderType === 'POS') {
-          return <Text type="secondary">Bán tại quầy</Text>;
+        const displayAddress = getDisplayAddress(record);
+
+        if (displayAddress === 'Bán tại quầy') {
+          return <Text type="secondary">{displayAddress}</Text>;
         }
 
-        return record.fullAddress ? (
-          <Text>{record.fullAddress}</Text>
-        ) : (
-          <Text type="secondary">Chưa có địa chỉ</Text>
-        );
+        if (displayAddress === 'Chưa có địa chỉ') {
+          return <Text type="secondary">{displayAddress}</Text>;
+        }
+
+        return <Text>{displayAddress}</Text>;
       },
     },
     {
@@ -256,7 +328,7 @@ const OrderManagementPage = () => {
       dataIndex: 'orderType',
       key: 'orderType',
       width: 120,
-      render: (_, record) => getOrderTypeTag(record.orderType),
+      render: (_, record) => getOrderTypeTag(record),
     },
     {
       title: 'Thao tác',
@@ -278,7 +350,7 @@ const OrderManagementPage = () => {
           />
         </Tooltip>,
 
-        record.status === 'PENDING' && (
+        normalizeStatus(record.status) === 'PENDING' && (
           <Popconfirm
             key="confirm"
             title="Xác nhận đơn hàng này?"
@@ -293,7 +365,7 @@ const OrderManagementPage = () => {
           </Popconfirm>
         ),
 
-        record.status === 'CONFIRMED' && (
+        normalizeStatus(record.status) === 'CONFIRMED' && (
           <Popconfirm
             key="ship"
             title="Xác nhận giao hàng?"
@@ -308,7 +380,7 @@ const OrderManagementPage = () => {
           </Popconfirm>
         ),
 
-        record.status === 'SHIPPING' && (
+        normalizeStatus(record.status) === 'SHIPPING' && (
           <Popconfirm
             key="complete"
             title="Hoàn thành đơn hàng?"
@@ -346,31 +418,47 @@ const OrderManagementPage = () => {
     );
   };
 
+  const pendingOrders = baseFilteredOrders.filter(
+    (o) => normalizeStatus(o.status) === 'PENDING'
+  );
+  const confirmedOrders = baseFilteredOrders.filter(
+    (o) => normalizeStatus(o.status) === 'CONFIRMED'
+  );
+  const shippingOrders = baseFilteredOrders.filter(
+    (o) => normalizeStatus(o.status) === 'SHIPPING'
+  );
+  const completedOrders = baseFilteredOrders.filter(
+    (o) => normalizeStatus(o.status) === 'COMPLETED'
+  );
+  const cancelledOrders = baseFilteredOrders.filter(
+    (o) => normalizeStatus(o.status) === 'CANCELLED'
+  );
+
   const tabItems = [
     {
       key: 'PENDING',
-      label: `Chờ xác nhận (${baseFilteredOrders.filter((o) => o.status === 'PENDING').length})`,
-      children: renderOrderTable(baseFilteredOrders.filter((o) => o.status === 'PENDING')),
+      label: `Chờ xác nhận (${pendingOrders.length})`,
+      children: renderOrderTable(pendingOrders),
     },
     {
       key: 'CONFIRMED',
-      label: `Đã xác nhận (${baseFilteredOrders.filter((o) => o.status === 'CONFIRMED').length})`,
-      children: renderOrderTable(baseFilteredOrders.filter((o) => o.status === 'CONFIRMED')),
+      label: `Đã xác nhận (${confirmedOrders.length})`,
+      children: renderOrderTable(confirmedOrders),
     },
     {
       key: 'SHIPPING',
-      label: `Đang giao (${baseFilteredOrders.filter((o) => o.status === 'SHIPPING').length})`,
-      children: renderOrderTable(baseFilteredOrders.filter((o) => o.status === 'SHIPPING')),
+      label: `Đang giao (${shippingOrders.length})`,
+      children: renderOrderTable(shippingOrders),
     },
     {
       key: 'COMPLETED',
-      label: `Hoàn thành (${baseFilteredOrders.filter((o) => o.status === 'COMPLETED').length})`,
-      children: renderOrderTable(baseFilteredOrders.filter((o) => o.status === 'COMPLETED')),
+      label: `Hoàn thành (${completedOrders.length})`,
+      children: renderOrderTable(completedOrders),
     },
     {
       key: 'CANCELLED',
-      label: `Đã hủy (${baseFilteredOrders.filter((o) => o.status === 'CANCELLED').length})`,
-      children: renderOrderTable(baseFilteredOrders.filter((o) => o.status === 'CANCELLED')),
+      label: `Đã hủy (${cancelledOrders.length})`,
+      children: renderOrderTable(cancelledOrders),
     },
   ];
 
