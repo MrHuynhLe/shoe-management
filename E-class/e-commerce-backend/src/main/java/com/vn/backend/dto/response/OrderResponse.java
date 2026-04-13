@@ -32,5 +32,10 @@ public class OrderResponse {
     private String fullAddress;
     private String orderType; 
     private Long employeeId; 
-    private String employeeName; 
+    private String employeeName;
+
+    private String paymentStatus;
+    private String paymentMethodCode;
+    private String paymentMethodName;
+    private Boolean canRetryVnpay;
 }

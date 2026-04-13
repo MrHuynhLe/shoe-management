@@ -38,8 +38,7 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
 
-                        .requestMatchers("/v1/auth/**", "/uploads/**", "/image/**").permitAll()
-
+                        .requestMatchers("/v1/auth/**", "/uploads/**", "/image/**", "/v1/chatbot/**").permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/v1/products/**",
                                 "/v1/brands/**",
@@ -58,16 +57,34 @@ public class SecurityConfig {
                         .hasAnyRole("CUSTOMER","ADMIN")
 
                         .requestMatchers(HttpMethod.POST, "/v1/orders")
-                        .hasAnyRole("CUSTOMER","ADMIN")
+                        .hasAnyRole("CUSTOMER", "ADMIN")
+
+                        .requestMatchers(HttpMethod.POST, "/v1/orders/*/vnpay")
+                        .hasAnyRole("CUSTOMER", "ADMIN")
 
                         .requestMatchers(HttpMethod.GET, "/v1/orders/my-orders")
-                        .hasAnyRole("CUSTOMER","ADMIN")
+                        .hasAnyRole("CUSTOMER", "ADMIN")
 
                         .requestMatchers(HttpMethod.GET, "/v1/orders/*")
-                        .hasAnyRole("CUSTOMER","ADMIN")
+                        .hasAnyRole("CUSTOMER", "ADMIN")
+
+                        .requestMatchers(HttpMethod.GET, "/v1/orders/shipping-addresses")
+                        .hasAnyRole("CUSTOMER", "ADMIN")
+
+                        .requestMatchers(HttpMethod.GET, "/v1/orders/vnpay/return")
+                        .permitAll()
+
+                        .requestMatchers(HttpMethod.GET, "/v1/orders/vnpay/ipn")
+                        .permitAll()
 
                         .requestMatchers(HttpMethod.PUT, "/v1/orders/*/cancel")
-                        .hasAnyRole("CUSTOMER","ADMIN")
+                        .hasAnyRole("CUSTOMER", "ADMIN")
+
+                        .requestMatchers(HttpMethod.POST, "/v1/orders/*/return-request")
+                        .hasAnyRole("CUSTOMER", "ADMIN")
+
+                        .requestMatchers(HttpMethod.PATCH, "/v1/orders/*/return-review")
+                        .hasRole("ADMIN")
 
                         .requestMatchers(HttpMethod.GET, "/v1/coupons/my-coupons")
                         .authenticated()

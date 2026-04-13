@@ -1,19 +1,17 @@
 package com.vn.backend.repository;
 
 import com.vn.backend.entity.ProductVariant;
-import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface ProductVariantRepository extends JpaRepository<ProductVariant, Long> {
-
 
     @Query("""
         SELECT DISTINCT pv
@@ -29,7 +27,6 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
         ORDER BY p.name ASC, pv.code ASC
     """)
     List<ProductVariant> findAllActiveWithAttributes();
-
 
     @Query("""
         SELECT DISTINCT pv
@@ -62,7 +59,6 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     """)
     Optional<ProductVariant> findActiveById(@Param("id") Long id);
 
-
     @Query("""
         SELECT DISTINCT pv
         FROM ProductVariant pv
@@ -84,12 +80,17 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     """)
     List<ProductVariant> searchForPos(@Param("keyword") String keyword);
 
-
     @Query(
             value = "SELECT * FROM product_variants WHERE id = :id FOR UPDATE",
             nativeQuery = true
     )
     Optional<ProductVariant> findByIdForUpdate(@Param("id") Long id);
+
+    @Query(
+            value = "SELECT * FROM product_variants WHERE id IN (:ids) ORDER BY id FOR UPDATE",
+            nativeQuery = true
+    )
+    List<ProductVariant> findAllByIdInForUpdate(@Param("ids") Collection<Long> ids);
 
     boolean existsByCodeAndDeletedAtIsNull(String code);
 

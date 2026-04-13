@@ -31,6 +31,9 @@ interface CartItem {
   productId: number;
   image: string;
   name: string;
+  size?: string | null;
+  color?: string | null;
+  variantCode?: string | null;
   price: number;
   quantity: number;
   total: number;
@@ -67,6 +70,8 @@ const CartPage = () => {
           ? `http://localhost:8080/api${item.imageUrl}`
           : "https://via.placeholder.com/80",
         name: `${item.productName} - ${item.variantCode}`,
+        size: item.size,
+        color: item.color,
         price: item.price,
         quantity: item.quantity,
         total: item.subTotal,
@@ -115,13 +120,21 @@ const CartPage = () => {
   useEffect(() => {
     if (activeTab === "cart") {
       fetchCart();
-    } else if (['pending', 'shipping', 'completed', 'cancelled'].includes(activeTab) && !ordersFetched) { 
+    } else if (
+      ["pending", "confirmed", "shipping", "completed", "cancelled"].includes(
+        activeTab,
+      ) &&
+      !ordersFetched
+    ) {
       fetchOrders();
       setOrdersFetched(true);
     }
-  }, [activeTab]); 
+  }, [activeTab]);
 
-  const handleQuantityChange = async (cartItemId: number, quantity: number | null) => {
+  const handleQuantityChange = async (
+    cartItemId: number,
+    quantity: number | null,
+  ) => {
     if (quantity === null || quantity < 1) return;
     try {
       await cartService.updateItemQuantity(cartItemId, quantity);
@@ -168,9 +181,31 @@ const CartPage = () => {
       dataIndex: "name",
       key: "name",
       render: (_: any, record: CartItem) => (
-        <Space>
+        <Space align="start">
           <Image width={80} src={record.image} preview={false} />
-          <Text strong>{record.name}</Text>
+          <Space direction="vertical" size={4}>
+            <Text strong>{record.name}</Text>
+
+            <Space size={[8, 4]} wrap>
+              {record.size && (
+                <Text type="secondary">
+                  Size: <Text strong>{record.size}</Text>
+                </Text>
+              )}
+
+              {record.color && (
+                <Text type="secondary">
+                  Màu: <Text strong>{record.color}</Text>
+                </Text>
+              )}
+            </Space>
+
+            {record.variantCode && (
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Mã SP: {record.variantCode}
+              </Text>
+            )}
+          </Space>
         </Space>
       ),
     },
@@ -188,11 +223,10 @@ const CartPage = () => {
         <InputNumber
           min={1}
           value={quantity}
-          
-          onChange={
-            (value) => {
-              console.log("record:", record);
-  handleQuantityChange(record.id, value)}}
+          onChange={(value) => {
+            console.log("record:", record);
+            handleQuantityChange(record.id, value);
+          }}
         />
       ),
     },
@@ -322,6 +356,17 @@ const CartPage = () => {
       children: (
         <MyOrdersPage
           orders={filterOrdersByStatus("PENDING")}
+          loading={loadingOrders}
+          onUpdate={fetchOrders}
+        />
+      ),
+    },
+    {
+      key: "confirmed",
+      label: `Đã xác nhận (${filterOrdersByStatus("CONFIRMED").length})`,
+      children: (
+        <MyOrdersPage
+          orders={filterOrdersByStatus("CONFIRMED")}
           loading={loadingOrders}
           onUpdate={fetchOrders}
         />

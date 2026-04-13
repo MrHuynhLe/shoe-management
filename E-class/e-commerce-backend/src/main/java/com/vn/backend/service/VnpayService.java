@@ -18,4 +18,14 @@ public interface VnpayService {
     PosVnpayReturnResponse handleReturn(Map<String, String> params);
 
     String handleIpn(Map<String, String> params);
+
+    PosVnpayCreateResponse createOnlinePaymentUrl(
+            Long orderId,
+            Long userId,
+            HttpServletRequest httpServletRequest
+    );
+
+    PosVnpayReturnResponse handleOnlineReturn(Map<String, String> params);
+
+    String handleOnlineIpn(Map<String, String> params);
 }
