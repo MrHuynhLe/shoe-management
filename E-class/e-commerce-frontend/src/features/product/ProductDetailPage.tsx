@@ -1,5 +1,5 @@
-import { useEffect, useState, useMemo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useEffect, useState, useMemo } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   Row,
   Col,
@@ -20,14 +20,16 @@ import {
   List,
   Avatar,
   Collapse,
-} from 'antd';
-import { ShoppingCartOutlined, ArrowLeftOutlined } from '@ant-design/icons';
-import { productService } from '@/services/product.service';
-import { cartService } from '@/services/cart.service';
-import { useAuth } from '@/services/AuthContext';
-import { ProductDetail, Variant } from '../admin/VariantDetailModal';
-import { PageResponse, ProductList } from './product.model';
-import { resolveImageUrl } from '@/utils/utils';
+  message,
+  Modal,
+} from "antd";
+import { ShoppingCartOutlined, ArrowLeftOutlined } from "@ant-design/icons";
+import { productService } from "@/services/product.service";
+import { cartService } from "@/services/cart.service";
+import { useAuth } from "@/services/AuthContext";
+import { ProductDetail, Variant } from "../admin/VariantDetailModal";
+import { PageResponse, ProductList } from "./product.model";
+import { resolveImageUrl } from "@/utils/utils";
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -46,7 +48,7 @@ const getProductImage = (product: any) => {
     product?.images?.[0]?.imageUrl ||
     product?.images?.[0]?.image_url ||
     product?.images?.[0] ||
-    ''
+    ""
   );
 };
 
@@ -57,7 +59,7 @@ const ProductDetailPage = () => {
 
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<string>('');
+  const [selectedImage, setSelectedImage] = useState<string>("");
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
@@ -81,47 +83,65 @@ const ProductDetailPage = () => {
         }
       })
       .catch((error) => {
-        console.error('Failed to fetch product details:', error);
+        console.error("Failed to fetch product details:", error);
         notification.error({
-          message: 'Lỗi',
-          description: 'Không thể tải thông tin sản phẩm. Có thể sản phẩm không tồn tại.',
+          message: "Lỗi",
+          description:
+            "Không thể tải thông tin sản phẩm. Có thể sản phẩm không tồn tại.",
         });
-        navigate('/products', { replace: true });
+        navigate("/products", { replace: true });
       })
       .finally(() => setLoading(false));
   }, [id, navigate]);
 
-  const { allSizes, allColors, variantsBySize, variantsByColor } = useMemo(() => {
-    if (!product) {
-      return {
-        allSizes: [],
-        allColors: [],
-        variantsBySize: {} as Record<string, Variant[]>,
-        variantsByColor: {} as Record<string, Variant[]>,
-      };
-    }
+  const { allSizes, allColors, variantsBySize, variantsByColor } =
+    useMemo(() => {
+      if (!product) {
+        return {
+          allSizes: [],
+          allColors: [],
+          variantsBySize: {} as Record<string, Variant[]>,
+          variantsByColor: {} as Record<string, Variant[]>,
+        };
+      }
 
-    const allSizes = [...new Set(product.variants.map((v) => v.attributes.SIZE))];
-    const allColors = [...new Set(product.variants.map((v) => v.attributes.COLOR))];
+      const allSizes = [
+        ...new Set(product.variants.map((v) => v.attributes.SIZE)),
+      ];
+      const allColors = [
+        ...new Set(product.variants.map((v) => v.attributes.COLOR)),
+      ];
 
-    const variantsByColor = allColors.reduce((acc, color) => {
-      acc[color] = product.variants.filter((v) => v.attributes.COLOR === color);
-      return acc;
-    }, {} as Record<string, Variant[]>);
+      const variantsByColor = allColors.reduce(
+        (acc, color) => {
+          acc[color] = product.variants.filter(
+            (v) => v.attributes.COLOR === color,
+          );
+          return acc;
+        },
+        {} as Record<string, Variant[]>,
+      );
 
-    const variantsBySize = allSizes.reduce((acc, size) => {
-      acc[size] = product.variants.filter((v) => v.attributes.SIZE === size);
-      return acc;
-    }, {} as Record<string, Variant[]>);
+      const variantsBySize = allSizes.reduce(
+        (acc, size) => {
+          acc[size] = product.variants.filter(
+            (v) => v.attributes.SIZE === size,
+          );
+          return acc;
+        },
+        {} as Record<string, Variant[]>,
+      );
 
-    return { allSizes, allColors, variantsBySize, variantsByColor };
-  }, [product]);
+      return { allSizes, allColors, variantsBySize, variantsByColor };
+    }, [product]);
 
   const selectedVariant = useMemo(() => {
     if (!product || !selectedSize || !selectedColor) return null;
     return (
       product.variants.find(
-        (v) => v.attributes.SIZE === selectedSize && v.attributes.COLOR === selectedColor
+        (v) =>
+          v.attributes.SIZE === selectedSize &&
+          v.attributes.COLOR === selectedColor,
       ) || null
     );
   }, [product, selectedSize, selectedColor]);
@@ -136,7 +156,7 @@ const ProductDetailPage = () => {
 
     if (selectedColor) {
       const variantsOfColor = product.variants.filter(
-        (v) => v.attributes.COLOR === selectedColor
+        (v) => v.attributes.COLOR === selectedColor,
       );
       const colorImages = variantsOfColor.flatMap((v) => v.images || []);
       if (colorImages.length > 0) {
@@ -162,7 +182,7 @@ const ProductDetailPage = () => {
       newImageList = selectedVariant.images;
     } else if (selectedColor) {
       const variantsOfColor = product.variants.filter(
-        (v) => v.attributes.COLOR === selectedColor
+        (v) => v.attributes.COLOR === selectedColor,
       );
       newImageList = variantsOfColor.flatMap((v) => v.images || []);
     }
@@ -175,11 +195,15 @@ const ProductDetailPage = () => {
   }, [product, selectedColor, selectedVariant]);
 
   const availableSizesForSelectedColor = selectedColor
-    ? variantsByColor[selectedColor]?.filter((v) => v.stockQuantity > 0).map((v) => v.attributes.SIZE)
+    ? variantsByColor[selectedColor]
+        ?.filter((v) => v.stockQuantity > 0)
+        .map((v) => v.attributes.SIZE)
     : allSizes;
 
   const availableColorsForSelectedSize = selectedSize
-    ? variantsBySize[selectedSize]?.filter((v) => v.stockQuantity > 0).map((v) => v.attributes.COLOR)
+    ? variantsBySize[selectedSize]
+        ?.filter((v) => v.stockQuantity > 0)
+        .map((v) => v.attributes.COLOR)
     : allColors;
 
   const isSizeDisabled = (size: string) => {
@@ -187,7 +211,10 @@ const ProductDetailPage = () => {
       return true;
     }
     const variantsForThisSize = variantsBySize[size];
-    if (!variantsForThisSize || variantsForThisSize.every((v) => v.stockQuantity === 0)) {
+    if (
+      !variantsForThisSize ||
+      variantsForThisSize.every((v) => v.stockQuantity === 0)
+    ) {
       return true;
     }
     return false;
@@ -198,14 +225,17 @@ const ProductDetailPage = () => {
       return true;
     }
     const variantsForThisColor = variantsByColor[color];
-    if (!variantsForThisColor || variantsForThisColor.every((v) => v.stockQuantity === 0)) {
+    if (
+      !variantsForThisColor ||
+      variantsForThisColor.every((v) => v.stockQuantity === 0)
+    ) {
       return true;
     }
     return false;
   };
 
-  const handleSelectAttribute = (type: 'size' | 'color', value: string) => {
-    if (type === 'size') {
+  const handleSelectAttribute = (type: "size" | "color", value: string) => {
+    if (type === "size") {
       setSelectedSize((prev) => (prev === value ? null : value));
     } else {
       setSelectedColor((prev) => (prev === value ? null : value));
@@ -214,60 +244,64 @@ const ProductDetailPage = () => {
   };
 
   const handleAddToCart = async () => {
-    if (!isAuthenticated) {
-      notification.warning({
-        message: 'Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng!',
-      });
-      navigate('/account');
-      return;
-    }
-
     if (!selectedVariant) {
-      notification.warning({
-        message: 'Chưa chọn phiên bản',
-        description: 'Vui lòng chọn đầy đủ Size và Màu sắc.',
-      });
+      message.warning("Vui lòng chọn size và màu trước khi thêm vào giỏ hàng.");
       return;
     }
 
-    if (selectedVariant.stockQuantity < quantity) {
-      notification.error({
-        message: 'Không đủ hàng',
-        description: `Chỉ còn ${selectedVariant.stockQuantity} sản phẩm trong kho.`,
-      });
+    if (!quantity || quantity <= 0) {
+      message.warning("Số lượng không hợp lệ.");
       return;
     }
 
-    try {
-      await cartService.addToCart({
-        productVariantId: selectedVariant.id,
-        quantity: quantity,
-      });
-
-      notification.success({
-        message: 'Thêm vào giỏ hàng thành công!',
-        description: `${product?.name} - Size: ${selectedSize} - Màu: ${selectedColor} (x${quantity})`,
-      });
-    } catch (error) {
-      console.error('Failed to add to cart:', error);
-      notification.error({
-        message: 'Lỗi',
-        description: 'Thêm vào giỏ hàng thất bại. Vui lòng thử lại.',
-      });
+    if ((selectedVariant.stockQuantity ?? 0) <= 0) {
+      message.error("Sản phẩm này đã hết hàng.");
+      return;
     }
+
+    if (quantity > (selectedVariant.stockQuantity ?? 0)) {
+      message.warning("Số lượng vượt quá tồn kho hiện có.");
+      return;
+    }
+
+    Modal.confirm({
+      title: "Xác nhận thêm vào giỏ hàng?",
+      content: `Bạn có muốn thêm ${quantity} sản phẩm vào giỏ hàng không?`,
+      okText: "Thêm",
+      cancelText: "Hủy",
+      onOk: async () => {
+        try {
+          await cartService.addToCart({
+            productVariantId: selectedVariant.id,
+            quantity,
+          });
+
+          message.success("Đã thêm vào giỏ hàng.");
+        } catch (error: any) {
+          message.error(
+            error?.response?.data?.message ||
+              "Thêm vào giỏ hàng thất bại. Vui lòng thử lại.",
+          );
+        }
+      },
+    });
   };
 
   if (!product) {
-    return <Spin size="large" style={{ display: 'block', margin: '100px auto' }} />;
+    return (
+      <Spin size="large" style={{ display: "block", margin: "100px auto" }} />
+    );
   }
 
   return (
     <Spin spinning={loading} size="large" tip="Đang tải sản phẩm...">
-      <div style={{ opacity: loading ? 0.5 : 1, transition: 'opacity 0.3s ease' }}>
+      <div
+        style={{ opacity: loading ? 0.5 : 1, transition: "opacity 0.3s ease" }}
+      >
         <Button
           icon={<ArrowLeftOutlined />}
-          onClick={() => navigate('/products')}
-          style={{ marginBottom: '24px' }}
+          onClick={() => navigate("/products")}
+          style={{ marginBottom: "24px" }}
         >
           Quay lại
         </Button>
@@ -276,13 +310,13 @@ const ProductDetailPage = () => {
           <Col xs={24} md={12}>
             <div
               style={{
-                border: '1px solid #f0f0f0',
-                borderRadius: '8px',
-                padding: '8px',
-                aspectRatio: '1 / 1',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                border: "1px solid #f0f0f0",
+                borderRadius: "8px",
+                padding: "8px",
+                aspectRatio: "1 / 1",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
               <Image
@@ -291,11 +325,14 @@ const ProductDetailPage = () => {
                 src={selectedImage || NO_IMAGE_PLACEHOLDER}
                 preview={false}
                 fallback={NO_IMAGE_PLACEHOLDER}
-                style={{ objectFit: 'contain' }}
+                style={{ objectFit: "contain" }}
               />
             </div>
 
-            <Row gutter={[10, 10]} style={{ marginTop: 16, maxHeight: '220px', overflowY: 'auto' }}>
+            <Row
+              gutter={[10, 10]}
+              style={{ marginTop: 16, maxHeight: "220px", overflowY: "auto" }}
+            >
               {imageListToDisplay.map((img, index) => {
                 const resolvedImg = resolveImageUrl(img);
 
@@ -303,24 +340,28 @@ const ProductDetailPage = () => {
                   <Col span={4} key={index}>
                     <div
                       style={{
-                        aspectRatio: '1 / 1',
-                        border: selectedImage === resolvedImg ? '2px solid #1677ff' : '2px solid #f0f0f0',
-                        borderRadius: '4px',
-                        padding: '4px',
-                        cursor: 'pointer',
-                        transition: 'transform 0.2s ease, border-color 0.2s ease',
+                        aspectRatio: "1 / 1",
+                        border:
+                          selectedImage === resolvedImg
+                            ? "2px solid #1677ff"
+                            : "2px solid #f0f0f0",
+                        borderRadius: "4px",
+                        padding: "4px",
+                        cursor: "pointer",
+                        transition:
+                          "transform 0.2s ease, border-color 0.2s ease",
                       }}
                       onClick={() => setSelectedImage(resolvedImg)}
                       onMouseOver={(e) => {
-                        e.currentTarget.style.transform = 'scale(1.05)';
+                        e.currentTarget.style.transform = "scale(1.05)";
                         if (selectedImage !== resolvedImg) {
-                          e.currentTarget.style.borderColor = '#91caff';
+                          e.currentTarget.style.borderColor = "#91caff";
                         }
                       }}
                       onMouseOut={(e) => {
-                        e.currentTarget.style.transform = 'scale(1)';
+                        e.currentTarget.style.transform = "scale(1)";
                         if (selectedImage !== resolvedImg) {
-                          e.currentTarget.style.borderColor = '#f0f0f0';
+                          e.currentTarget.style.borderColor = "#f0f0f0";
                         }
                       }}
                     >
@@ -330,7 +371,7 @@ const ProductDetailPage = () => {
                         fallback={NO_IMAGE_PLACEHOLDER}
                         width="100%"
                         height="100%"
-                        style={{ objectFit: 'contain' }}
+                        style={{ objectFit: "contain" }}
                       />
                     </div>
                   </Col>
@@ -340,14 +381,17 @@ const ProductDetailPage = () => {
           </Col>
 
           <Col xs={24} md={12}>
-            <Title level={2} style={{ fontWeight: '700', fontSize: '28px' }}>
+            <Title level={2} style={{ fontWeight: "700", fontSize: "28px" }}>
               {product.name}
             </Title>
 
-            <Title level={3} style={{ color: '#d0021b', marginTop: 0, fontWeight: '600' }}>
+            <Title
+              level={3}
+              style={{ color: "#d0021b", marginTop: 0, fontWeight: "600" }}
+            >
               {selectedVariant
-                ? `${selectedVariant.sellingPrice.toLocaleString('vi-VN')} ₫`
-                : 'Chọn Size và Màu để xem giá'}
+                ? `${selectedVariant.sellingPrice.toLocaleString("vi-VN")} ₫`
+                : "Chọn Size và Màu để xem giá"}
             </Title>
 
             <Space>
@@ -355,8 +399,28 @@ const ProductDetailPage = () => {
               <Tag color="purple">{product.categoryName}</Tag>
             </Space>
 
-            {selectedVariant && <Text>Tồn kho: {selectedVariant.stockQuantity}</Text>}
+            {selectedVariant && (
+              <>
+                <div style={{ marginTop: 8 }}>
+                  <Text>Tồn kho: {selectedVariant.stockQuantity}</Text>
+                </div>
 
+                {selectedVariant.stockQuantity <= 0 && (
+                  <div style={{ color: "red", marginTop: 8 }}>
+                    Sản phẩm hiện đã hết hàng.
+                  </div>
+                )}
+
+                {selectedVariant.stockQuantity > 0 &&
+                  selectedVariant.stockQuantity <= 3 && (
+                    <div style={{ color: "#fa8c16", marginTop: 8 }}>
+                      Sản phẩm sắp hết hàng, vui lòng đặt sớm.
+                    </div>
+                  )}
+              </>
+            )}
+
+            <Divider />
             <Divider />
 
             <div>
@@ -365,8 +429,8 @@ const ProductDetailPage = () => {
                 {allSizes.map((size) => (
                   <Button
                     key={size}
-                    type={selectedSize === size ? 'primary' : 'default'}
-                    onClick={() => handleSelectAttribute('size', size)}
+                    type={selectedSize === size ? "primary" : "default"}
+                    onClick={() => handleSelectAttribute("size", size)}
                     disabled={isSizeDisabled(size)}
                   >
                     {size}
@@ -381,8 +445,8 @@ const ProductDetailPage = () => {
                 {allColors.map((color) => (
                   <Button
                     key={color}
-                    type={selectedColor === color ? 'primary' : 'default'}
-                    onClick={() => handleSelectAttribute('color', color)}
+                    type={selectedColor === color ? "primary" : "default"}
+                    onClick={() => handleSelectAttribute("color", color)}
                     disabled={isColorDisabled(color)}
                   >
                     {color}
@@ -395,20 +459,22 @@ const ProductDetailPage = () => {
 
             <div>
               <Text strong>Mô tả sản phẩm:</Text>
-              <ul style={{ paddingLeft: '20px', marginTop: '8px' }}>
-                {product.description?.split('\n').map((item, index) =>
+              <ul style={{ paddingLeft: "20px", marginTop: "8px" }}>
+                {product.description?.split("\n").map((item, index) =>
                   item.trim() ? (
                     <li key={index}>
-                      <Paragraph style={{ marginBottom: '4px' }}>{item.trim()}</Paragraph>
+                      <Paragraph style={{ marginBottom: "4px" }}>
+                        {item.trim()}
+                      </Paragraph>
                     </li>
-                  ) : null
+                  ) : null,
                 )}
               </ul>
             </div>
 
             <Divider />
 
-            <Space align="center" size="large" style={{ marginBottom: '24px' }}>
+            <Space align="center" size="large" style={{ marginBottom: "24px" }}>
               <InputNumber
                 min={1}
                 max={selectedVariant?.stockQuantity || 1}
@@ -430,7 +496,11 @@ const ProductDetailPage = () => {
 
             <Collapse ghost>
               <Collapse.Panel
-                header={<Title level={4} style={{ fontWeight: '600' }}>Đánh giá sản phẩm</Title>}
+                header={
+                  <Title level={4} style={{ fontWeight: "600" }}>
+                    Đánh giá sản phẩm
+                  </Title>
+                }
                 key="1"
               >
                 <ReviewSection productId={product.id} />
@@ -447,7 +517,11 @@ const ProductDetailPage = () => {
   );
 };
 
-const SuggestedProducts = ({ currentProductId }: { currentProductId: number }) => {
+const SuggestedProducts = ({
+  currentProductId,
+}: {
+  currentProductId: number;
+}) => {
   const [products, setProducts] = useState<PageResponse<ProductList>>();
   const [loading, setLoading] = useState(false);
 
@@ -459,7 +533,9 @@ const SuggestedProducts = ({ currentProductId }: { currentProductId: number }) =
       .then((res) => {
         const filteredProducts = {
           ...res.data,
-          content: res.data.content.filter((p: ProductList) => p.id !== currentProductId),
+          content: res.data.content.filter(
+            (p: ProductList) => p.id !== currentProductId,
+          ),
         };
         setProducts(filteredProducts);
       })
@@ -472,7 +548,7 @@ const SuggestedProducts = ({ currentProductId }: { currentProductId: number }) =
 
   return (
     <div>
-      <Title level={3} style={{ fontWeight: '600' }}>
+      <Title level={3} style={{ fontWeight: "600" }}>
         Có thể bạn cũng thích
       </Title>
 
@@ -482,20 +558,31 @@ const SuggestedProducts = ({ currentProductId }: { currentProductId: number }) =
             <Card
               hoverable
               style={{
-                display: 'flex',
-                flexDirection: 'column',
-                height: '100%',
-                transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                display: "flex",
+                flexDirection: "column",
+                height: "100%",
+                transition: "transform 0.3s ease, box-shadow 0.3s ease",
               }}
-              bodyStyle={{ padding: '16px', flex: '1' }}
+              bodyStyle={{ padding: "16px", flex: "1" }}
               cover={
-                <Link to={`/products/${p.id}`} style={{ display: 'block', aspectRatio: '1 / 1' }}>
+                <Link
+                  to={`/products/${p.id}`}
+                  style={{ display: "block", aspectRatio: "1 / 1" }}
+                >
                   <img
                     alt={p.name}
                     src={resolveImageUrl(getProductImage(p))}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
                     onError={(e) => {
-                      console.error('IMAGE LOAD ERROR:', p.name, getProductImage(p));
+                      console.error(
+                        "IMAGE LOAD ERROR:",
+                        p.name,
+                        getProductImage(p),
+                      );
                       e.currentTarget.onerror = null;
                       e.currentTarget.src = NO_IMAGE_PLACEHOLDER;
                     }}
@@ -510,12 +597,12 @@ const SuggestedProducts = ({ currentProductId }: { currentProductId: number }) =
                   </Link>
                 }
                 description={
-                  <Typography.Text strong style={{ color: '#d0021b' }}>
+                  <Typography.Text strong style={{ color: "#d0021b" }}>
                     {p.minPrice !== null && p.maxPrice !== null
                       ? p.minPrice === p.maxPrice
-                        ? `${p.minPrice.toLocaleString('vi-VN')} ₫`
-                        : `${p.minPrice.toLocaleString('vi-VN')} ₫ - ${p.maxPrice.toLocaleString('vi-VN')} ₫`
-                      : 'Chưa có giá'}
+                        ? `${p.minPrice.toLocaleString("vi-VN")} ₫`
+                        : `${p.minPrice.toLocaleString("vi-VN")} ₫ - ${p.maxPrice.toLocaleString("vi-VN")} ₫`
+                      : "Chưa có giá"}
                   </Typography.Text>
                 }
               />
@@ -540,7 +627,7 @@ const authService = {
   getCurrentUser: () => {
     return {
       isLoggedIn: true,
-      name: 'Nguyễn Văn An',
+      name: "Nguyễn Văn An",
     };
   },
 };
@@ -553,34 +640,34 @@ const reviewService = {
           {
             id: 1,
             productId: 1,
-            reviewerName: 'Nguyễn Văn A',
+            reviewerName: "Nguyễn Văn A",
             rating: 5,
-            comment: 'Sản phẩm rất đẹp và chất lượng, giao hàng nhanh.',
-            date: '2023-10-26',
+            comment: "Sản phẩm rất đẹp và chất lượng, giao hàng nhanh.",
+            date: "2023-10-26",
           },
           {
             id: 2,
             productId: 1,
-            reviewerName: 'Trần Thị B',
+            reviewerName: "Trần Thị B",
             rating: 4,
-            comment: 'Hài lòng với sản phẩm, nhưng giao hàng hơi chậm.',
-            date: '2023-10-25',
+            comment: "Hài lòng với sản phẩm, nhưng giao hàng hơi chậm.",
+            date: "2023-10-25",
           },
           {
             id: 3,
             productId: 1,
-            reviewerName: 'Phạm Văn C',
+            reviewerName: "Phạm Văn C",
             rating: 5,
-            comment: 'Giày đi êm chân, đúng size. Sẽ ủng hộ shop dài dài.',
-            date: '2023-10-24',
+            comment: "Giày đi êm chân, đúng size. Sẽ ủng hộ shop dài dài.",
+            date: "2023-10-24",
           },
           {
             id: 4,
             productId: 2,
-            reviewerName: 'Lê Thị D',
+            reviewerName: "Lê Thị D",
             rating: 3,
-            comment: 'Màu sắc không như mong đợi lắm, nhưng chất lượng ổn.',
-            date: '2023-10-23',
+            comment: "Màu sắc không như mong đợi lắm, nhưng chất lượng ổn.",
+            date: "2023-10-23",
           },
         ];
         resolve({ data: mockReviews.filter((r) => r.productId === productId) });
@@ -588,14 +675,16 @@ const reviewService = {
     });
   },
 
-  submitReview: (review: Omit<Review, 'id' | 'date'>): Promise<{ success: boolean; data: Review }> => {
+  submitReview: (
+    review: Omit<Review, "id" | "date">,
+  ): Promise<{ success: boolean; data: Review }> => {
     return new Promise((resolve) => {
       setTimeout(() => {
-        console.log('Submitting review:', review);
+        console.log("Submitting review:", review);
         const newReview: Review = {
           ...review,
           id: Date.now(),
-          date: new Date().toISOString().split('T')[0],
+          date: new Date().toISOString().split("T")[0],
         };
         resolve({ success: true, data: newReview });
       }, 500);
@@ -618,8 +707,11 @@ const ReviewSection = ({ productId }: { productId: number }) => {
         setReviews(res.data);
       })
       .catch((error) => {
-        console.error('Failed to fetch reviews:', error);
-        notification.error({ message: 'Lỗi', description: 'Không thể tải đánh giá sản phẩm.' });
+        console.error("Failed to fetch reviews:", error);
+        notification.error({
+          message: "Lỗi",
+          description: "Không thể tải đánh giá sản phẩm.",
+        });
       })
       .finally(() => setLoadingReviews(false));
   };
@@ -640,13 +732,19 @@ const ReviewSection = ({ productId }: { productId: number }) => {
     reviewService
       .submitReview(reviewData)
       .then(() => {
-        notification.success({ message: 'Thành công', description: 'Đánh giá của bạn đã được gửi.' });
+        notification.success({
+          message: "Thành công",
+          description: "Đánh giá của bạn đã được gửi.",
+        });
         form.resetFields();
         fetchReviews();
       })
       .catch((error) => {
-        console.error('Failed to submit review:', error);
-        notification.error({ message: 'Lỗi', description: 'Không thể gửi đánh giá.' });
+        console.error("Failed to submit review:", error);
+        notification.error({
+          message: "Lỗi",
+          description: "Không thể gửi đánh giá.",
+        });
       })
       .finally(() => setSubmittingReview(false));
   };
@@ -660,11 +758,19 @@ const ReviewSection = ({ productId }: { productId: number }) => {
           renderItem={(item) => (
             <List.Item>
               <List.Item.Meta
-                avatar={<Avatar src={`https://api.dicebear.com/7.x/miniavs/svg?seed=${item.reviewerName}`} />}
+                avatar={
+                  <Avatar
+                    src={`https://api.dicebear.com/7.x/miniavs/svg?seed=${item.reviewerName}`}
+                  />
+                }
                 title={
                   <Space>
                     {item.reviewerName}
-                    <Rate disabled defaultValue={item.rating} style={{ fontSize: 14 }} />
+                    <Rate
+                      disabled
+                      defaultValue={item.rating}
+                      style={{ fontSize: 14 }}
+                    />
                   </Space>
                 }
                 description={
@@ -685,14 +791,14 @@ const ReviewSection = ({ productId }: { productId: number }) => {
 
       {currentUser.isLoggedIn ? (
         <>
-          <Title level={4} style={{ fontWeight: '600' }}>
+          <Title level={4} style={{ fontWeight: "600" }}>
             Gửi đánh giá của bạn
           </Title>
           <Form form={form} onFinish={onFinishReview} layout="vertical">
             <Form.Item
               name="rating"
               label="Đánh giá sao"
-              rules={[{ required: true, message: 'Vui lòng chọn số sao!' }]}
+              rules={[{ required: true, message: "Vui lòng chọn số sao!" }]}
             >
               <Rate />
             </Form.Item>
@@ -700,13 +806,19 @@ const ReviewSection = ({ productId }: { productId: number }) => {
             <Form.Item
               name="comment"
               label="Bình luận"
-              rules={[{ required: true, message: 'Vui lòng nhập bình luận của bạn!' }]}
+              rules={[
+                { required: true, message: "Vui lòng nhập bình luận của bạn!" },
+              ]}
             >
               <Input.TextArea rows={4} />
             </Form.Item>
 
             <Form.Item>
-              <Button type="primary" htmlType="submit" loading={submittingReview}>
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={submittingReview}
+              >
                 Gửi đánh giá
               </Button>
             </Form.Item>

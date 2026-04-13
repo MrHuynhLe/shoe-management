@@ -1,4 +1,4 @@
-import { axiosClient } from './axiosClient';
+import { axiosClient } from "./axiosClient";
 
 interface ShippingInfo {
   customerName: string;
@@ -38,9 +38,13 @@ export interface OnlineVnpayReturnResponse {
   orderId?: number;
 }
 
+export interface ReturnRequestDTO {
+  reason: string;
+}
+
 export const orderService = {
   placeOrder: (orderData: PlaceOrderDTO) => {
-    return axiosClient.post('/v1/orders', orderData);
+    return axiosClient.post("/v1/orders", orderData);
   },
 
   createOnlineVnpayPayment: (orderId: number) => {
@@ -54,7 +58,7 @@ export const orderService = {
   },
 
   getMyOrders: (params?: any) => {
-    return axiosClient.get('/v1/orders/my-orders', { params });
+    return axiosClient.get("/v1/orders/my-orders", { params });
   },
 
   getOrderDetails: (orderId: number, config?: any) => {
@@ -65,7 +69,11 @@ export const orderService = {
     return axiosClient.put(`/v1/orders/${orderId}/cancel`);
   },
 
+  requestReturn: (orderId: number, payload: ReturnRequestDTO) => {
+    return axiosClient.post(`/v1/orders/${orderId}/return-request`, payload);
+  },
+
   getUserShippingAddresses: () => {
-    return axiosClient.get('/v1/orders/shipping-addresses');
+    return axiosClient.get("/v1/orders/shipping-addresses");
   },
 };

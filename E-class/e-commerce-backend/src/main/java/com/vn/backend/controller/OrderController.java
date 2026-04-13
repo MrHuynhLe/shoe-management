@@ -1,5 +1,7 @@
 package com.vn.backend.controller;
 
+import com.vn.backend.dto.request.OrderReturnRequest;
+import com.vn.backend.dto.request.OrderReturnReviewRequest;
 import com.vn.backend.dto.request.PlaceOrderRequest;
 import com.vn.backend.dto.response.OrderDetailResponse;
 import com.vn.backend.dto.response.OrderResponse;
@@ -32,8 +34,12 @@ public class OrderController {
     private final VnpayService vnpayService;
 
     @PostMapping
-    public ResponseEntity<OrderResponse> placeOrder(@Valid @RequestBody PlaceOrderRequest request, @AuthenticationPrincipal CustomUserDetails userDetails) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(orderService.placeOrder(userDetails.getUserId(), request));
+    public ResponseEntity<OrderResponse> placeOrder(
+            @Valid @RequestBody PlaceOrderRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(orderService.placeOrder(userDetails.getUserId(), request));
     }
 
     @PostMapping("/{orderId}/vnpay")
@@ -64,7 +70,8 @@ public class OrderController {
     @GetMapping("/my-orders")
     public ResponseEntity<Page<OrderResponse>> getMyOrders(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            Pageable pageable) {
+            Pageable pageable
+    ) {
         return ResponseEntity.ok(orderService.getMyOrders(userDetails.getUserId(), pageable));
     }
 
@@ -84,20 +91,43 @@ public class OrderController {
     @PatchMapping("/{id}/status")
     public ResponseEntity<OrderResponse> updateOrderStatus(
             @PathVariable Long id,
-            @RequestParam String status) {
+            @RequestParam String status
+    ) {
         return ResponseEntity.ok(orderService.updateOrderStatus(id, status));
     }
 
     @PutMapping("/{id}/cancel")
     public ResponseEntity<Void> cancelOrder(
             @PathVariable Long id,
-            @AuthenticationPrincipal CustomUserDetails userDetails) {
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
         orderService.cancelOrder(id, userDetails.getUserId());
         return ResponseEntity.ok().build();
     }
 
+    @PostMapping("/{id}/return-request")
+    public ResponseEntity<Void> requestReturn(
+            @PathVariable Long id,
+            @Valid @RequestBody OrderReturnRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        orderService.requestReturn(id, userDetails.getUserId(), request);
+        return ResponseEntity.ok().build();
+    }
+
+    @PatchMapping("/{id}/return-review")
+    public ResponseEntity<Void> reviewReturn(
+            @PathVariable Long id,
+            @Valid @RequestBody OrderReturnReviewRequest request
+    ) {
+        orderService.reviewReturn(id, request);
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/shipping-addresses")
-    public ResponseEntity<List<OrderShippingAddressResponse>> getUserShippingAddresses(@AuthenticationPrincipal CustomUserDetails userDetails) {
+    public ResponseEntity<List<OrderShippingAddressResponse>> getUserShippingAddresses(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
         return ResponseEntity.ok(orderService.getUserShippingAddresses(userDetails.getUserId()));
     }
 }

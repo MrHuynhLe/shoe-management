@@ -133,8 +133,6 @@ const CheckoutPage = () => {
     }
   };
 
- 
-  
   const handleAddressSelect = (address: Address) => {
     form.setFieldsValue({
       customerName: address.fullName,
@@ -217,7 +215,6 @@ const CheckoutPage = () => {
         );
     }
   }, [isAuthenticated, form]);
-
 
   const handleApplyVoucher = async () => {
     if (!voucherCode) {
