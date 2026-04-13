@@ -105,12 +105,12 @@ footer p:hover {
   overflow: hidden;
 }
 
-.ant-pro-table .ant-table-thead > tr > th {
+.ant-pro-table .ant-table-thead>tr>th {
   background: #fcfdff;
   color: #1f2937;
 }
 
-.ant-pro-table .ant-table-tbody > tr > td {
+.ant-pro-table .ant-table-tbody>tr>td {
   background: #ffffff;
 }
 
@@ -171,3 +171,43 @@ footer p:hover {
   color: #1b6eea !important;
 }
 
+.ant-typography,
+.ant-table-cell,
+.ant-card-head-title,
+.ant-tabs-tab-btn,
+.ant-form-item-label>label,
+.ant-select-selection-item,
+.ant-select-item-option-content,
+.ant-btn>span,
+.ant-menu-title-content,
+span,
+p,
+div,
+td,
+th,
+label {
+  cursor: default;
+  caret-color: transparent;
+}
+
+
+input,
+textarea,
+.ant-input,
+.ant-input-affix-wrapper input,
+.ant-picker-input input,
+[contenteditable="true"] {
+  cursor: text !important;
+  caret-color: auto !important;
+}
+
+
+button,
+a,
+.ant-btn,
+.ant-menu-item,
+.ant-menu-submenu-title,
+.ant-pagination-item,
+.ant-tabs-tab {
+  cursor: pointer;
+}
