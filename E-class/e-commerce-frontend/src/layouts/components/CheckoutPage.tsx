@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Row,
   Col,
@@ -19,18 +19,21 @@ import {
   Select,
   Tag,
   Modal,
-  Image,
-  Descriptions,
-} from 'antd';
-import { Popconfirm } from 'antd';
-import { ArrowLeftOutlined, CreditCardOutlined, TruckOutlined, EditOutlined } from '@ant-design/icons';
-import { orderService } from '@/services/order.service';
-import { useAuth } from '@/services/AuthContext';
-import { discountService } from '@/services/discount.service';
-import { userService } from '@/services/userService';
-import { shippingService } from '@/services/shipping.service';
-import { promotionService } from '@/services/promotion.service';
-import { couponService } from '@/services/coupon.service';
+} from "antd";
+import { Popconfirm } from "antd";
+import {
+  ArrowLeftOutlined,
+  CreditCardOutlined,
+  TruckOutlined,
+  EditOutlined,
+} from "@ant-design/icons";
+import { orderService } from "@/services/order.service";
+import { useAuth } from "@/services/AuthContext";
+import { discountService } from "@/services/discount.service";
+import { userService } from "@/services/userService";
+import { shippingService } from "@/services/shipping.service";
+import { promotionService } from "@/services/promotion.service";
+import { couponService } from "@/services/coupon.service";
 
 interface Address {
   fullName: string;
@@ -49,74 +52,69 @@ const CheckoutPage = () => {
   const navigate = useNavigate();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
-  const [voucherCode, setVoucherCode] = useState('');
+  const [voucherCode, setVoucherCode] = useState("");
   const [discount, setDiscount] = useState(0);
   const [appliedVoucher, setAppliedVoucher] = useState<string | null>(null);
   const [appliedVoucherInfo, setAppliedVoucherInfo] = useState<any>(null);
   const [availableVouchers, setAvailableVouchers] = useState<any[]>([]);
   const [shippingFee, setShippingFee] = useState(0);
   const [isEstimatingShipping, setIsEstimatingShipping] = useState(false);
-  const [isBankModalVisible, setIsBankModalVisible] = useState(false);
-  const [pendingOrderData, setPendingOrderData] = useState<any>(null);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [isAddressModalVisible, setIsAddressModalVisible] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
-  const [previewAddress, setPreviewAddress] = useState('');
   const { isAuthenticated } = useAuth();
   const { items, subtotal } = location.state || { items: [], subtotal: 0 };
 
   const total = subtotal + shippingFee - discount;
   const formatMoney = (value?: number | string) =>
-    `${new Intl.NumberFormat('vi-VN').format(Number(value || 0))} ₫`;
+    `${new Intl.NumberFormat("vi-VN").format(Number(value || 0))} ₫`;
 
   const buildVoucherLabel = (v: any) => {
     const discountText =
-      v.discountType === 'PERCENTAGE'
-        ? `Giảm ${v.discountValue}%${v.maxDiscountAmount ? `, tối đa ${formatMoney(v.maxDiscountAmount)}` : ''}`
+      v.discountType === "PERCENTAGE"
+        ? `Giảm ${v.discountValue}%${v.maxDiscountAmount ? `, tối đa ${formatMoney(v.maxDiscountAmount)}` : ""}`
         : `Giảm ${formatMoney(v.discountValue)}`;
 
     const minOrderText =
-      v.minOrderValue != null ? `, đơn tối thiểu ${formatMoney(v.minOrderValue)}` : '';
+      v.minOrderValue != null
+        ? `, đơn tối thiểu ${formatMoney(v.minOrderValue)}`
+        : "";
 
     const remainingText =
       v.remainingUsage != null
         ? `, còn ${v.remainingUsage} lượt`
         : v.usageLimit != null
           ? `, tổng ${v.usageLimit} lượt`
-          : '';
+          : "";
 
     return `${v.code || v.name} - ${discountText}${minOrderText}${remainingText}`;
-  };
-
-  const generateVietQRUrl = (amount: number, note: string) => {
-    const bankId = "VCB";
-    const accountNumber = "1234567890";
-    const accountName = "CONG TY TNHH ABC";
-    const template = "compact2";
-    const encodedNote = encodeURIComponent(note);
-    const encodedAccountName = encodeURIComponent(accountName);
-
-    return `https://img.vietqr.io/image/${bankId}-${accountNumber}-${template}.png?amount=${amount}&addInfo=${encodedNote}&accountName=${encodedAccountName}`;
   };
 
   useEffect(() => {
     const fetchVouchers = async () => {
       try {
-        const promotionsRes = await promotionService.getPublicPromotions({ page: 0, size: 50 });
+        const promotionsRes = await promotionService.getPublicPromotions({
+          page: 0,
+          size: 50,
+        });
         const promotions =
-          promotionsRes.data.content?.map((p: any) => ({ ...p, type: 'PROMOTION' })) || [];
+          promotionsRes.data.content?.map((p: any) => ({
+            ...p,
+            type: "PROMOTION",
+          })) || [];
 
         let coupons: any[] = [];
         if (isAuthenticated) {
           const couponsRes = await couponService.getMyCoupons();
-          coupons = couponsRes.data?.map((c: any) => ({ ...c, type: 'COUPON' })) || [];
+          coupons =
+            couponsRes.data?.map((c: any) => ({ ...c, type: "COUPON" })) || [];
         }
 
         const merged = [...promotions, ...coupons];
 
         setAvailableVouchers(merged);
       } catch (error) {
-        console.error('Không thể tải danh sách voucher:', error);
+        console.error("Không thể tải danh sách voucher:", error);
         setAvailableVouchers([]);
       }
     };
@@ -130,19 +128,9 @@ const CheckoutPage = () => {
         const response = await orderService.getUserShippingAddresses();
         setAddresses(response.data);
       } catch (error) {
-        console.error('Không thể tải danh sách địa chỉ:', error);
+        console.error("Không thể tải danh sách địa chỉ:", error);
       }
     }
-  };
-
-  const updatePreviewAddress = () => {
-    const values = form.getFieldsValue(['province', 'district', 'ward', 'address']);
-    const parts = [];
-    if (values.province) parts.push(values.province);
-    if (values.district) parts.push(values.district);
-    if (values.ward) parts.push(values.ward);
-    if (values.address) parts.push(values.address);
-    setPreviewAddress(parts.join(', '));
   };
 
   const handleAddressSelect = (address: Address) => {
@@ -156,7 +144,6 @@ const CheckoutPage = () => {
       note: address.note,
     });
     setSelectedAddress(address);
-    updatePreviewAddress();
     setIsAddressModalVisible(false);
     setTimeout(() => estimateShippingCost(), 100);
   };
@@ -166,12 +153,16 @@ const CheckoutPage = () => {
   };
 
   const handleAddressFieldChange = () => {
-    updatePreviewAddress();
     estimateShippingCost();
   };
 
   const estimateShippingCost = async () => {
-    const { address, province, district, ward } = form.getFieldsValue(['address', 'province', 'district', 'ward']);
+    const { address, province, district, ward } = form.getFieldsValue([
+      "address",
+      "province",
+      "district",
+      "ward",
+    ]);
     if (!province || !district || !ward || items.length === 0) {
       setShippingFee(0);
       return;
@@ -190,10 +181,14 @@ const CheckoutPage = () => {
           quantity: item.quantity,
         })),
       };
-      const response = await shippingService.estimateShippingFee(shippingEstimateRequest);
+      const response = await shippingService.estimateShippingFee(
+        shippingEstimateRequest,
+      );
       setShippingFee(response.data.shippingFee);
     } catch (error) {
-      message.error('Không thể ước tính phí vận chuyển. Vui lòng kiểm tra địa chỉ.');
+      message.error(
+        "Không thể ước tính phí vận chuyển. Vui lòng kiểm tra địa chỉ.",
+      );
       setShippingFee(0);
     } finally {
       setIsEstimatingShipping(false);
@@ -202,8 +197,9 @@ const CheckoutPage = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      userService.getProfile()
-        .then(response => {
+      userService
+        .getProfile()
+        .then((response) => {
           const profile = response.data;
           if (profile) {
             form.setFieldsValue({
@@ -214,58 +210,36 @@ const CheckoutPage = () => {
             });
           }
         })
-        .catch(err => console.error("Không thể tải thông tin người dùng:", err));
+        .catch((err) =>
+          console.error("Không thể tải thông tin người dùng:", err),
+        );
     }
   }, [isAuthenticated, form]);
 
-  useEffect(() => {
-    setAvailableVouchers([]);
-
-    const fetchAvailableVouchers = async () => {
-      try {
-        const response = await promotionService.getPublicPromotions({ page: 0, size: 50 });
-        const promotions = response.data.content.map((p: any) => ({ ...p, type: 'PROMOTION' })) || [];
-        setAvailableVouchers(prev => [...promotions, ...prev.filter(v => v.type !== 'PROMOTION')]);
-      } catch (error) {
-        console.error("Không thể tải danh sách khuyến mãi:", error);
-      }
-    };
-
-    const fetchMyCoupons = async () => {
-      try {
-        const response = await couponService.getMyCoupons();
-        const coupons = response.data.map((c: any) => ({ ...c, type: 'COUPON' })) || [];
-        setAvailableVouchers(prev => [...prev.filter(v => v.type !== 'COUPON'), ...coupons]);
-      } catch (error) {
-        console.error("Không thể tải danh sách coupon:", error);
-      }
-    };
-
-    fetchAvailableVouchers();
-    if (isAuthenticated) {
-      fetchMyCoupons();
-    }
-  }, [isAuthenticated]);
-
   const handleApplyVoucher = async () => {
     if (!voucherCode) {
-      message.warning('Vui lòng nhập mã giảm giá.');
+      message.warning("Vui lòng nhập mã giảm giá.");
       return;
     }
 
     try {
-      console.log('voucherCode =', voucherCode);
-      const response = await discountService.validateVoucher(voucherCode, subtotal);
+      const response = await discountService.validateVoucher(
+        voucherCode,
+        subtotal,
+      );
       const { discountAmount, message: successMessage } = response.data;
 
       setDiscount(discountAmount);
       setAppliedVoucher(voucherCode);
       setAppliedVoucherInfo(response.data);
 
-      message.success(successMessage || `Áp dụng mã "${voucherCode}" thành công!`);
+      message.success(
+        successMessage || `Áp dụng mã "${voucherCode}" thành công!`,
+      );
     } catch (error: any) {
       const errorMessage =
-        error.response?.data?.message || 'Mã giảm giá không hợp lệ hoặc đã xảy ra lỗi.';
+        error.response?.data?.message ||
+        "Mã giảm giá không hợp lệ hoặc đã xảy ra lỗi.";
       message.error(errorMessage);
     }
   };
@@ -290,18 +264,12 @@ const CheckoutPage = () => {
       voucherCode: appliedVoucher,
     };
 
-    if (values.paymentMethod === 'BANK') {
-      setPendingOrderData(orderData);
-      setIsBankModalVisible(true);
-    } else {
-      await submitOrder(orderData);
+    if (values.paymentMethod === "VNPAY") {
+      await submitOrderAndRedirectVnpay(orderData);
+      return;
     }
-  };
-  const handleConfirmBankTransfer = async () => {
-    setIsBankModalVisible(false);
-    if (pendingOrderData) {
-      await submitOrder(pendingOrderData);
-    }
+
+    await submitOrder(orderData);
   };
 
   const submitOrder = async (orderData: any) => {
@@ -312,120 +280,274 @@ const CheckoutPage = () => {
       setDiscount(0);
       setAppliedVoucher(null);
       setAppliedVoucherInfo(null);
-      setVoucherCode('');
+      setVoucherCode("");
 
-      message.success('Đặt hàng thành công!');
-      navigate('/cart?tab=pending');
+      message.success("Đặt hàng thành công!");
+      navigate("/cart?tab=pending");
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Đặt hàng thất bại. Vui lòng thử lại.';
+      const errorMessage =
+        error.response?.data?.message || "Đặt hàng thất bại. Vui lòng thử lại.";
       message.error(errorMessage);
-      console.error('Failed to place order:', error);
+      console.error("Failed to place order:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitOrderAndRedirectVnpay = async (orderData: any) => {
+    setLoading(true);
+    try {
+      const placeOrderResponse = await orderService.placeOrder(orderData);
+      const createdOrder = placeOrderResponse.data;
+
+      const vnpayResponse = await orderService.createOnlineVnpayPayment(
+        createdOrder.id,
+      );
+
+      const paymentUrl = vnpayResponse.data.paymentUrl;
+
+      if (!paymentUrl) {
+        throw new Error("Không tạo được link thanh toán VNPAY");
+      }
+
+      window.location.href = paymentUrl;
+    } catch (error: any) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Không thể khởi tạo thanh toán VNPAY.";
+      message.error(errorMessage);
+      console.error("Failed to create VNPAY payment:", error);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div style={{ padding: "24px" }}>
       <Button
         icon={<ArrowLeftOutlined />}
-        onClick={() => navigate('/cart')}
-        style={{ marginBottom: '24px' }}
+        onClick={() => navigate("/cart")}
+        style={{ marginBottom: "24px" }}
       >
         Quay lại giỏ hàng
       </Button>
-      <Title level={2} style={{ marginBottom: '24px' }}>
+      <Title level={2} style={{ marginBottom: "24px" }}>
         Thanh toán
       </Title>
       <Form form={form} layout="vertical" onFinish={handlePlaceOrder}>
         <Row gutter={[32, 32]}>
           <Col xs={24} lg={14}>
-            <Card title="1. Thông tin giao hàng" bordered={false} style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
-              extra={isEstimatingShipping && <Spin size="small" />}>
-              <Form.Item name="customerName" label="Họ và tên người nhận" rules={[{ required: true, message: 'Vui lòng nhập họ tên!' }]}>
+            <Card
+              title="1. Thông tin giao hàng"
+              bordered={false}
+              style={{ boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}
+              extra={isEstimatingShipping && <Spin size="small" />}
+            >
+              <Form.Item
+                name="customerName"
+                label="Họ và tên người nhận"
+                rules={[{ required: true, message: "Vui lòng nhập họ tên!" }]}
+              >
                 <Input placeholder="Nguyễn Văn A" />
               </Form.Item>
-              <Form.Item name="phone" label="Số điện thoại" rules={[{ required: true, message: 'Vui lòng nhập số điện thoại!' }]}>
+              <Form.Item
+                name="phone"
+                label="Số điện thoại"
+                rules={[
+                  { required: true, message: "Vui lòng nhập số điện thoại!" },
+                ]}
+              >
                 <Input placeholder="Ví dụ: 0123456789" />
               </Form.Item>
               <Row gutter={16}>
                 <Col span={12}>
-                  <Form.Item name="province" label="Tỉnh/Thành phố" rules={[{ required: true, message: 'Vui lòng nhập Tỉnh/Thành phố!' }]}>
-                    <Input placeholder="Ví dụ: Hà Nội" onChange={handleAddressFieldChange} />
+                  <Form.Item
+                    name="province"
+                    label="Tỉnh/Thành phố"
+                    rules={[
+                      {
+                        required: true,
+                        message: "Vui lòng nhập Tỉnh/Thành phố!",
+                      },
+                    ]}
+                  >
+                    <Input
+                      placeholder="Ví dụ: Hà Nội"
+                      onChange={handleAddressFieldChange}
+                    />
                   </Form.Item>
                 </Col>
                 <Col span={12}>
-                  <Form.Item name="district" label="Quận/Huyện" rules={[{ required: true, message: 'Vui lòng nhập Quận/Huyện!' }]}>
-                    <Input placeholder="Ví dụ: Quận Cầu Giấy" onChange={handleAddressFieldChange} />
+                  <Form.Item
+                    name="district"
+                    label="Quận/Huyện"
+                    rules={[
+                      { required: true, message: "Vui lòng nhập Quận/Huyện!" },
+                    ]}
+                  >
+                    <Input
+                      placeholder="Ví dụ: Quận Cầu Giấy"
+                      onChange={handleAddressFieldChange}
+                    />
                   </Form.Item>
                 </Col>
               </Row>
               <Row gutter={16}>
                 <Col span={12}>
-                  <Form.Item name="ward" label="Phường/Xã" rules={[{ required: true, message: 'Vui lòng nhập Phường/Xã!' }]}>
-                    <Input placeholder="Ví dụ: Phường Dịch Vọng" onChange={handleAddressFieldChange} />
+                  <Form.Item
+                    name="ward"
+                    label="Phường/Xã"
+                    rules={[
+                      { required: true, message: "Vui lòng nhập Phường/Xã!" },
+                    ]}
+                  >
+                    <Input
+                      placeholder="Ví dụ: Phường Dịch Vọng"
+                      onChange={handleAddressFieldChange}
+                    />
                   </Form.Item>
                 </Col>
                 <Col span={12}>
-                  <Form.Item name="address" label="Địa chỉ chi tiết" rules={[{ required: true, message: 'Vui lòng nhập địa chỉ chi tiết!' }]}>
-                    <Input placeholder="Số nhà, tên đường" onChange={updatePreviewAddress} />
+                  <Form.Item
+                    name="address"
+                    label="Địa chỉ chi tiết"
+                    rules={[
+                      {
+                        required: true,
+                        message: "Vui lòng nhập địa chỉ chi tiết!",
+                      },
+                    ]}
+                  >
+                    <Input
+                      placeholder="Số nhà, tên đường"
+                      onChange={handleAddressFieldChange}
+                    />
                   </Form.Item>
                 </Col>
               </Row>
-              <Button type="link" icon={<EditOutlined />} onClick={() => {
-                loadUserAddresses();
-                setIsAddressModalVisible(true);
-              }} style={{ padding: 0, marginBottom: 16 }}>
+              <Button
+                type="link"
+                icon={<EditOutlined />}
+                onClick={() => {
+                  loadUserAddresses();
+                  setIsAddressModalVisible(true);
+                }}
+                style={{ padding: 0, marginBottom: 16 }}
+              >
                 Chọn địa chỉ đã lưu
               </Button>
               <Form.Item name="note" label="Ghi chú cho đơn hàng (tùy chọn)">
-                <Input.TextArea rows={2} placeholder="Ghi chú thêm cho người bán hoặc shipper" />
+                <Input.TextArea
+                  rows={2}
+                  placeholder="Ghi chú thêm cho người bán hoặc shipper"
+                />
               </Form.Item>
               <Form.Item name="saveAddress" valuePropName="checked">
                 <Checkbox>Lưu thông tin này cho lần mua sắm tiếp theo</Checkbox>
               </Form.Item>
             </Card>
-            <Card title="Địa chỉ giao hàng" bordered={false} style={{ marginTop: 24, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+            <Card
+              title="Địa chỉ giao hàng"
+              bordered={false}
+              style={{
+                marginTop: 24,
+                boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+              }}
+            >
               {(() => {
-                const values = form.getFieldsValue(['customerName', 'phone', 'province', 'district', 'ward', 'address']);
-                const hasCompleteAddress = values.customerName && values.phone && values.province && values.district && values.ward && values.address;
+                const values = form.getFieldsValue([
+                  "customerName",
+                  "phone",
+                  "province",
+                  "district",
+                  "ward",
+                  "address",
+                ]);
+                const hasCompleteAddress =
+                  values.customerName &&
+                  values.phone &&
+                  values.province &&
+                  values.district &&
+                  values.ward &&
+                  values.address;
 
                 if (!hasCompleteAddress) {
-                  return <Text type="secondary">Vui lòng nhập thông tin giao hàng đầy đủ</Text>;
+                  return (
+                    <Text type="secondary">
+                      Vui lòng nhập thông tin giao hàng đầy đủ
+                    </Text>
+                  );
                 }
 
                 return (
-                  <div style={{ lineHeight: '1.8' }}>
-                    <div style={{ marginBottom: '8px' }}>
-                      <Text strong style={{ display: 'inline-block', minWidth: '120px' }}>Người nhận:</Text>
+                  <div style={{ lineHeight: "1.8" }}>
+                    <div style={{ marginBottom: "8px" }}>
+                      <Text
+                        strong
+                        style={{ display: "inline-block", minWidth: "120px" }}
+                      >
+                        Người nhận:
+                      </Text>
                       <Text>{values.customerName}</Text>
                     </div>
-                    <div style={{ marginBottom: '8px' }}>
-                      <Text strong style={{ display: 'inline-block', minWidth: '120px' }}>Số điện thoại:</Text>
+                    <div style={{ marginBottom: "8px" }}>
+                      <Text
+                        strong
+                        style={{ display: "inline-block", minWidth: "120px" }}
+                      >
+                        Số điện thoại:
+                      </Text>
                       <Text>{values.phone}</Text>
                     </div>
                     <div>
-                      <Text strong style={{ display: 'inline-block', minWidth: '120px', verticalAlign: 'top' }}>Địa chỉ:</Text>
-                      <Text style={{ display: 'inline-block', maxWidth: 'calc(100% - 120px)' }}>
-                        {values.address}, {values.ward}, {values.district}, {values.province}
+                      <Text
+                        strong
+                        style={{
+                          display: "inline-block",
+                          minWidth: "120px",
+                          verticalAlign: "top",
+                        }}
+                      >
+                        Địa chỉ:
+                      </Text>
+                      <Text
+                        style={{
+                          display: "inline-block",
+                          maxWidth: "calc(100% - 120px)",
+                        }}
+                      >
+                        {values.address}, {values.ward}, {values.district},{" "}
+                        {values.province}
                       </Text>
                     </div>
                   </div>
                 );
               })()}
             </Card>
-            <Card title="2. Mã giảm giá" bordered={false} style={{ marginTop: 24, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
-              <Space.Compact style={{ width: '100%' }}>
+            <Card
+              title="2. Mã giảm giá"
+              bordered={false}
+              style={{
+                marginTop: 24,
+                boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+              }}
+            >
+              <Space.Compact style={{ width: "100%" }}>
                 <Select
                   showSearch
                   allowClear
-                  style={{ width: '100%' }}
+                  style={{ width: "100%" }}
                   placeholder="Chọn hoặc nhập mã giảm giá"
                   value={voucherCode || undefined}
-                  onSelect={(value) => { setVoucherCode(value); }}
-                  onSearch={(value) => { setVoucherCode(value); }}
+                  onSelect={(value) => {
+                    setVoucherCode(value);
+                  }}
+                  onSearch={(value) => {
+                    setVoucherCode(value);
+                  }}
                   onChange={(value) => {
-                    setVoucherCode(value || '');
+                    setVoucherCode(value || "");
                     if (!value) {
                       setDiscount(0);
                       setAppliedVoucher(null);
@@ -433,42 +555,87 @@ const CheckoutPage = () => {
                     }
                   }}
                   filterOption={(input, option) =>
-                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                    (option?.label ?? "")
+                      .toLowerCase()
+                      .includes(input.toLowerCase())
                   }
                   options={availableVouchers.map((v) => ({
                     label: buildVoucherLabel(v),
                     value: v.code,
                   }))}
-                  notFoundContent={isAuthenticated ? "Bạn không có mã giảm giá nào" : "Đăng nhập để xem mã giảm giá của bạn"}
+                  notFoundContent={
+                    isAuthenticated
+                      ? "Bạn không có mã giảm giá nào"
+                      : "Đăng nhập để xem mã giảm giá của bạn"
+                  }
                 />
-                <Button type="primary" onClick={handleApplyVoucher} disabled={!!appliedVoucher || !voucherCode}>
+                <Button
+                  type="primary"
+                  onClick={handleApplyVoucher}
+                  disabled={!!appliedVoucher || !voucherCode}
+                >
                   Áp dụng
                 </Button>
               </Space.Compact>
               {appliedVoucher && (
-                <div style={{ marginTop: '12px' }}>
+                <div style={{ marginTop: "12px" }}>
                   <Text type="success">
                     Đã áp dụng mã: <strong>{appliedVoucher}</strong>
                   </Text>
                   {appliedVoucherInfo && (
                     <div style={{ marginTop: 8 }}>
-                      <Text type="secondary">{buildVoucherLabel(appliedVoucherInfo)}</Text>
+                      <Text type="secondary">
+                        {buildVoucherLabel(appliedVoucherInfo)}
+                      </Text>
                     </div>
                   )}
                 </div>
               )}
             </Card>
-            <Card title="3. Phương thức thanh toán" bordered={false} style={{ marginTop: 24, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
-              <Form.Item name="paymentMethod" initialValue="CASH" rules={[{ required: true, message: 'Vui lòng chọn phương thức thanh toán!' }]}>
-                <Radio.Group style={{ width: '100%' }}>
-                  <Space direction="vertical" style={{ width: '100%' }}>
-                    <Radio value="CASH" style={{ border: '1px solid #d9d9d9', padding: '16px', borderRadius: '8px', width: '100%' }}>
+            <Card
+              title="3. Phương thức thanh toán"
+              bordered={false}
+              style={{
+                marginTop: 24,
+                boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+              }}
+            >
+              <Form.Item
+                name="paymentMethod"
+                initialValue="CASH"
+                rules={[
+                  {
+                    required: true,
+                    message: "Vui lòng chọn phương thức thanh toán!",
+                  },
+                ]}
+              >
+                <Radio.Group style={{ width: "100%" }}>
+                  <Space direction="vertical" style={{ width: "100%" }}>
+                    <Radio
+                      value="CASH"
+                      style={{
+                        border: "1px solid #d9d9d9",
+                        padding: "16px",
+                        borderRadius: "8px",
+                        width: "100%",
+                      }}
+                    >
                       <TruckOutlined style={{ marginRight: 8 }} />
                       Thanh toán khi nhận hàng (COD)
                     </Radio>
-                    <Radio value="BANK" style={{ border: '1px solid #d9d9d9', padding: '16px', borderRadius: '8px', width: '100%' }}>
+
+                    <Radio
+                      value="VNPAY"
+                      style={{
+                        border: "1px solid #d9d9d9",
+                        padding: "16px",
+                        borderRadius: "8px",
+                        width: "100%",
+                      }}
+                    >
                       <CreditCardOutlined style={{ marginRight: 8 }} />
-                      Chuyển khoản ngân hàng
+                      Thanh toán online qua VNPAY
                     </Radio>
                   </Space>
                 </Radio.Group>
@@ -477,7 +644,15 @@ const CheckoutPage = () => {
           </Col>
 
           <Col xs={24} lg={10}>
-            <Card title={`Đơn hàng (${items.length} sản phẩm)`} bordered={false} style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)', position: 'sticky', top: 24 }}>
+            <Card
+              title={`Đơn hàng (${items.length} sản phẩm)`}
+              bordered={false}
+              style={{
+                boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                position: "sticky",
+                top: 24,
+              }}
+            >
               <Spin spinning={loading}>
                 <List
                   itemLayout="horizontal"
@@ -485,12 +660,23 @@ const CheckoutPage = () => {
                   renderItem={(item: any) => (
                     <List.Item>
                       <List.Item.Meta
-                        avatar={<Avatar shape="square" size={64} src={item.image} />}
+                        avatar={
+                          <Avatar shape="square" size={64} src={item.image} />
+                        }
                         title={<Text>{item.name}</Text>}
                         description={
                           <Row justify="space-between">
-                            <Col><Text type="secondary">SL: {item.quantity}</Text></Col>
-                            <Col><Text strong>{(item.price * item.quantity).toLocaleString('vi-VN')} ₫</Text></Col>
+                            <Col>
+                              <Text type="secondary">SL: {item.quantity}</Text>
+                            </Col>
+                            <Col>
+                              <Text strong>
+                                {(item.price * item.quantity).toLocaleString(
+                                  "vi-VN",
+                                )}{" "}
+                                ₫
+                              </Text>
+                            </Col>
                           </Row>
                         }
                       />
@@ -500,28 +686,36 @@ const CheckoutPage = () => {
                 <Divider />
                 <Row justify="space-between" style={{ marginBottom: 12 }}>
                   <Text>Tạm tính</Text>
-                  <Text strong>{subtotal.toLocaleString('vi-VN')} ₫</Text>
+                  <Text strong>{subtotal.toLocaleString("vi-VN")} ₫</Text>
                 </Row>
                 <Row justify="space-between" style={{ marginBottom: 12 }}>
                   <Text>Phí vận chuyển</Text>
-                  <Text strong>{shippingFee.toLocaleString('vi-VN')} ₫</Text>
+                  <Text strong>{shippingFee.toLocaleString("vi-VN")} ₫</Text>
                 </Row>
                 {discount > 0 && (
                   <Row justify="space-between" style={{ marginBottom: 12 }}>
                     <Text type="success">Giảm giá</Text>
-                    <Text strong type="success">- {discount.toLocaleString('vi-VN')} ₫</Text>
+                    <Text strong type="success">
+                      - {discount.toLocaleString("vi-VN")} ₫
+                    </Text>
                   </Row>
                 )}
                 {appliedVoucher && (
                   <Row justify="space-between" style={{ marginBottom: 12 }}>
                     <Text>Mã đã dùng</Text>
-                    <Text strong><Tag color="green">{appliedVoucher}</Tag></Text>
+                    <Text strong>
+                      <Tag color="green">{appliedVoucher}</Tag>
+                    </Text>
                   </Row>
                 )}
                 <Divider />
                 <Row justify="space-between">
-                  <Title level={4} style={{ margin: 0 }}>Tổng cộng</Title>
-                  <Title level={4} style={{ margin: 0, color: '#c81d1d' }}>{total.toLocaleString('vi-VN')} ₫</Title>
+                  <Title level={4} style={{ margin: 0 }}>
+                    Tổng cộng
+                  </Title>
+                  <Title level={4} style={{ margin: 0, color: "#c81d1d" }}>
+                    {total.toLocaleString("vi-VN")} ₫
+                  </Title>
                 </Row>
                 <Popconfirm
                   title="Xác nhận đặt hàng?"
@@ -536,9 +730,9 @@ const CheckoutPage = () => {
                     block
                     size="large"
                     loading={loading}
-                    style={{ marginTop: '24px' }}
+                    style={{ marginTop: "24px" }}
                   >
-                    {loading ? 'Đang xử lý...' : 'Hoàn tất đặt hàng'}
+                    {loading ? "Đang xử lý..." : "Hoàn tất đặt hàng"}
                   </Button>
                 </Popconfirm>
               </Spin>
@@ -548,32 +742,6 @@ const CheckoutPage = () => {
       </Form>
 
       <Modal
-        title="Thông tin chuyển khoản"
-        open={isBankModalVisible}
-        onCancel={() => setIsBankModalVisible(false)}
-        footer={[
-          <Button key="back" onClick={() => setIsBankModalVisible(false)}>
-            Hủy
-          </Button>,
-          <Button key="submit" type="primary" loading={loading} onClick={handleConfirmBankTransfer}>
-            Tôi đã chuyển khoản
-          </Button>,
-        ]}
-      >
-        <div style={{ textAlign: 'center' }}>
-          <p>Vui lòng quét mã QR hoặc chuyển khoản theo thông tin dưới đây.</p>
-          <Image width={250} src={generateVietQRUrl(total, `DH ${pendingOrderData?.shippingInfo?.phone || ''}`)} preview={false} />
-          <Descriptions bordered column={1} style={{ marginTop: 20 }}>
-            <Descriptions.Item label="Ngân hàng">Vietcombank</Descriptions.Item>
-            <Descriptions.Item label="Chủ tài khoản">CONG TY TNHH ABC</Descriptions.Item>
-            <Descriptions.Item label="Số tài khoản">1234567890</Descriptions.Item>
-            <Descriptions.Item label="Số tiền"><Text strong style={{ color: '#c81d1d' }}>{total.toLocaleString('vi-VN')} ₫</Text></Descriptions.Item>
-            <Descriptions.Item label="Nội dung chuyển khoản"><Text copyable strong>{`DH ${pendingOrderData?.shippingInfo?.phone}`}</Text></Descriptions.Item>
-          </Descriptions>
-          <Text type="danger" style={{ marginTop: 16, display: 'block' }}>Lưu ý: Vui lòng nhập chính xác nội dung chuyển khoản để đơn hàng được xác nhận tự động.</Text>
-        </div>
-      </Modal>
-      <Modal
         title="Chọn địa chỉ giao hàng"
         open={isAddressModalVisible}
         onCancel={() => setIsAddressModalVisible(false)}
@@ -581,12 +749,16 @@ const CheckoutPage = () => {
         width={600}
       >
         <div style={{ marginBottom: 16 }}>
-          <Button type="primary" onClick={handleNewAddress} style={{ marginBottom: 16 }}>
+          <Button
+            type="primary"
+            onClick={handleNewAddress}
+            style={{ marginBottom: 16 }}
+          >
             Nhập địa chỉ mới
           </Button>
         </div>
         {addresses.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '20px' }}>
+          <div style={{ textAlign: "center", padding: "20px" }}>
             <Text type="secondary">Không có địa chỉ đã lưu</Text>
           </div>
         ) : (
@@ -598,15 +770,18 @@ const CheckoutPage = () => {
                   <Button
                     type="link"
                     onClick={() => handleAddressSelect(address)}
-                    disabled={selectedAddress?.fullName === address.fullName && selectedAddress?.phone === address.phone}
+                    disabled={
+                      selectedAddress?.fullName === address.fullName &&
+                      selectedAddress?.phone === address.phone
+                    }
                   >
                     Chọn
-                  </Button>
+                  </Button>,
                 ]}
               >
                 <List.Item.Meta
                   title={`${address.fullName} - ${address.phone}`}
-                  description={`${address.address}${address.ward ? `, ${address.ward}` : ''}${address.district ? `, ${address.district}` : ''}${address.province ? `, ${address.province}` : ''}`}
+                  description={`${address.address}${address.ward ? `, ${address.ward}` : ""}${address.district ? `, ${address.district}` : ""}${address.province ? `, ${address.province}` : ""}`}
                 />
               </List.Item>
             )}

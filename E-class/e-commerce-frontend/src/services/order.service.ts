@@ -1,4 +1,4 @@
-import { axiosClient } from './axiosClient';
+import { axiosClient } from "./axiosClient";
 
 interface ShippingInfo {
   customerName: string;
@@ -15,20 +15,50 @@ interface OrderItem {
   quantity: number;
 }
 
-interface PlaceOrderDTO {
+export interface PlaceOrderDTO {
   shippingInfo: ShippingInfo;
   paymentMethodCode: string;
   items: OrderItem[];
   voucherCode?: string | null;
 }
 
+export interface OnlineVnpayCreateResponse {
+  orderId: number;
+  orderCode: string;
+  txnRef: string;
+  paymentUrl: string;
+}
+
+export interface OnlineVnpayReturnResponse {
+  success: boolean;
+  message: string;
+  txnRef?: string;
+  transactionNo?: string;
+  responseCode?: string;
+  orderId?: number;
+}
+
+export interface ReturnRequestDTO {
+  reason: string;
+}
+
 export const orderService = {
   placeOrder: (orderData: PlaceOrderDTO) => {
-    return axiosClient.post('/v1/orders', orderData);
+    return axiosClient.post("/v1/orders", orderData);
+  },
+
+  createOnlineVnpayPayment: (orderId: number) => {
+    return axiosClient.post<OnlineVnpayCreateResponse>(`/v1/orders/${orderId}/vnpay`);
+  },
+
+  getOnlineVnpayReturnResult: (params: Record<string, string>) => {
+    return axiosClient.get<OnlineVnpayReturnResponse>("/v1/orders/vnpay/return", {
+      params,
+    });
   },
 
   getMyOrders: (params?: any) => {
-    return axiosClient.get('/v1/orders/my-orders', { params });
+    return axiosClient.get("/v1/orders/my-orders", { params });
   },
 
   getOrderDetails: (orderId: number, config?: any) => {
@@ -39,7 +69,11 @@ export const orderService = {
     return axiosClient.put(`/v1/orders/${orderId}/cancel`);
   },
 
+  requestReturn: (orderId: number, payload: ReturnRequestDTO) => {
+    return axiosClient.post(`/v1/orders/${orderId}/return-request`, payload);
+  },
+
   getUserShippingAddresses: () => {
-    return axiosClient.get('/v1/orders/shipping-addresses');
+    return axiosClient.get("/v1/orders/shipping-addresses");
   },
 };

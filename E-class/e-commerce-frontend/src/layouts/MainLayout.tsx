@@ -2,6 +2,7 @@ import { Layout, ConfigProvider } from 'antd';
 import { Outlet, useLocation } from 'react-router-dom';
 import CustomHeader from './components/CustomHeader';
 import FooterBar from './components/FooterBar';
+import ChatbotWidget from "@/features/chatbot/ChatbotWidget";
 
 const { Content } = Layout;
 
@@ -25,7 +26,8 @@ const MainLayout = () => {
             <Outlet />
           </div>
         </ConfigProvider>
-      </Content>
+     </Content>
+      <ChatbotWidget channel="WEB_USER" />
       <FooterBar />
     </Layout>
   );

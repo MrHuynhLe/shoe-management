@@ -1,5 +1,7 @@
 package com.vn.backend.service;
 
+import com.vn.backend.dto.request.OrderReturnRequest;
+import com.vn.backend.dto.request.OrderReturnReviewRequest;
 import com.vn.backend.dto.request.PlaceOrderRequest;
 import com.vn.backend.dto.response.OrderDetailResponse;
 import com.vn.backend.dto.response.OrderResponse;
@@ -17,4 +19,8 @@ public interface OrderService {
     OrderResponse updateOrderStatus(Long orderId, String status);
     void cancelOrder(Long orderId, Long userId);
     List<OrderShippingAddressResponse> getUserShippingAddresses(Long userId);
+
+    void requestReturn(Long orderId, Long userId, OrderReturnRequest request);
+
+    void reviewReturn(Long orderId, OrderReturnReviewRequest request);
 }

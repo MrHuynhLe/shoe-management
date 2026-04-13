@@ -4,7 +4,6 @@ import com.vn.backend.dto.request.PlaceOrderRequest;
 import com.vn.backend.dto.request.ValidateDiscountRequest;
 import com.vn.backend.dto.request.OrderItemRequest;
 import com.vn.backend.dto.response.*;
-import com.vn.backend.dto.ghtk.GhtkFeeRequest;
 import com.vn.backend.entity.*;
 import com.vn.backend.exception.InvalidRequestException;
 import com.vn.backend.exception.ResourceNotFoundException;
@@ -13,7 +12,6 @@ import com.vn.backend.security.CustomUserDetails;
 import com.vn.backend.service.DiscountService;
 import com.vn.backend.service.OrderService;
 import com.vn.backend.service.GhtkService;
-import com.vn.backend.service.impl.GHTKLogicHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -25,12 +23,13 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import com.vn.backend.dto.request.OrderReturnRequest;
+import com.vn.backend.dto.request.OrderReturnReviewRequest;
 
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -38,7 +37,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -59,13 +57,24 @@ public class OrderServiceImpl implements OrderService {
     private final GhtkService ghtkService; // Inject GhtkService
     private final GHTKLogicHandler ghtkLogicHandler;
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
+    private final InventoryTransactionRepository inventoryTransactionRepository;
 
     private static final String ORDER_TYPE_ONLINE = "ONLINE";
+
     private static final String ORDER_STATUS_PENDING = "PENDING";
     private static final String ORDER_STATUS_CONFIRMED = "CONFIRMED";
     private static final String ORDER_STATUS_SHIPPING = "SHIPPING";
     private static final String ORDER_STATUS_COMPLETED = "COMPLETED";
     private static final String ORDER_STATUS_CANCELLED = "CANCELLED";
+
+    private static final String ORDER_STATUS_RETURN_REQUESTED = "RETURN_REQUESTED";
+    private static final String ORDER_STATUS_RETURNED = "RETURNED";
+    private static final String ORDER_STATUS_RETURN_REJECTED = "RETURN_REJECTED";
+
+    private static final String PAYMENT_STATUS_PAID = "PAID";
+    private static final String PAYMENT_STATUS_REFUND_PENDING = "REFUND_PENDING";
+
+    private static final int RETURN_WINDOW_DAYS = 7;
 
 
     @Override
@@ -75,24 +84,28 @@ public class OrderServiceImpl implements OrderService {
 
         BigDecimal subTotal = BigDecimal.ZERO;
         List<OrderItem> orderItems = new ArrayList<>();
+
         List<Long> requestedVariantIds = request.getItems().stream()
                 .map(OrderItemRequest::getVariantId)
                 .toList();
 
-        Map<Long, ProductVariant> variantsMap = productVariantRepository.findAllById(requestedVariantIds)
-                .stream()
-                .collect(Collectors.toMap(ProductVariant::getId, variant -> variant));
+        Map<Long, Integer> requestedQuantityByVariantId = new HashMap<>();
+        for (OrderItemRequest itemRequest : request.getItems()) {
+            requestedQuantityByVariantId.merge(
+                    itemRequest.getVariantId(),
+                    itemRequest.getQuantity(),
+                    Integer::sum
+            );
+        }
+
+        Map<Long, ProductVariant> variantsMap = lockVariantsForOnlineOrder(requestedQuantityByVariantId);
+        reserveStockForOnlineOrder(requestedQuantityByVariantId, variantsMap);
 
         for (OrderItemRequest itemRequest : request.getItems()) {
             ProductVariant variant = variantsMap.get(itemRequest.getVariantId());
-            if (variant == null) {
-                throw new ResourceNotFoundException("Product variant not found with id: " + itemRequest.getVariantId());
-            }
-            if (variant.getStockQuantity() < itemRequest.getQuantity()) {
-                throw new InvalidRequestException("Not enough stock for product: " + variant.getProduct().getName());
-            }
 
-            BigDecimal itemSubTotal = variant.getSellingPrice().multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
+            BigDecimal itemSubTotal = variant.getSellingPrice()
+                    .multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
             subTotal = subTotal.add(itemSubTotal);
 
             OrderItem orderItem = OrderItem.builder()
@@ -101,6 +114,7 @@ public class OrderServiceImpl implements OrderService {
                     .costPriceAtPurchase(variant.getCostPrice())
                     .priceAtPurchase(variant.getSellingPrice())
                     .build();
+
             orderItems.add(orderItem);
         }
 
@@ -178,7 +192,14 @@ public class OrderServiceImpl implements OrderService {
 
         saveOrderStatusHistory(savedOrder, null, ORDER_STATUS_PENDING);
 
-        if (appliedPromotion != null || appliedCoupon != null) {
+        PaymentMethod paymentMethod = paymentMethodRepository.findByCode(request.getPaymentMethodCode())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Phương thức thanh toán không hợp lệ: " + request.getPaymentMethodCode()
+                ));
+
+        boolean isVnpayPayment = "VNPAY".equalsIgnoreCase(paymentMethod.getCode());
+
+        if (!isVnpayPayment && (appliedPromotion != null || appliedCoupon != null)) {
             CouponUsage usage = CouponUsage.builder()
                     .order(savedOrder)
                     .customer(customer)
@@ -188,16 +209,14 @@ public class OrderServiceImpl implements OrderService {
             couponUsageRepository.save(usage);
         }
 
-        PaymentMethod paymentMethod = paymentMethodRepository.findByCode(request.getPaymentMethodCode())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Phương thức thanh toán không hợp lệ: " + request.getPaymentMethodCode()
-                ));
-
         Payment payment = Payment.builder()
                 .order(savedOrder)
                 .paymentMethod(paymentMethod)
                 .amount(savedOrder.getTotalAmount())
                 .status("PENDING")
+                .note(isVnpayPayment
+                        ? "Chờ thanh toán VNPAY cho đơn online"
+                        : "Thanh toán khi nhận hàng (COD)")
                 .build();
 
         paymentRepository.save(payment);
@@ -332,11 +351,21 @@ public class OrderServiceImpl implements OrderService {
             return mapToOrderResponse(order);
         }
 
-        if (ORDER_STATUS_CANCELLED.equals(previousStatus) || ORDER_STATUS_COMPLETED.equals(previousStatus)) {
+        if (ORDER_STATUS_RETURN_REQUESTED.equals(previousStatus)) {
+            throw new InvalidRequestException(
+                    "Đơn hàng đang có yêu cầu trả hàng. Hãy dùng chức năng duyệt / từ chối trả hàng."
+            );
+        }
+
+        if (ORDER_STATUS_CANCELLED.equals(previousStatus)
+                || ORDER_STATUS_COMPLETED.equals(previousStatus)
+                || ORDER_STATUS_RETURNED.equals(previousStatus)
+                || ORDER_STATUS_RETURN_REJECTED.equals(previousStatus)) {
             throw new InvalidRequestException("Không thể cập nhật trạng thái từ đơn hàng đã kết thúc.");
         }
 
-        if (ORDER_STATUS_SHIPPING.equals(normalizedStatus)) {
+        if (ORDER_STATUS_SHIPPING.equals(normalizedStatus)
+                && !ORDER_TYPE_ONLINE.equalsIgnoreCase(order.getOrderType())) {
             for (OrderItem item : order.getItems()) {
                 ProductVariant variant = item.getProductVariant();
                 if (variant.getStockQuantity() < item.getQuantity()) {
@@ -377,12 +406,98 @@ public class OrderServiceImpl implements OrderService {
         }
 
         String previousStatus = order.getStatus();
+
+        if (ORDER_TYPE_ONLINE.equalsIgnoreCase(order.getOrderType())) {
+            restoreStockForOrder(order);
+        }
+
         order.setStatus(ORDER_STATUS_CANCELLED);
 
         couponUsageRepository.deleteByOrder_Id(order.getId());
         orderRepository.save(order);
 
         saveOrderStatusHistory(order, previousStatus, ORDER_STATUS_CANCELLED);
+    }
+
+    @Override
+    @Transactional
+    public void requestReturn(Long orderId, Long userId, OrderReturnRequest request) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với ID: " + orderId));
+
+        Customer customer = resolveCustomer(userId);
+        if (order.getCustomer() == null || !order.getCustomer().getId().equals(customer.getId())) {
+            throw new AccessDeniedException("Bạn không có quyền yêu cầu trả hàng cho đơn này.");
+        }
+
+        if (!ORDER_STATUS_COMPLETED.equalsIgnoreCase(order.getStatus())) {
+            throw new InvalidRequestException("Chỉ đơn hàng đã hoàn thành mới được yêu cầu trả hàng.");
+        }
+
+        validateReturnReason(request.getReason());
+
+        OffsetDateTime completedAt = findLatestCompletedAt(order);
+        if (completedAt == null) {
+            completedAt = order.getCreatedAt();
+        }
+
+        OffsetDateTime deadline = completedAt.plusDays(RETURN_WINDOW_DAYS);
+        if (OffsetDateTime.now().isAfter(deadline)) {
+            throw new InvalidRequestException(
+                    "Đơn hàng đã quá thời hạn " + RETURN_WINDOW_DAYS + " ngày để yêu cầu trả hàng."
+            );
+        }
+
+        String previousStatus = order.getStatus();
+        order.setStatus(ORDER_STATUS_RETURN_REQUESTED);
+        order.setNote(appendAuditNote(order.getNote(), "RETURN_REQUEST", request.getReason()));
+        orderRepository.save(order);
+
+        saveOrderStatusHistory(order, previousStatus, ORDER_STATUS_RETURN_REQUESTED);
+    }
+
+    @Override
+    @Transactional
+    public void reviewReturn(Long orderId, OrderReturnReviewRequest request) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với ID: " + orderId));
+
+        if (!ORDER_STATUS_RETURN_REQUESTED.equalsIgnoreCase(order.getStatus())) {
+            throw new InvalidRequestException("Đơn hàng này hiện không ở trạng thái chờ xử lý trả hàng.");
+        }
+
+        String action = request.getAction() == null ? "" : request.getAction().trim().toUpperCase();
+        if (!"APPROVE".equals(action) && !"REJECT".equals(action)) {
+            throw new InvalidRequestException("Action phải là APPROVE hoặc REJECT.");
+        }
+
+        String previousStatus = order.getStatus();
+
+        if ("APPROVE".equals(action)) {
+            restoreStockForApprovedReturn(order);
+            markPaymentRefundPending(order, request.getNote());
+
+            order.setStatus(ORDER_STATUS_RETURNED);
+            order.setNote(appendAuditNote(
+                    order.getNote(),
+                    "RETURN_APPROVED",
+                    defaultText(request.getNote(), "Admin đã duyệt trả hàng")
+            ));
+            orderRepository.save(order);
+
+            saveOrderStatusHistory(order, previousStatus, ORDER_STATUS_RETURNED);
+            return;
+        }
+
+        order.setStatus(ORDER_STATUS_RETURN_REJECTED);
+        order.setNote(appendAuditNote(
+                order.getNote(),
+                "RETURN_REJECTED",
+                defaultText(request.getNote(), "Admin từ chối yêu cầu trả hàng")
+        ));
+        orderRepository.save(order);
+
+        saveOrderStatusHistory(order, previousStatus, ORDER_STATUS_RETURN_REJECTED);
     }
 
     @Override
@@ -466,6 +581,24 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal discountAmount = defaultZero(order.getDiscountAmount());
         BigDecimal discountPercent = calculateDiscountPercent(subtotalAmount, discountAmount);
 
+        Payment latestPayment = paymentRepository.findByOrder_Id(order.getId())
+                .stream()
+                .max(Comparator.comparing(Payment::getId))
+                .orElse(null);
+
+        String paymentStatus = latestPayment != null ? latestPayment.getStatus() : null;
+        String paymentMethodCode = latestPayment != null && latestPayment.getPaymentMethod() != null
+                ? latestPayment.getPaymentMethod().getCode()
+                : null;
+        String paymentMethodName = latestPayment != null && latestPayment.getPaymentMethod() != null
+                ? latestPayment.getPaymentMethod().getName()
+                : null;
+
+        boolean canRetryVnpay = ORDER_TYPE_ONLINE.equalsIgnoreCase(order.getOrderType())
+                && ORDER_STATUS_PENDING.equalsIgnoreCase(order.getStatus())
+                && "VNPAY".equalsIgnoreCase(paymentMethodCode)
+                && (paymentStatus == null || !"PAID".equalsIgnoreCase(paymentStatus));
+
         return OrderResponse.builder()
                 .id(order.getId())
                 .code(order.getCode())
@@ -488,6 +621,10 @@ public class OrderServiceImpl implements OrderService {
                 .orderType(order.getOrderType())
                 .employeeId(employeeId)
                 .employeeName(employeeName)
+                .paymentStatus(paymentStatus)
+                .paymentMethodCode(paymentMethodCode)
+                .paymentMethodName(paymentMethodName)
+                .canRetryVnpay(canRetryVnpay)
                 .build();
     }
 
@@ -553,6 +690,23 @@ public class OrderServiceImpl implements OrderService {
         return value == null ? BigDecimal.ZERO : value;
     }
 
+    private void restoreStockForOrder(Order order) {
+        if (order == null || order.getItems() == null) {
+            return;
+        }
+
+        for (OrderItem item : order.getItems()) {
+            ProductVariant variant = item.getProductVariant();
+            if (variant == null) {
+                continue;
+            }
+
+            int currentStock = variant.getStockQuantity() == null ? 0 : variant.getStockQuantity();
+            variant.setStockQuantity(currentStock + item.getQuantity());
+            productVariantRepository.save(variant);
+        }
+    }
+
     private Customer resolveCustomer(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new InvalidRequestException("User not found"));
@@ -560,5 +714,136 @@ public class OrderServiceImpl implements OrderService {
         return customerRepository
                 .findByUserProfileId(user.getUserProfile().getId())
                 .orElseThrow(() -> new InvalidRequestException("Customer not found"));
+    }
+
+    private void validateReturnReason(String reason) {
+        if (!StringUtils.hasText(reason) || reason.trim().length() < 10) {
+            throw new InvalidRequestException("Lý do trả hàng phải có ít nhất 10 ký tự.");
+        }
+    }
+
+    private OffsetDateTime findLatestCompletedAt(Order order) {
+        return orderStatusHistoryRepository.findByOrder_IdOrderByChangedAtAsc(order.getId())
+                .stream()
+                .filter(history -> ORDER_STATUS_COMPLETED.equalsIgnoreCase(history.getToStatus()))
+                .map(OrderStatusHistory::getChangedAt)
+                .max(OffsetDateTime::compareTo)
+                .orElse(null);
+    }
+
+    private void restoreStockForApprovedReturn(Order order) {
+        if (order == null || order.getItems() == null || order.getItems().isEmpty()) {
+            return;
+        }
+
+        for (OrderItem item : order.getItems()) {
+            if (item.getProductVariant() == null || item.getProductVariant().getId() == null) {
+                continue;
+            }
+
+            ProductVariant lockedVariant = productVariantRepository.findByIdForUpdate(item.getProductVariant().getId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Không tìm thấy biến thể sản phẩm: " + item.getProductVariant().getId()
+                    ));
+
+            int currentStock = lockedVariant.getStockQuantity() == null ? 0 : lockedVariant.getStockQuantity();
+            lockedVariant.setStockQuantity(currentStock + item.getQuantity());
+            productVariantRepository.save(lockedVariant);
+
+            InventoryTransaction transaction = new InventoryTransaction();
+            transaction.setProductVariant(lockedVariant);
+            transaction.setStore(order.getStore());
+            transaction.setTransactionType("IN");
+            transaction.setQuantity(item.getQuantity());
+            transaction.setReason("Hoàn kho do duyệt trả hàng cho đơn " + order.getCode());
+            transaction.setReferenceCode("RETURN-" + order.getCode());
+
+            inventoryTransactionRepository.save(transaction);
+        }
+    }
+
+    private void markPaymentRefundPending(Order order, String adminNote) {
+        Payment latestPayment = paymentRepository.findByOrder_Id(order.getId())
+                .stream()
+                .max(Comparator.comparing(Payment::getId))
+                .orElse(null);
+
+        if (latestPayment == null) {
+            return;
+        }
+
+        if (!PAYMENT_STATUS_PAID.equalsIgnoreCase(latestPayment.getStatus())) {
+            return;
+        }
+
+        latestPayment.setStatus(PAYMENT_STATUS_REFUND_PENDING);
+        latestPayment.setNote(appendAuditNote(
+                latestPayment.getNote(),
+                "REFUND_PENDING",
+                defaultText(adminNote, "Chờ hoàn tiền do admin duyệt trả hàng")
+        ));
+        paymentRepository.save(latestPayment);
+    }
+
+    private String appendAuditNote(String currentNote, String tag, String message) {
+        String safeMessage = defaultText(message, "N/A").trim();
+        String newLine = "[" + tag + "][" + OffsetDateTime.now() + "] " + safeMessage;
+
+        if (!StringUtils.hasText(currentNote)) {
+            return newLine;
+        }
+
+        return currentNote + System.lineSeparator() + newLine;
+    }
+
+    private String defaultText(String value, String fallback) {
+        return StringUtils.hasText(value) ? value.trim() : fallback;
+    }
+
+    private Map<Long, ProductVariant> lockVariantsForOnlineOrder(
+            Map<Long, Integer> requestedQuantityByVariantId
+    ) {
+        List<Long> sortedVariantIds = requestedQuantityByVariantId.keySet()
+                .stream()
+                .sorted()
+                .toList();
+
+        List<ProductVariant> lockedVariants = productVariantRepository.findAllByIdInForUpdate(sortedVariantIds);
+
+        Map<Long, ProductVariant> variantsMap = lockedVariants.stream()
+                .collect(Collectors.toMap(ProductVariant::getId, variant -> variant));
+
+        for (Long variantId : sortedVariantIds) {
+            if (!variantsMap.containsKey(variantId)) {
+                throw new ResourceNotFoundException("Product variant not found with id: " + variantId);
+            }
+        }
+
+        return variantsMap;
+    }
+
+    private void reserveStockForOnlineOrder(
+            Map<Long, Integer> requestedQuantityByVariantId,
+            Map<Long, ProductVariant> variantsMap
+    ) {
+        for (Map.Entry<Long, Integer> entry : requestedQuantityByVariantId.entrySet()) {
+            Long variantId = entry.getKey();
+            Integer requestedQuantity = entry.getValue();
+
+            ProductVariant variant = variantsMap.get(variantId);
+            int currentStock = variant.getStockQuantity() == null ? 0 : variant.getStockQuantity();
+
+            if (currentStock < requestedQuantity) {
+                throw new InvalidRequestException(
+                        "Không đủ tồn kho cho sản phẩm: "
+                                + variant.getProduct().getName()
+                                + " - "
+                                + variant.getCode()
+                );
+            }
+
+            variant.setStockQuantity(currentStock - requestedQuantity);
+            productVariantRepository.save(variant);
+        }
     }
 }

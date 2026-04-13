@@ -35,6 +35,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import com.vn.backend.entity.Customer;
+import com.vn.backend.entity.User;
+import com.vn.backend.repository.CustomerRepository;
+import com.vn.backend.repository.UserRepository;
+import com.vn.backend.exception.InvalidRequestException;
+import com.vn.backend.exception.ResourceNotFoundException;
 
 @Service
 @RequiredArgsConstructor
@@ -42,7 +48,12 @@ import java.util.TreeMap;
 public class VnpayServiceImpl implements com.vn.backend.service.VnpayService {
 
     private static final String ORDER_STATUS_DRAFT = "DRAFT";
+    private static final String ORDER_STATUS_PENDING = "PENDING";
+    private static final String ORDER_STATUS_CONFIRMED = "CONFIRMED";
+    private static final String ORDER_STATUS_SHIPPING = "SHIPPING";
     private static final String ORDER_STATUS_COMPLETED = "COMPLETED";
+    private static final String ORDER_STATUS_CANCELLED = "CANCELLED";
+    private static final String ORDER_TYPE_ONLINE = "ONLINE";
 
     private static final String PAYMENT_STATUS_PENDING = "PENDING";
     private static final String PAYMENT_STATUS_PAID = "PAID";
@@ -52,6 +63,9 @@ public class VnpayServiceImpl implements com.vn.backend.service.VnpayService {
     private static final ZoneId VNPAY_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final DateTimeFormatter VNPAY_DATE_FORMAT =
             DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+
+    private final UserRepository userRepository;
+    private final CustomerRepository customerRepository;
 
 
     private final VnpayConfig vnpayConfig;
@@ -117,7 +131,7 @@ public class VnpayServiceImpl implements com.vn.backend.service.VnpayService {
         vnpParams.put("vnp_OrderInfo", "Thanh toan hoa don POS " + order.getCode());
         vnpParams.put("vnp_OrderType", "other");
         vnpParams.put("vnp_Locale", "vn");
-        vnpParams.put("vnp_ReturnUrl", vnpayConfig.getReturnUrl());
+        vnpParams.put("vnp_ReturnUrl", vnpayConfig.getPosReturnUrl());
         vnpParams.put("vnp_IpAddr", getClientIp(httpServletRequest));
         vnpParams.put("vnp_CreateDate", now.format(VNPAY_DATE_FORMAT));
         vnpParams.put("vnp_ExpireDate", now.plusMinutes(15).format(VNPAY_DATE_FORMAT));
@@ -338,6 +352,253 @@ public class VnpayServiceImpl implements com.vn.backend.service.VnpayService {
         orderRepository.save(order);
 
         return new AppliedDiscount(appliedVoucherType, appliedVoucherCode);
+    }
+
+    @Override
+    public PosVnpayCreateResponse createOnlinePaymentUrl(
+            Long orderId,
+            Long userId,
+            HttpServletRequest httpServletRequest
+    ) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy đơn hàng"));
+
+        Customer customer = resolveCustomer(userId);
+        validateOnlineOrderOwner(order, customer);
+        validateOnlineOrderForVnpay(order);
+
+        Payment payment = paymentRepository
+                .findTopByOrder_IdAndPaymentMethod_CodeOrderByIdDesc(orderId, PAYMENT_CODE_VNPAY)
+                .orElseThrow(() -> new IllegalArgumentException("Đơn hàng này không được tạo với phương thức VNPAY"));
+
+        if (PAYMENT_STATUS_PAID.equalsIgnoreCase(payment.getStatus())) {
+            throw new IllegalArgumentException("Đơn hàng này đã được thanh toán");
+        }
+
+        String txnRef = generateUniqueTxnRef("ONL", order.getId());
+
+        payment.setProviderTxnRef(txnRef);
+        payment.setAmount(defaultZero(order.getTotalAmount()));
+        payment.setStatus(PAYMENT_STATUS_PENDING);
+        payment.setNote("Khởi tạo thanh toán VNPAY cho đơn online");
+        paymentRepository.save(payment);
+
+        OffsetDateTime now = OffsetDateTime.now(VNPAY_ZONE);
+
+        TreeMap<String, String> vnpParams = VnpayUtil.sortedMap();
+        vnpParams.put("vnp_Version", "2.1.0");
+        vnpParams.put("vnp_Command", "pay");
+        vnpParams.put("vnp_TmnCode", vnpayConfig.getTmnCode());
+        vnpParams.put(
+                "vnp_Amount",
+                defaultZero(order.getTotalAmount())
+                        .multiply(BigDecimal.valueOf(100))
+                        .setScale(0, RoundingMode.HALF_UP)
+                        .toPlainString()
+        );
+        vnpParams.put("vnp_CurrCode", "VND");
+        vnpParams.put("vnp_TxnRef", txnRef);
+        vnpParams.put("vnp_OrderInfo", "Thanh toan don hang online " + order.getCode());
+        vnpParams.put("vnp_OrderType", "other");
+        vnpParams.put("vnp_Locale", "vn");
+        vnpParams.put("vnp_ReturnUrl", vnpayConfig.getOnlineReturnUrl());
+        vnpParams.put("vnp_IpAddr", getClientIp(httpServletRequest));
+        vnpParams.put("vnp_CreateDate", now.format(VNPAY_DATE_FORMAT));
+        vnpParams.put("vnp_ExpireDate", now.plusMinutes(15).format(VNPAY_DATE_FORMAT));
+
+        String hashData = VnpayUtil.buildHashData(vnpParams);
+        String secureHash = VnpayUtil.hmacSHA512(vnpayConfig.getHashSecret(), hashData);
+        vnpParams.put("vnp_SecureHash", secureHash);
+
+        String paymentUrl = vnpayConfig.getPayUrl() + "?" + VnpayUtil.buildQueryString(vnpParams);
+
+        return PosVnpayCreateResponse.builder()
+                .orderId(order.getId())
+                .orderCode(order.getCode())
+                .txnRef(txnRef)
+                .paymentUrl(paymentUrl)
+                .build();
+    }
+
+    @Override
+    public PosVnpayReturnResponse handleOnlineReturn(Map<String, String> params) {
+        String txnRef = params.get("vnp_TxnRef");
+        String transactionNo = params.get("vnp_TransactionNo");
+        String responseCode = params.get("vnp_ResponseCode");
+        String transactionStatus = params.get("vnp_TransactionStatus");
+        String secureHash = params.get("vnp_SecureHash");
+
+        if (!isValidChecksum(params, secureHash)) {
+            return PosVnpayReturnResponse.builder()
+                    .success(false)
+                    .message("Sai chữ ký bảo mật")
+                    .txnRef(txnRef)
+                    .transactionNo(transactionNo)
+                    .responseCode(responseCode)
+                    .build();
+        }
+
+        Payment payment = paymentRepository.findByProviderTxnRef(txnRef).orElse(null);
+        Long orderId = payment != null && payment.getOrder() != null
+                ? payment.getOrder().getId()
+                : null;
+
+        boolean success = isPaymentSuccess(responseCode, transactionStatus);
+
+        if (payment != null) {
+            if (success) {
+                finalizeSuccessfulOnlinePayment(
+                        payment,
+                        transactionNo,
+                        "Thanh toán VNPAY online thành công (RETURN)"
+                );
+            } else {
+                markOnlinePaymentFailed(
+                        payment,
+                        transactionNo,
+                        responseCode,
+                        transactionStatus,
+                        "RETURN"
+                );
+            }
+        }
+
+        return PosVnpayReturnResponse.builder()
+                .success(success)
+                .message(success
+                        ? "Thanh toán thành công"
+                        : buildFailureMessage(responseCode, transactionStatus))
+                .txnRef(txnRef)
+                .transactionNo(transactionNo)
+                .responseCode(responseCode)
+                .orderId(orderId)
+                .build();
+    }
+
+    @Override
+    public String handleOnlineIpn(Map<String, String> params) {
+        String txnRef = params.get("vnp_TxnRef");
+        String transactionNo = params.get("vnp_TransactionNo");
+        String responseCode = params.get("vnp_ResponseCode");
+        String transactionStatus = params.get("vnp_TransactionStatus");
+        String secureHash = params.get("vnp_SecureHash");
+
+        if (!isValidChecksum(params, secureHash)) {
+            return "{\"RspCode\":\"97\",\"Message\":\"Invalid Checksum\"}";
+        }
+
+        Payment payment = paymentRepository.findByProviderTxnRef(txnRef).orElse(null);
+
+        if (payment == null) {
+            return "{\"RspCode\":\"01\",\"Message\":\"Order not found\"}";
+        }
+
+        if (isPaymentSuccess(responseCode, transactionStatus)) {
+            finalizeSuccessfulOnlinePayment(
+                    payment,
+                    transactionNo,
+                    "Thanh toán VNPAY online thành công (IPN)"
+            );
+            return "{\"RspCode\":\"00\",\"Message\":\"Confirm Success\"}";
+        }
+
+        markOnlinePaymentFailed(
+                payment,
+                transactionNo,
+                responseCode,
+                transactionStatus,
+                "IPN"
+        );
+        return "{\"RspCode\":\"00\",\"Message\":\"Confirm Success\"}";
+    }
+
+    private void validateOnlineOrderOwner(Order order, Customer customer) {
+        if (order.getCustomer() == null || !order.getCustomer().getId().equals(customer.getId())) {
+            throw new InvalidRequestException("Bạn không có quyền thanh toán đơn hàng này");
+        }
+    }
+
+    private void validateOnlineOrderForVnpay(Order order) {
+        if (order.getOrderType() == null || !ORDER_TYPE_ONLINE.equalsIgnoreCase(order.getOrderType())) {
+            throw new InvalidRequestException("Đây không phải đơn hàng online");
+        }
+
+        if (ORDER_STATUS_CANCELLED.equalsIgnoreCase(order.getStatus())
+                || ORDER_STATUS_COMPLETED.equalsIgnoreCase(order.getStatus())
+                || ORDER_STATUS_SHIPPING.equalsIgnoreCase(order.getStatus())) {
+            throw new InvalidRequestException("Đơn hàng này không còn ở trạng thái thanh toán hợp lệ");
+        }
+    }
+
+    private void finalizeSuccessfulOnlinePayment(
+            Payment payment,
+            String transactionNo,
+            String successNote
+    ) {
+        if (PAYMENT_STATUS_PAID.equalsIgnoreCase(payment.getStatus())) {
+            return;
+        }
+
+        payment.setStatus(PAYMENT_STATUS_PAID);
+        payment.setTransactionCode(transactionNo);
+        payment.setPaidAt(OffsetDateTime.now());
+        payment.setNote(successNote);
+        paymentRepository.save(payment);
+
+        Order order = payment.getOrder();
+        if (order != null) {
+            String previousStatus = order.getStatus();
+
+            order.setCustomerPaid(defaultZero(payment.getAmount()));
+
+            if (!ORDER_STATUS_CONFIRMED.equalsIgnoreCase(order.getStatus())) {
+                order.setStatus(ORDER_STATUS_CONFIRMED);
+                orderRepository.save(order);
+                saveOrderStatusHistory(order, previousStatus, ORDER_STATUS_CONFIRMED);
+            } else {
+                orderRepository.save(order);
+            }
+
+            saveVoucherUsageIfNeeded(order);
+        }
+    }
+
+    private void markOnlinePaymentFailed(
+            Payment payment,
+            String transactionNo,
+            String responseCode,
+            String transactionStatus,
+            String source
+    ) {
+        if (PAYMENT_STATUS_PAID.equalsIgnoreCase(payment.getStatus())) {
+            return;
+        }
+
+        payment.setStatus(PAYMENT_STATUS_FAILED);
+        payment.setTransactionCode(transactionNo);
+        payment.setNote(
+                "Thanh toán VNPAY online thất bại (" + source + ") - responseCode="
+                        + responseCode
+                        + ", transactionStatus="
+                        + transactionStatus
+        );
+        paymentRepository.save(payment);
+    }
+
+    private Customer resolveCustomer(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        return customerRepository.findByUserProfileId(user.getUserProfile().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
+    }
+
+    private String generateUniqueTxnRef(String prefix, Long orderId) {
+        String txnRef;
+        do {
+            txnRef = prefix + orderId + System.currentTimeMillis();
+        } while (paymentRepository.existsByProviderTxnRef(txnRef));
+        return txnRef;
     }
 
     private BigDecimal calculateFinalAmount(Order order) {
