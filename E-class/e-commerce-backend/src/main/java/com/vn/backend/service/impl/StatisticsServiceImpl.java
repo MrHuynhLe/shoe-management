@@ -28,13 +28,14 @@ public class StatisticsServiceImpl implements StatisticsService {
         );
 
         if (result == null) {
-            return new OverviewStatisticsResponse(0L, 0L, 0.0, 0L);
+            return new OverviewStatisticsResponse(0L, 0L, 0.0, 0.0, 0L);
         }
 
         return new OverviewStatisticsResponse(
                 result.getTotalOrders() != null ? result.getTotalOrders() : 0L,
                 result.getTotalProductsSold() != null ? result.getTotalProductsSold() : 0L,
                 result.getTotalRevenue() != null ? result.getTotalRevenue().doubleValue() : 0.0,
+                result.getTotalProfit() != null ? result.getTotalProfit().doubleValue() : 0.0,
                 result.getTotalCustomers() != null ? result.getTotalCustomers() : 0L
         );
     }
@@ -42,13 +43,18 @@ public class StatisticsServiceImpl implements StatisticsService {
     @Override
     public DashboardResponse getDashboard(StatisticsQuery query) {
         OverviewStatisticsResponse overview = getOverview(query);
-        BigDecimal totalProfit = getRevenue("day", query).stream()
-                .map(RevenueChartItemResponse::profit)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalRevenue = BigDecimal.valueOf(
+                overview.getTotalRevenue() != null ? overview.getTotalRevenue() : 0.0
+        );
+
+        BigDecimal totalProfit = BigDecimal.valueOf(
+                overview.getTotalProfit() != null ? overview.getTotalProfit() : 0.0
+        );
 
         return new DashboardResponse(
                 overview.getTotalOrders() != null ? overview.getTotalOrders() : 0L,
-                BigDecimal.valueOf(overview.getTotalRevenue() != null ? overview.getTotalRevenue() : 0.0),
+                totalRevenue,
                 overview.getTotalProductsSold() != null ? overview.getTotalProductsSold() : 0L,
                 totalProfit,
                 0L,

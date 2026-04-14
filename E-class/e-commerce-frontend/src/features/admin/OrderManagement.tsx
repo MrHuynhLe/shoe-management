@@ -308,108 +308,108 @@ const OrderManagementPage = () => {
       render: (_, record) => getOrderTypeTag(record.orderType),
     },
     {
-  title: "Thao tác",
-  valueType: "option",
-  align: "center",
-  fixed: "right",
-  width: 320,
-  render: (_, record) => [
-    <Tooltip title="Xem chi tiết" key="view">
-      <Button
-        icon={<EyeOutlined />}
-        shape="circle"
-        type="text"
-        size="large"
-        onClick={() => {
-          setSelectedOrderId(record.id);
-          setIsModalVisible(true);
-        }}
-      />
-    </Tooltip>,
-
-    record.status === "PENDING" && (
-      <Popconfirm
-        key="confirm"
-        title="Xác nhận đơn hàng này?"
-        description="Trạng thái sẽ chuyển sang Đã xác nhận để kho xử lý."
-        onConfirm={() => handleUpdateStatus(record.id, "CONFIRMED")}
-        okText="Xác nhận"
-        cancelText="Hủy"
-      >
-        <Tooltip title="Xác nhận đơn hàng">
+      title: "Thao tác",
+      valueType: "option",
+      align: "center",
+      fixed: "right",
+      width: 320,
+      render: (_, record) => [
+        <Tooltip title="Xem chi tiết" key="view">
           <Button
-            type="primary"
-            icon={<CheckCircleOutlined />}
+            icon={<EyeOutlined />}
             shape="circle"
+            type="text"
             size="large"
+            onClick={() => {
+              setSelectedOrderId(record.id);
+              setIsModalVisible(true);
+            }}
           />
-        </Tooltip>
-      </Popconfirm>
-    ),
+        </Tooltip>,
 
-    record.status === "CONFIRMED" && (
-      <Popconfirm
-        key="ship"
-        title="Xác nhận giao hàng?"
-        description="Trạng thái sẽ chuyển sang Đang giao hàng."
-        onConfirm={() => handleUpdateStatus(record.id, "SHIPPING")}
-        okText="Xác nhận"
-        cancelText="Hủy"
-      >
-        <Tooltip title="Giao hàng">
-          <Button
-            type="default"
-            icon={<CarOutlined />}
-            shape="circle"
-            size="large"
-          />
-        </Tooltip>
-      </Popconfirm>
-    ),
+        record.status === "PENDING" && (
+          <Popconfirm
+            key="confirm"
+            title="Xác nhận đơn hàng này?"
+            description="Đơn sẽ chuyển sang Đã xác nhận và hệ thống sẽ trừ tồn kho."
+            onConfirm={() => handleUpdateStatus(record.id, "CONFIRMED")}
+            okText="Xác nhận"
+            cancelText="Hủy"
+          >
+            <Tooltip title="Xác nhận đơn hàng">
+              <Button
+                type="primary"
+                icon={<CheckCircleOutlined />}
+                shape="circle"
+                size="large"
+              />
+            </Tooltip>
+          </Popconfirm>
+        ),
 
-    record.status === "SHIPPING" && (
-      <Popconfirm
-        key="complete"
-        title="Hoàn thành đơn hàng?"
-        onConfirm={() => handleUpdateStatus(record.id, "COMPLETED")}
-        okText="Đồng ý"
-        cancelText="Hủy"
-      >
-        <Tooltip title="Hoàn thành">
-          <Button
-            icon={<CheckCircleOutlined />}
-            shape="circle"
-            size="large"
-            style={{ color: "green", borderColor: "green" }}
-          />
-        </Tooltip>
-      </Popconfirm>
-    ),
+        record.status === "CONFIRMED" && (
+          <Popconfirm
+            key="ship"
+            title="Xác nhận giao hàng?"
+            description="Trạng thái sẽ chuyển sang Đang giao hàng."
+            onConfirm={() => handleUpdateStatus(record.id, "SHIPPING")}
+            okText="Xác nhận"
+            cancelText="Hủy"
+          >
+            <Tooltip title="Giao hàng">
+              <Button
+                type="default"
+                icon={<CarOutlined />}
+                shape="circle"
+                size="large"
+              />
+            </Tooltip>
+          </Popconfirm>
+        ),
 
-    record.status === "RETURN_REQUESTED" && (
-      <Space key={`return-actions-${record.id}`}>
-        <Popconfirm
-          title="Duyệt trả hàng?"
-          description="Hệ thống sẽ hoàn kho và chuyển thanh toán sang chờ hoàn tiền nếu đơn đã thanh toán."
-          onConfirm={() => handleReviewReturn(record.id, "APPROVE")}
-          okText="Duyệt"
-          cancelText="Không"
-        >
-          <Button type="primary">Duyệt trả hàng</Button>
-        </Popconfirm>
+        record.status === "SHIPPING" && (
+          <Popconfirm
+            key="complete"
+            title="Hoàn thành đơn hàng?"
+            onConfirm={() => handleUpdateStatus(record.id, "COMPLETED")}
+            okText="Đồng ý"
+            cancelText="Hủy"
+          >
+            <Tooltip title="Hoàn thành">
+              <Button
+                icon={<CheckCircleOutlined />}
+                shape="circle"
+                size="large"
+                style={{ color: "green", borderColor: "green" }}
+              />
+            </Tooltip>
+          </Popconfirm>
+        ),
 
-        <Popconfirm
-          title="Từ chối yêu cầu trả hàng?"
-          onConfirm={() => handleReviewReturn(record.id, "REJECT")}
-          okText="Từ chối"
-          cancelText="Không"
-        >
-          <Button danger>Từ chối</Button>
-        </Popconfirm>
-      </Space>
-    ),
-  ],
-},
+        record.status === "RETURN_REQUESTED" && (
+          <Space key={`return-actions-${record.id}`}>
+            <Popconfirm
+              title="Duyệt trả hàng?"
+              description="Hệ thống sẽ hoàn kho và chuyển thanh toán sang chờ hoàn tiền nếu đơn đã thanh toán."
+              onConfirm={() => handleReviewReturn(record.id, "APPROVE")}
+              okText="Duyệt"
+              cancelText="Không"
+            >
+              <Button type="primary">Duyệt trả hàng</Button>
+            </Popconfirm>
+
+            <Popconfirm
+              title="Từ chối yêu cầu trả hàng?"
+              onConfirm={() => handleReviewReturn(record.id, "REJECT")}
+              okText="Từ chối"
+              cancelText="Không"
+            >
+              <Button danger>Từ chối</Button>
+            </Popconfirm>
+          </Space>
+        ),
+      ],
+    },
   ];
 
   const renderOrderTable = (orders: Order[]) => {
@@ -433,64 +433,64 @@ const OrderManagementPage = () => {
     );
   };
 
- const tabItems = [
-  {
-    key: "PENDING",
-    label: `Chờ xác nhận (${baseFilteredOrders.filter((o) => o.status === "PENDING").length})`,
-    children: renderOrderTable(
-      baseFilteredOrders.filter((o) => o.status === "PENDING"),
-    ),
-  },
-  {
-    key: "CONFIRMED",
-    label: `Đã xác nhận (${baseFilteredOrders.filter((o) => o.status === "CONFIRMED").length})`,
-    children: renderOrderTable(
-      baseFilteredOrders.filter((o) => o.status === "CONFIRMED"),
-    ),
-  },
-  {
-    key: "SHIPPING",
-    label: `Đang giao (${baseFilteredOrders.filter((o) => o.status === "SHIPPING").length})`,
-    children: renderOrderTable(
-      baseFilteredOrders.filter((o) => o.status === "SHIPPING"),
-    ),
-  },
-  {
-    key: "COMPLETED",
-    label: `Hoàn thành (${baseFilteredOrders.filter((o) => o.status === "COMPLETED").length})`,
-    children: renderOrderTable(
-      baseFilteredOrders.filter((o) => o.status === "COMPLETED"),
-    ),
-  },
-  {
-    key: "RETURN_REQUESTED",
-    label: `Chờ duyệt trả hàng (${baseFilteredOrders.filter((o) => o.status === "RETURN_REQUESTED").length})`,
-    children: renderOrderTable(
-      baseFilteredOrders.filter((o) => o.status === "RETURN_REQUESTED"),
-    ),
-  },
-  {
-    key: "RETURNED",
-    label: `Đã trả hàng (${baseFilteredOrders.filter((o) => o.status === "RETURNED").length})`,
-    children: renderOrderTable(
-      baseFilteredOrders.filter((o) => o.status === "RETURNED"),
-    ),
-  },
-  {
-    key: "RETURN_REJECTED",
-    label: `Từ chối trả hàng (${baseFilteredOrders.filter((o) => o.status === "RETURN_REJECTED").length})`,
-    children: renderOrderTable(
-      baseFilteredOrders.filter((o) => o.status === "RETURN_REJECTED"),
-    ),
-  },
-  {
-    key: "CANCELLED",
-    label: `Đã hủy (${baseFilteredOrders.filter((o) => o.status === "CANCELLED").length})`,
-    children: renderOrderTable(
-      baseFilteredOrders.filter((o) => o.status === "CANCELLED"),
-    ),
-  },
-];
+  const tabItems = [
+    {
+      key: "PENDING",
+      label: `Chờ xác nhận (${baseFilteredOrders.filter((o) => o.status === "PENDING").length})`,
+      children: renderOrderTable(
+        baseFilteredOrders.filter((o) => o.status === "PENDING"),
+      ),
+    },
+    {
+      key: "CONFIRMED",
+      label: `Đã xác nhận (${baseFilteredOrders.filter((o) => o.status === "CONFIRMED").length})`,
+      children: renderOrderTable(
+        baseFilteredOrders.filter((o) => o.status === "CONFIRMED"),
+      ),
+    },
+    {
+      key: "SHIPPING",
+      label: `Đang giao (${baseFilteredOrders.filter((o) => o.status === "SHIPPING").length})`,
+      children: renderOrderTable(
+        baseFilteredOrders.filter((o) => o.status === "SHIPPING"),
+      ),
+    },
+    {
+      key: "COMPLETED",
+      label: `Hoàn thành (${baseFilteredOrders.filter((o) => o.status === "COMPLETED").length})`,
+      children: renderOrderTable(
+        baseFilteredOrders.filter((o) => o.status === "COMPLETED"),
+      ),
+    },
+    {
+      key: "RETURN_REQUESTED",
+      label: `Chờ duyệt trả hàng (${baseFilteredOrders.filter((o) => o.status === "RETURN_REQUESTED").length})`,
+      children: renderOrderTable(
+        baseFilteredOrders.filter((o) => o.status === "RETURN_REQUESTED"),
+      ),
+    },
+    {
+      key: "RETURNED",
+      label: `Đã trả hàng (${baseFilteredOrders.filter((o) => o.status === "RETURNED").length})`,
+      children: renderOrderTable(
+        baseFilteredOrders.filter((o) => o.status === "RETURNED"),
+      ),
+    },
+    {
+      key: "RETURN_REJECTED",
+      label: `Từ chối trả hàng (${baseFilteredOrders.filter((o) => o.status === "RETURN_REJECTED").length})`,
+      children: renderOrderTable(
+        baseFilteredOrders.filter((o) => o.status === "RETURN_REJECTED"),
+      ),
+    },
+    {
+      key: "CANCELLED",
+      label: `Đã hủy (${baseFilteredOrders.filter((o) => o.status === "CANCELLED").length})`,
+      children: renderOrderTable(
+        baseFilteredOrders.filter((o) => o.status === "CANCELLED"),
+      ),
+    },
+  ];
 
   return (
     <Card

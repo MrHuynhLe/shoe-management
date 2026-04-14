@@ -13,11 +13,12 @@ export const productService = {
   getOrigins: () => axiosClient.get("/v1/origins"),
   getSuppliers: () => axiosClient.get("/v1/suppliers"),
   getAttributes: () => axiosClient.get("/v1/attributes"),
+
   getColors: () => axiosClient.get("/v1/attributes/color/values"),
   getSizes: () => axiosClient.get("/v1/attributes/size/values"),
+  getMaterials: () => axiosClient.get("/v1/attributes/material/values"),
 
-
-  createProduct: (formData: FormData) =>
+  createProductWithImages: (formData: FormData) =>
     axiosClient.post("/v1/products/with-images", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
@@ -26,13 +27,6 @@ export const productService = {
 
   uploadImage: (formData: FormData) =>
     axiosClient.post("/v1/products/upload-image", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    }),
-
-  createProductWithImages: (formData: FormData) =>
-    axiosClient.post("/v1/products/with-images", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
@@ -53,7 +47,7 @@ export const productService = {
       "data",
       new Blob([JSON.stringify({ productId, variants: variantsJson })], {
         type: "application/json",
-      })
+      }),
     );
 
     variants.forEach((variant) => {

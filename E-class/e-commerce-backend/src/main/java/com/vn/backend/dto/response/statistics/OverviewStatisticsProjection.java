@@ -6,5 +6,6 @@ public interface OverviewStatisticsProjection {
     Long getTotalOrders();
     Long getTotalProductsSold();
     BigDecimal getTotalRevenue();
+    BigDecimal getTotalProfit();
     Long getTotalCustomers();
 }

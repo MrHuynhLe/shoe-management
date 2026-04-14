@@ -14,7 +14,6 @@ public class ProductVariantCreateRequest {
     @NotNull(message = "ProductId không được để trống")
     private Long productId;
 
-    @NotBlank(message = "Mã biến thể không được để trống")
     private String code;
 
     private String barcode;

@@ -53,6 +53,7 @@ const DashboardPage = () => {
 
   const [overview, setOverview] = useState<OverviewStatistics>({
     totalRevenue: 0,
+    totalProfit: 0,
     totalOrders: 0,
     totalProductsSold: 0,
     totalCustomers: 0,
@@ -95,6 +96,7 @@ const DashboardPage = () => {
       setOverview(
         overviewRes ?? {
           totalRevenue: 0,
+          totalProfit: 0,
           totalOrders: 0,
           totalProductsSold: 0,
           totalCustomers: 0,
@@ -438,6 +440,18 @@ const DashboardPage = () => {
               />
             </Card>
           </Col>
+
+          <Col xs={24} sm={12} xl={6}>
+            <Card>
+              <Statistic
+                title="Tổng lợi nhuận"
+                value={Number(overview.totalProfit || 0)}
+                formatter={(value) => formatCurrency(Number(value || 0))}
+                prefix={<DollarCircleOutlined />}
+              />
+            </Card>
+          </Col>
+
           <Col xs={24} sm={12} xl={6}>
             <Card>
               <Statistic
@@ -448,6 +462,7 @@ const DashboardPage = () => {
               />
             </Card>
           </Col>
+
           <Col xs={24} sm={12} xl={6}>
             <Card>
               <Statistic
@@ -458,6 +473,7 @@ const DashboardPage = () => {
               />
             </Card>
           </Col>
+
           <Col xs={24} sm={12} xl={6}>
             <Card>
               <Statistic
@@ -467,6 +483,7 @@ const DashboardPage = () => {
               />
             </Card>
           </Col>
+
           <Col xs={24} sm={12} xl={6}>
             <Card>
               <Statistic
@@ -476,6 +493,7 @@ const DashboardPage = () => {
               />
             </Card>
           </Col>
+
           <Col xs={24} sm={12} xl={6}>
             <Card>
               <Statistic

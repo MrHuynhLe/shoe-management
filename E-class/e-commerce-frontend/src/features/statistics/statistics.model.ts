@@ -7,6 +7,7 @@ export interface StatisticsQuery {
 
 export interface OverviewStatistics {
   totalRevenue: number;
+  totalProfit: number;
   totalOrders: number;
   totalProductsSold: number;
   totalCustomers: number;
@@ -36,7 +37,6 @@ export interface OrderStatusItem {
   totalOrders: number;
   totalAmount: number;
 }
-
 
 export interface PaymentMethodRevenueItem {
   paymentMethodCode: string;

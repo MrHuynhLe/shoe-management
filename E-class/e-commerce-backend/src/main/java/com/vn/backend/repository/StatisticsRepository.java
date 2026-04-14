@@ -25,7 +25,7 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
             ) AS revenue
         FROM orders o
         JOIN order_items oi ON oi.order_id = o.id
-        WHERE o.status = 'COMPLETED'
+       WHERE o.status IN ('COMPLETED', 'RETURN_REQUESTED', 'RETURN_REJECTED')
           AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
           AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
         GROUP BY o.id, DATE_TRUNC('day', o.created_at), o.discount_amount
@@ -58,7 +58,7 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
             ) AS revenue
         FROM orders o
         JOIN order_items oi ON oi.order_id = o.id
-        WHERE o.status = 'COMPLETED'
+        WHERE o.status IN ('COMPLETED', 'RETURN_REQUESTED', 'RETURN_REJECTED')
           AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
           AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
         GROUP BY o.id, DATE_TRUNC('week', o.created_at), o.discount_amount
@@ -91,7 +91,7 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
             ) AS revenue
         FROM orders o
         JOIN order_items oi ON oi.order_id = o.id
-        WHERE o.status = 'COMPLETED'
+       WHERE o.status IN ('COMPLETED', 'RETURN_REQUESTED', 'RETURN_REJECTED')
           AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
           AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
         GROUP BY o.id, DATE_TRUNC('month', o.created_at), o.discount_amount
@@ -111,6 +111,9 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
             @Param("toDate") String toDate
     );
 
+
+
+
     @Query(value = """
     WITH order_summary AS (
         SELECT
@@ -120,10 +123,11 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
             GREATEST(
                 COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0) - COALESCE(o.discount_amount, 0),
                 0
-            ) AS total_revenue
+            ) AS total_revenue,
+            COALESCE(SUM(oi.quantity * (oi.price_at_purchase - oi.cost_price_at_purchase)), 0) AS total_profit
         FROM orders o
         JOIN order_items oi ON oi.order_id = o.id
-        WHERE o.status = 'COMPLETED'
+        WHERE o.status IN ('COMPLETED', 'RETURN_REQUESTED', 'RETURN_REJECTED')
           AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
           AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
         GROUP BY o.id, o.customer_id, o.discount_amount
@@ -132,6 +136,7 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
         COUNT(order_id) AS totalOrders,
         COALESCE(SUM(total_products_sold), 0) AS totalProductsSold,
         COALESCE(SUM(total_revenue), 0) AS totalRevenue,
+        COALESCE(SUM(total_profit), 0) AS totalProfit,
         COUNT(DISTINCT customer_id) AS totalCustomers
     FROM order_summary
 """, nativeQuery = true)
@@ -155,7 +160,7 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
     JOIN products p ON p.id = pv.product_id
     LEFT JOIN brands b ON b.id = p.brand_id
     LEFT JOIN categories c ON c.id = p.category_id
-    WHERE o.status = 'COMPLETED'
+   WHERE o.status IN ('COMPLETED', 'RETURN_REQUESTED', 'RETURN_REJECTED')
       AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
       AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
     GROUP BY p.id, p.code, p.name, b.name, c.name
@@ -168,7 +173,7 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
         JOIN orders o ON o.id = oi.order_id
         JOIN product_variants pv ON pv.id = oi.product_variant_id
         JOIN products p ON p.id = pv.product_id
-        WHERE o.status = 'COMPLETED'
+       WHERE o.status IN ('COMPLETED', 'RETURN_REQUESTED', 'RETURN_REJECTED')
           AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
           AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
         GROUP BY p.id
@@ -196,7 +201,16 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
             )
         ), 0) AS totalAmount
     FROM orders o
-    WHERE o.status IN ('PENDING', 'CONFIRMED', 'SHIPPING', 'COMPLETED', 'CANCELLED')
+            WHERE o.status IN (
+                'PENDING',
+                'CONFIRMED',
+                'SHIPPING',
+                'COMPLETED',
+                'RETURN_REQUESTED',
+                'RETURNED',
+                'RETURN_REJECTED',
+                'CANCELLED'
+            )
       AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
       AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
     GROUP BY o.status
@@ -225,7 +239,7 @@ SELECT
 FROM payments p
 JOIN orders o ON o.id = p.order_id
 LEFT JOIN payment_methods pm ON pm.id = p.payment_method_id
-WHERE o.status = 'COMPLETED'
+WHERE o.status IN ('COMPLETED', 'RETURN_REQUESTED', 'RETURN_REJECTED')
   AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
   AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
 GROUP BY pm.code, pm.name
@@ -235,4 +249,6 @@ ORDER BY revenue DESC, paymentMethodName ASC
             @Param("fromDate") String fromDate,
             @Param("toDate") String toDate
     );
+
+
 }
