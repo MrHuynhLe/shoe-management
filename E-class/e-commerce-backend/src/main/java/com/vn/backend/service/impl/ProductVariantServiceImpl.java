@@ -16,6 +16,8 @@ import com.vn.backend.service.ProductVariantService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+import java.text.Normalizer;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -112,10 +114,6 @@ public class ProductVariantServiceImpl implements ProductVariantService {
             Boolean isActive,
             List<Long> attributeValueIds
     ) {
-        if (code == null || code.isBlank()) {
-            throw new RuntimeException("Mã biến thể không được để trống");
-        }
-
         if (costPrice == null || sellingPrice == null) {
             throw new RuntimeException("Giá nhập và giá bán không được để trống");
         }
@@ -126,11 +124,6 @@ public class ProductVariantServiceImpl implements ProductVariantService {
 
         Product product = productRepository.findByIdAndDeletedAtIsNull(productId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm"));
-
-        String trimmedCode = code.trim();
-        if (productVariantRepository.existsByCodeAndDeletedAtIsNull(trimmedCode)) {
-            throw new RuntimeException("Mã biến thể đã tồn tại");
-        }
 
         String trimmedBarcode = null;
         if (barcode != null && !barcode.isBlank()) {
@@ -158,9 +151,15 @@ public class ProductVariantServiceImpl implements ProductVariantService {
         validateNoDuplicateAttributeType(attributeValues);
         validateDuplicateCombination(productId, attributeValues);
 
+        String resolvedCode = resolveVariantCode(product, code, attributeValues);
+
+        if (productVariantRepository.existsByCodeAndDeletedAtIsNull(resolvedCode)) {
+            throw new RuntimeException("Mã biến thể đã tồn tại");
+        }
+
         ProductVariant variant = new ProductVariant();
         variant.setProduct(product);
-        variant.setCode(trimmedCode);
+        variant.setCode(resolvedCode);
         variant.setBarcode(trimmedBarcode);
         variant.setCostPrice(costPrice);
         variant.setSellingPrice(sellingPrice);
@@ -259,5 +258,60 @@ public class ProductVariantServiceImpl implements ProductVariantService {
                 variant.getIsActive(),
                 attributes
         );
+    }
+
+    private String resolveVariantCode(
+            Product product,
+            String requestedCode,
+            List<AttributeValue> attributeValues
+    ) {
+        if (StringUtils.hasText(requestedCode)) {
+            return ensureUniqueVariantCode(normalizeCode(requestedCode));
+        }
+
+        String color = attributeValues.stream()
+                .filter(av -> "COLOR".equalsIgnoreCase(av.getAttribute().getCode()))
+                .map(AttributeValue::getValue)
+                .findFirst()
+                .orElse("COLOR");
+
+        String size = attributeValues.stream()
+                .filter(av -> "SIZE".equalsIgnoreCase(av.getAttribute().getCode()))
+                .map(AttributeValue::getValue)
+                .findFirst()
+                .orElse("SIZE");
+
+        String baseCode = normalizeCode(product.getCode() + "-" + color + "-" + size);
+        return ensureUniqueVariantCode(baseCode);
+    }
+
+    private String ensureUniqueVariantCode(String baseCode) {
+        String candidate = baseCode;
+        int counter = 1;
+
+        while (productVariantRepository.existsByCodeAndDeletedAtIsNull(candidate)) {
+            candidate = baseCode + "-" + String.format("%02d", counter++);
+        }
+
+        return candidate;
+    }
+
+    private String normalizeCode(String input) {
+        if (!StringUtils.hasText(input)) {
+            return "";
+        }
+
+        String normalized = Normalizer.normalize(input, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .replace("đ", "d")
+                .replace("Đ", "D")
+                .trim()
+                .toUpperCase()
+                .replaceAll("[^A-Z0-9\\s-]", "")
+                .replaceAll("\\s+", "-")
+                .replaceAll("-+", "-")
+                .replaceAll("^-|-$", "");
+
+        return normalized.length() > 50 ? normalized.substring(0, 50) : normalized;
     }
 }

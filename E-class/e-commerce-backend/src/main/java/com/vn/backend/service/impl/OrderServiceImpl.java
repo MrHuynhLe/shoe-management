@@ -99,7 +99,6 @@ public class OrderServiceImpl implements OrderService {
         }
 
         Map<Long, ProductVariant> variantsMap = lockVariantsForOnlineOrder(requestedQuantityByVariantId);
-        reserveStockForOnlineOrder(requestedQuantityByVariantId, variantsMap);
 
         for (OrderItemRequest itemRequest : request.getItems()) {
             ProductVariant variant = variantsMap.get(itemRequest.getVariantId());
@@ -351,35 +350,18 @@ public class OrderServiceImpl implements OrderService {
             return mapToOrderResponse(order);
         }
 
-        if (ORDER_STATUS_RETURN_REQUESTED.equals(previousStatus)) {
-            throw new InvalidRequestException(
-                    "Đơn hàng đang có yêu cầu trả hàng. Hãy dùng chức năng duyệt / từ chối trả hàng."
-            );
-        }
-
-        if (ORDER_STATUS_CANCELLED.equals(previousStatus)
-                || ORDER_STATUS_COMPLETED.equals(previousStatus)
-                || ORDER_STATUS_RETURNED.equals(previousStatus)
-                || ORDER_STATUS_RETURN_REJECTED.equals(previousStatus)) {
+        if (ORDER_STATUS_CANCELLED.equals(previousStatus) || ORDER_STATUS_COMPLETED.equals(previousStatus)) {
             throw new InvalidRequestException("Không thể cập nhật trạng thái từ đơn hàng đã kết thúc.");
         }
 
-        if (ORDER_STATUS_SHIPPING.equals(normalizedStatus)
-                && !ORDER_TYPE_ONLINE.equalsIgnoreCase(order.getOrderType())) {
-            for (OrderItem item : order.getItems()) {
-                ProductVariant variant = item.getProductVariant();
-                if (variant.getStockQuantity() < item.getQuantity()) {
-                    throw new InvalidRequestException(
-                            "Không đủ số lượng tồn kho cho sản phẩm: "
-                                    + variant.getProduct().getName()
-                                    + " - "
-                                    + variant.getCode()
-                    );
-                }
+        // 1. Chỉ trừ kho khi chuyển từ PENDING -> CONFIRMED
+        if (ORDER_STATUS_PENDING.equals(previousStatus) && ORDER_STATUS_CONFIRMED.equals(normalizedStatus)) {
+            decreaseStockForOrder(order);
+        }
 
-                variant.setStockQuantity(variant.getStockQuantity() - item.getQuantity());
-                productVariantRepository.save(variant);
-            }
+        // 2. Nếu đã xác nhận rồi mà hủy thì hoàn kho lại
+        if (ORDER_STATUS_CONFIRMED.equals(previousStatus) && ORDER_STATUS_CANCELLED.equals(normalizedStatus)) {
+            restoreStockForOrder(order);
         }
 
         order.setStatus(normalizedStatus);
@@ -406,10 +388,6 @@ public class OrderServiceImpl implements OrderService {
         }
 
         String previousStatus = order.getStatus();
-
-        if (ORDER_TYPE_ONLINE.equalsIgnoreCase(order.getOrderType())) {
-            restoreStockForOrder(order);
-        }
 
         order.setStatus(ORDER_STATUS_CANCELLED);
 
@@ -528,6 +506,33 @@ public class OrderServiceImpl implements OrderService {
                 .distinct()
                 .collect(Collectors.toList());
     }
+
+    private void decreaseStockForOrder(Order order) {
+        for (OrderItem item : order.getItems()) {
+            ProductVariant variant = item.getProductVariant();
+
+            if (variant.getStockQuantity() < item.getQuantity()) {
+                throw new InvalidRequestException(
+                        "Không đủ số lượng tồn kho cho sản phẩm: "
+                                + variant.getProduct().getName()
+                                + " - "
+                                + variant.getCode()
+                );
+            }
+
+            variant.setStockQuantity(variant.getStockQuantity() - item.getQuantity());
+            productVariantRepository.save(variant);
+        }
+    }
+
+    private void restoreStockForOrder(Order order) {
+        for (OrderItem item : order.getItems()) {
+            ProductVariant variant = item.getProductVariant();
+            variant.setStockQuantity(variant.getStockQuantity() + item.getQuantity());
+            productVariantRepository.save(variant);
+        }
+    }
+
     private OrderResponse mapToOrderResponse(Order order) {
         String customerName = null;
         String phone = null;
@@ -690,22 +695,7 @@ public class OrderServiceImpl implements OrderService {
         return value == null ? BigDecimal.ZERO : value;
     }
 
-    private void restoreStockForOrder(Order order) {
-        if (order == null || order.getItems() == null) {
-            return;
-        }
 
-        for (OrderItem item : order.getItems()) {
-            ProductVariant variant = item.getProductVariant();
-            if (variant == null) {
-                continue;
-            }
-
-            int currentStock = variant.getStockQuantity() == null ? 0 : variant.getStockQuantity();
-            variant.setStockQuantity(currentStock + item.getQuantity());
-            productVariantRepository.save(variant);
-        }
-    }
 
     private Customer resolveCustomer(Long userId) {
         User user = userRepository.findById(userId)
@@ -748,17 +738,8 @@ public class OrderServiceImpl implements OrderService {
 
             int currentStock = lockedVariant.getStockQuantity() == null ? 0 : lockedVariant.getStockQuantity();
             lockedVariant.setStockQuantity(currentStock + item.getQuantity());
+
             productVariantRepository.save(lockedVariant);
-
-            InventoryTransaction transaction = new InventoryTransaction();
-            transaction.setProductVariant(lockedVariant);
-            transaction.setStore(order.getStore());
-            transaction.setTransactionType("IN");
-            transaction.setQuantity(item.getQuantity());
-            transaction.setReason("Hoàn kho do duyệt trả hàng cho đơn " + order.getCode());
-            transaction.setReferenceCode("RETURN-" + order.getCode());
-
-            inventoryTransactionRepository.save(transaction);
         }
     }
 

@@ -11,5 +11,6 @@ public class OverviewStatisticsResponse {
     private Long totalOrders;
     private Long totalProductsSold;
     private Double totalRevenue;
+    private Double totalProfit;
     private Long totalCustomers;
 }

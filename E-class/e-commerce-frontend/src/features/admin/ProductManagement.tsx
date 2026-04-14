@@ -96,113 +96,115 @@ const ProductManagementPage = () => {
   }, []);
 
   const handleAddProduct = async (values: any) => {
-  try {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    const formData = new FormData();
+      const formData = new FormData();
 
-    const productDTO = {
-      name: values.name,
-      code: values.code,
-      description: values.description ?? "",
-      brandId: values.brand_id ? Number(values.brand_id) : null,
-      categoryId: values.category_id ? Number(values.category_id) : null,
-      originId: values.origin_id ? Number(values.origin_id) : null,
-      supplierId: values.supplier_id ? Number(values.supplier_id) : null,
-      isActive: values.is_active ?? true,
-    };
+      const productDTO = {
+        name: values.name,
+        code: values.code || null,
+        description: values.description ?? "",
+        brandId: values.brand_id ? Number(values.brand_id) : null,
+        categoryId: values.category_id ? Number(values.category_id) : null,
+        originId: values.origin_id ? Number(values.origin_id) : null,
+        supplierId: values.supplier_id ? Number(values.supplier_id) : null,
+        isActive: values.is_active ?? true,
+      };
 
-    if (
-      !productDTO.brandId ||
-      !productDTO.categoryId ||
-      !productDTO.originId ||
-      !productDTO.supplierId ||
-      !productDTO.name ||
-      !productDTO.code
-    ) {
-      notification.warning({
-        message: "Thiếu thông tin",
-        description: "Vui lòng điền đầy đủ các trường bắt buộc (*)",
-      });
-      return;
-    }
-
-    formData.append(
-      "data",
-      new Blob([JSON.stringify(productDTO)], {
-        type: "application/json",
-      })
-    );
-
-    const imageFileList = values.images || [];
-
-    if (imageFileList.length > 0) {
-      // ảnh đầu tiên = ảnh chính
-      const firstFile = imageFileList[0];
-      if (firstFile?.originFileObj) {
-        formData.append("image", firstFile.originFileObj);
+      if (
+        !productDTO.brandId ||
+        !productDTO.categoryId ||
+        !productDTO.originId ||
+        !productDTO.supplierId ||
+        !productDTO.name
+      ) {
+        notification.warning({
+          message: "Thiếu thông tin",
+          description: "Vui lòng điền đầy đủ các trường bắt buộc (*)",
+        });
+        return;
       }
 
-      // các ảnh còn lại = ảnh phụ
-      imageFileList.slice(1).forEach((file: any) => {
-        if (file?.originFileObj) {
-          formData.append("images", file.originFileObj);
+      formData.append(
+        "data",
+        new Blob([JSON.stringify(productDTO)], {
+          type: "application/json",
+        }),
+      );
+
+      const imageFileList = values.images || [];
+
+      if (imageFileList.length > 0) {
+        // ảnh đầu tiên = ảnh chính
+        const firstFile = imageFileList[0];
+        if (firstFile?.originFileObj) {
+          formData.append("image", firstFile.originFileObj);
         }
+
+        // các ảnh còn lại = ảnh phụ
+        imageFileList.slice(1).forEach((file: any) => {
+          if (file?.originFileObj) {
+            formData.append("images", file.originFileObj);
+          }
+        });
+      }
+
+      // QUAN TRỌNG: gọi đúng endpoint with-images
+      const productRes = await productService.createProductWithImages(formData);
+
+      const createdProductId =
+        productRes?.data?.id || productRes?.data?.data?.id;
+
+      if (!createdProductId) {
+        throw new Error("Không lấy được productId sau khi tạo sản phẩm");
+      }
+
+      if (values.variants && values.variants.length > 0) {
+        const variantsPayload = values.variants.map((item: any) => ({
+          costPrice: item.cost_price,
+          sellingPrice: item.selling_price,
+          stockQuantity: item.stock_quantity,
+          attributeValueIds: [
+            item.color_id,
+            item.size_id,
+            item.material_id,
+          ].filter(Boolean),
+        }));
+
+        await productService.bulkCreateVariantsOnly({
+          productId: createdProductId,
+          variants: variantsPayload,
+        });
+      }
+
+      setIsModalOpen(false);
+      notification.success({
+        message: "Thành công",
+        description: "Sản phẩm đã được tạo thành công!",
       });
-    }
 
-    // QUAN TRỌNG: gọi đúng endpoint with-images
-    const productRes = await productService.createProductWithImages(formData);
+      fetchProducts();
+    } catch (error: any) {
+      console.error("CREATE PRODUCT ERROR:", error);
 
-    const createdProductId =
-      productRes?.data?.id || productRes?.data?.data?.id;
+      const serverMessage =
+        error.response?.data?.message ||
+        error.response?.data ||
+        error.message ||
+        "Đã có lỗi xảy ra trong quá trình tạo sản phẩm.";
 
-    if (!createdProductId) {
-      throw new Error("Không lấy được productId sau khi tạo sản phẩm");
-    }
-
-    if (values.variants && values.variants.length > 0) {
-      const variantsPayload = values.variants.map((item: any) => ({
-        code: item.sku,
-        costPrice: item.sale_price ?? item.price,
-        sellingPrice: item.price,
-        stockQuantity: item.stock_quantity,
-        attributeValueIds: [item.color_id, item.size_id],
-      }));
-
-      await productService.bulkCreateVariantsOnly({
-        productId: createdProductId,
-        variants: variantsPayload,
+      notification.error({
+        message: "Tạo sản phẩm thất bại",
+        description:
+          typeof serverMessage === "string"
+            ? serverMessage
+            : "Dữ liệu không hợp lệ, vui lòng kiểm tra lại.",
       });
+    } finally {
+      setLoading(false);
     }
-
-    setIsModalOpen(false);
-    notification.success({
-      message: "Thành công",
-      description: "Sản phẩm đã được tạo thành công!",
-    });
-
-    fetchProducts();
-  } catch (error: any) {
-    console.error("CREATE PRODUCT ERROR:", error);
-
-    const serverMessage =
-      error.response?.data?.message ||
-      error.response?.data ||
-      error.message ||
-      "Đã có lỗi xảy ra trong quá trình tạo sản phẩm.";
-
-    notification.error({
-      message: "Tạo sản phẩm thất bại",
-      description:
-        typeof serverMessage === "string"
-          ? serverMessage
-          : "Dữ liệu không hợp lệ, vui lòng kiểm tra lại.",
-    });
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const showAddModal = () => {
     setIsModalOpen(true);
@@ -231,11 +233,14 @@ const ProductManagementPage = () => {
         message: "Thành công",
         description: "Biến thể đã được xóa thành công!",
       });
-      
+
       fetchProducts();
     } catch (error: any) {
       console.error("Lỗi khi xóa biến thể:", error);
-      notification.error({ message: "Lỗi", description: error.response?.data?.message || "Không thể xóa biến thể." });
+      notification.error({
+        message: "Lỗi",
+        description: error.response?.data?.message || "Không thể xóa biến thể.",
+      });
     } finally {
       setLoading(false);
     }
@@ -392,7 +397,9 @@ const ProductManagementPage = () => {
               shape="circle"
               type="text"
               size="large"
-              onClick={() => notification.info({ message: 'Chức năng đang phát triển' })}
+              onClick={() =>
+                notification.info({ message: "Chức năng đang phát triển" })
+              }
             />
           </Tooltip>
           {record.hasVariants && (
@@ -421,7 +428,11 @@ const ProductManagementPage = () => {
                 fetchProducts();
               } catch (error: any) {
                 console.error("Lỗi khi xóa sản phẩm:", error);
-                notification.error({ message: "Lỗi", description: error.response?.data?.message || "Không thể xóa sản phẩm." });
+                notification.error({
+                  message: "Lỗi",
+                  description:
+                    error.response?.data?.message || "Không thể xóa sản phẩm.",
+                });
               } finally {
                 setLoading(false);
               }
@@ -430,7 +441,12 @@ const ProductManagementPage = () => {
             cancelText="Không"
           >
             <Tooltip title="Xóa">
-              <Button icon={<DeleteOutlined />} danger shape="circle" size="large" />
+              <Button
+                icon={<DeleteOutlined />}
+                danger
+                shape="circle"
+                size="large"
+              />
             </Tooltip>
           </Popconfirm>
         </Space>
@@ -440,10 +456,18 @@ const ProductManagementPage = () => {
 
   return (
     <Card
-      style={{ borderRadius: 14, border: '1px solid #e5e7eb', boxShadow: '0 6px 16px rgb(0 0 0 / 8%)' }}
+      style={{
+        borderRadius: 14,
+        border: "1px solid #e5e7eb",
+        boxShadow: "0 6px 16px rgb(0 0 0 / 8%)",
+      }}
       bodyStyle={{ padding: 24 }}
       bordered={false}
-      title={<Title level={3} style={{ margin: 0, color: '#0f172a' }}>Quản lý sản phẩm</Title>}
+      title={
+        <Title level={3} style={{ margin: 0, color: "#0f172a" }}>
+          Quản lý sản phẩm
+        </Title>
+      }
     >
       <Space direction="vertical" style={{ width: "100%" }} size="large">
         <div
@@ -456,9 +480,9 @@ const ProductManagementPage = () => {
         >
           <Search
             placeholder="Tìm kiếm theo tên hoặc mã sản phẩm"
-            style={{ maxWidth: 420, width: '100%' }}
+            style={{ maxWidth: 420, width: "100%" }}
             allowClear
-            onSearch={(v) => console.log('Search', v)}
+            onSearch={(v) => console.log("Search", v)}
           />
           <Button
             type="primary"
@@ -477,46 +501,46 @@ const ProductManagementPage = () => {
           rowKey="key"
           size="middle"
           bordered
-          style={{ borderRadius: 10, background: '#ffffff' }}
+          style={{ borderRadius: 10, background: "#ffffff" }}
         />
 
-      <Modal
-        title="Thêm mới sản phẩm"
-        open={isModalOpen}
-        onCancel={() => setIsModalOpen(false)}
-        footer={null}
-        width={1000}
-        destroyOnClose
-      >
-        <AddProductForm
-          onFinish={handleAddProduct}
+        <Modal
+          title="Thêm mới sản phẩm"
+          open={isModalOpen}
           onCancel={() => setIsModalOpen(false)}
+          footer={null}
+          width={1000}
+          destroyOnClose
+        >
+          <AddProductForm
+            onFinish={handleAddProduct}
+            onCancel={() => setIsModalOpen(false)}
+          />
+        </Modal>
+        <VariantDetailModal
+          open={isVariantDetailModalOpen}
+          productId={selectedProductId}
+          onCancel={handleCancelVariantDetailModal}
+          onEdit={handleEditVariant}
+          onDelete={handleDeleteVariant}
+          onAddVariant={handleAddVariant}
         />
-      </Modal>
-      <VariantDetailModal
-        open={isVariantDetailModalOpen}
-        productId={selectedProductId}
-        onCancel={handleCancelVariantDetailModal}
-        onEdit={handleEditVariant}
-        onDelete={handleDeleteVariant}
-        onAddVariant={handleAddVariant}
-      />
 
-      <EditVariantModal
-        open={isEditVariantModalOpen}
-        variant={editingVariant}
-        onCancel={() => setIsEditVariantModalOpen(false)}
-        onSave={handleSaveVariant}
-      />
+        <EditVariantModal
+          open={isEditVariantModalOpen}
+          variant={editingVariant}
+          onCancel={() => setIsEditVariantModalOpen(false)}
+          onSave={handleSaveVariant}
+        />
 
-      <CreateOrderModal
-        open={isOrderModalOpen}
-        product={selectedProduct}
-        onCancel={() => setIsOrderModalOpen(false)}
-        onSubmit={handleCreateOrder}
-      />
-    </Space>
-  </Card>
+        <CreateOrderModal
+          open={isOrderModalOpen}
+          product={selectedProduct}
+          onCancel={() => setIsOrderModalOpen(false)}
+          onSubmit={handleCreateOrder}
+        />
+      </Space>
+    </Card>
   );
 };
 export default ProductManagementPage;

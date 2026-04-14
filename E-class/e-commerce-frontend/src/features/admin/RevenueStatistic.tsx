@@ -33,6 +33,7 @@ const RevenueStatisticPage = () => {
 
   const [overview, setOverview] = useState<OverviewStatistics>({
     totalRevenue: 0,
+    totalProfit: 0,
     totalOrders: 0,
     totalProductsSold: 0,
     totalCustomers: 0,
@@ -84,11 +85,13 @@ const RevenueStatisticPage = () => {
       ]);
 
       const overviewData = (overviewRes as any)?.data ?? overviewRes ?? {};
-      const topProductsData = (topProductsRes as any)?.data ?? topProductsRes ?? {};
+      const topProductsData =
+        (topProductsRes as any)?.data ?? topProductsRes ?? {};
       const revenueChartData = (revenueRes as any)?.data ?? revenueRes ?? [];
 
       setOverview({
         totalRevenue: Number(overviewData?.totalRevenue ?? 0),
+        totalProfit: Number(overviewData?.totalProfit ?? 0),
         totalOrders: Number(overviewData?.totalOrders ?? 0),
         totalProductsSold: Number(overviewData?.totalProductsSold ?? 0),
         totalCustomers: Number(overviewData?.totalCustomers ?? 0),
@@ -423,7 +426,9 @@ const RevenueStatisticPage = () => {
                   <Button type="primary" htmlType="submit">
                     Lọc dữ liệu
                   </Button>
-                  <Button onClick={() => fetchData(query, groupBy)}>Tải lại</Button>
+                  <Button onClick={() => fetchData(query, groupBy)}>
+                    Tải lại
+                  </Button>
                   <Button loading={exportLoading} onClick={handleExportExcel}>
                     Xuất Excel
                   </Button>
@@ -475,7 +480,7 @@ const RevenueStatisticPage = () => {
       </Card>
 
       <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} lg={8} xl={4}>
           <Card style={{ borderRadius: 12 }}>
             <Statistic
               title="Tổng doanh thu"
@@ -485,7 +490,17 @@ const RevenueStatisticPage = () => {
           </Card>
         </Col>
 
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} lg={8} xl={4}>
+          <Card style={{ borderRadius: 12 }}>
+            <Statistic
+              title="Tổng lợi nhuận"
+              value={Number(overview.totalProfit || 0)}
+              formatter={(value) => formatCurrency(Number(value || 0))}
+            />
+          </Card>
+        </Col>
+
+        <Col xs={24} sm={12} lg={8} xl={4}>
           <Card style={{ borderRadius: 12 }}>
             <Statistic
               title="Tổng đơn hàng"
@@ -494,7 +509,7 @@ const RevenueStatisticPage = () => {
           </Card>
         </Col>
 
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} lg={8} xl={4}>
           <Card style={{ borderRadius: 12 }}>
             <Statistic
               title="Tổng sản phẩm bán"
@@ -503,7 +518,7 @@ const RevenueStatisticPage = () => {
           </Card>
         </Col>
 
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} lg={8} xl={4}>
           <Card style={{ borderRadius: 12 }}>
             <Statistic
               title="Tổng khách hàng"
@@ -548,7 +563,9 @@ const RevenueStatisticPage = () => {
                       {};
 
                     setHoveredRevenue(Number(data?.revenue || 0));
-                    setHoveredLabel(String(data?.rawLabel || data?.label || ""));
+                    setHoveredLabel(
+                      String(data?.rawLabel || data?.label || ""),
+                    );
                   };
 
                   chart.on("element:click", handleClick);

@@ -10,7 +10,6 @@ public class ProductCreateRequest {
     @NotBlank(message = "Tên sản phẩm không được rỗng")
     private String name;
 
-    @NotBlank(message = "Mã sản phẩm không được rỗng")
     private String code;
 
     @NotNull(message = "Thương hiệu không được rỗng")

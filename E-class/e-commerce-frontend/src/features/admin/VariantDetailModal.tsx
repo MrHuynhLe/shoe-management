@@ -150,32 +150,55 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
   };
 
   const columns = [
-    { title: 'SKU', dataIndex: 'code', key: 'code' },
-    ...dynamicAttributes.map(attr => ({
-      title: attr.name,
-      dataIndex: ['attributes', attr.code],
-      key: attr.code,
-    })),
-    { title: 'Giá bán', dataIndex: 'sellingPrice', key: 'sellingPrice', render: (price: number) => price.toLocaleString('vi-VN') + ' ₫' },
-    { title: 'Tồn kho', dataIndex: 'stockQuantity', key: 'stockQuantity' },
-    {
-      title: 'Trạng thái',
-      dataIndex: 'isActive',
-      key: 'isActive',
-      render: (isActive: boolean) => (isActive ? <Tag color="green">Hoạt động</Tag> : <Tag color="red">Ngừng</Tag>),
-    },
-    {
-      title: 'Thao tác',
-      key: 'action',
-      render: (_: any, record: Variant) => (
-        <Space size="middle">
-          <Button icon={<EditOutlined />} onClick={() => onEdit(record)} />
-          <Button icon={<DeleteOutlined />} danger onClick={() => handleDeleteVariantWithRefresh(record.id)}>
-          </Button>
-        </Space>
-      ),
-    },
-  ];
+  { title: "SKU", dataIndex: "code", key: "code" },
+
+  ...dynamicAttributes.map((attr) => ({
+    title: attr.name,
+    dataIndex: ["attributes", attr.code],
+    key: attr.code,
+  })),
+
+  {
+    title: "Giá nhập",
+    dataIndex: "costPrice",
+    key: "costPrice",
+    render: (price: number) =>
+      price != null ? price.toLocaleString("vi-VN") + " ₫" : "-",
+  },
+
+  {
+    title: "Giá bán",
+    dataIndex: "sellingPrice",
+    key: "sellingPrice",
+    render: (price: number) =>
+      price != null ? price.toLocaleString("vi-VN") + " ₫" : "-",
+  },
+
+  { title: "Tồn kho", dataIndex: "stockQuantity", key: "stockQuantity" },
+
+  {
+    title: "Trạng thái",
+    dataIndex: "isActive",
+    key: "isActive",
+    render: (isActive: boolean) =>
+      isActive ? <Tag color="green">Hoạt động</Tag> : <Tag color="red">Ngừng</Tag>,
+  },
+
+  {
+    title: "Thao tác",
+    key: "action",
+    render: (_: any, record: Variant) => (
+      <Space size="middle">
+        <Button icon={<EditOutlined />} onClick={() => onEdit(record)} />
+        <Button
+          icon={<DeleteOutlined />}
+          danger
+          onClick={() => handleDeleteVariantWithRefresh(record.id)}
+        />
+      </Space>
+    ),
+  },
+];
   const handleUpload = async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -357,7 +380,7 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
               <Descriptions.Item label="Xuất xứ">{product.originName}</Descriptions.Item>
               <Descriptions.Item label="Mô tả" span={2}>{product.description}</Descriptions.Item>
             </Descriptions>
-            <Typography.Title level={5}>Các phiên bản (SKU)</Typography.Title>
+            <Typography.Title level={5}>Các biến thể sản phẩm</Typography.Title>
             <Table
               columns={columns}
               dataSource={product.variants}
@@ -392,8 +415,8 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
                   placeholder="Giá vốn hàng loạt"
                   style={{ width: '100%' }}
                   onChange={(value) => setBulkCostPrice(value === null ? null : Number(value))}
-                  formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={(value) => value!.replace(/\$\s?|(,*)/g, '')}
+                  // formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  // parser={(value) => value!.replace(/\$\s?|(,*)/g, '')}
                 />
               </Col>
               <Col span={8}>
@@ -401,8 +424,8 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
                   placeholder="Giá bán hàng loạt"
                   style={{ width: '100%' }}
                   onChange={(value) => setBulkSellingPrice(value === null ? null : Number(value))}
-                  formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={(value) => value!.replace(/\$\s?|(,*)/g, '')}
+                  // formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  // parser={(value) => value!.replace(/\$\s?|(,*)/g, '')}
                 />
               </Col>
               <Col span={8}>

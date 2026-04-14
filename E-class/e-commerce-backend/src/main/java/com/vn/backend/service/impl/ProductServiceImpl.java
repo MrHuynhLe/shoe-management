@@ -18,6 +18,8 @@ import java.time.OffsetDateTime;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.util.StringUtils;
+import java.text.Normalizer;
 
 import java.util.Comparator;
 import java.util.List;
@@ -38,10 +40,6 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public Product create(ProductCreateRequest request) {
-        if (productRepository.existsByCodeAndDeletedAtIsNull(request.getCode().trim())) {
-            throw new RuntimeException("Mã sản phẩm đã tồn tại");
-        }
-
         Brand brand = brandRepository.findById(request.getBrandId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy thương hiệu"));
 
@@ -54,9 +52,11 @@ public class ProductServiceImpl implements ProductService {
         Supplier supplier = supplierRepository.findById(request.getSupplierId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy nhà cung cấp"));
 
+        String resolvedCode = resolveProductCode(request);
+
         Product product = new Product();
         product.setName(request.getName().trim());
-        product.setCode(request.getCode().trim());
+        product.setCode(resolvedCode);
         product.setDescription(request.getDescription());
         product.setBrand(brand);
         product.setCategory(category);
@@ -134,10 +134,6 @@ public class ProductServiceImpl implements ProductService {
             MultipartFile primaryImage,
             List<MultipartFile> galleryImages) {
 
-        if (productRepository.existsByCodeAndDeletedAtIsNull(request.getCode().trim())) {
-            throw new RuntimeException("Mã sản phẩm đã tồn tại");
-        }
-
         Brand brand = brandRepository.findById(request.getBrandId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy thương hiệu"));
 
@@ -152,7 +148,8 @@ public class ProductServiceImpl implements ProductService {
 
         Product product = new Product();
         product.setName(request.getName().trim());
-        product.setCode(request.getCode().trim());
+        String resolvedCode = resolveProductCode(request);
+        product.setCode(resolvedCode);
         product.setDescription(request.getDescription());
         product.setBrand(brand);
         product.setCategory(category);
@@ -220,5 +217,48 @@ public class ProductServiceImpl implements ProductService {
                 productVariantRepository.save(variant);
             }
         });
+    }
+
+    private String resolveProductCode(ProductCreateRequest request) {
+        if (StringUtils.hasText(request.getCode())) {
+            return ensureUniqueProductCode(normalizeCode(request.getCode()));
+        }
+
+        String base = normalizeCode(request.getName());
+        if (!StringUtils.hasText(base)) {
+            base = "SAN-PHAM";
+        }
+
+        return ensureUniqueProductCode(base);
+    }
+
+    private String ensureUniqueProductCode(String baseCode) {
+        String candidate = baseCode;
+        int counter = 1;
+
+        while (productRepository.existsByCodeAndDeletedAtIsNull(candidate)) {
+            candidate = baseCode + "-" + String.format("%02d", counter++);
+        }
+
+        return candidate;
+    }
+
+    private String normalizeCode(String input) {
+        if (!StringUtils.hasText(input)) {
+            return "";
+        }
+
+        String normalized = Normalizer.normalize(input, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .replace("đ", "d")
+                .replace("Đ", "D")
+                .trim()
+                .toUpperCase()
+                .replaceAll("[^A-Z0-9\\s-]", "")
+                .replaceAll("\\s+", "-")
+                .replaceAll("-+", "-")
+                .replaceAll("^-|-$", "");
+
+        return normalized.length() > 30 ? normalized.substring(0, 30) : normalized;
     }
 }
