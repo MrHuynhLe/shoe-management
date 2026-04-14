@@ -134,9 +134,68 @@ const OrderManagementPage = () => {
     }
   };
 
+  const normalizeStatus = (status?: string) => {
+    const raw = String(status ?? '').trim().toUpperCase();
+
+    if (['DRAFT'].includes(raw)) return 'DRAFT';
+    if (['PENDING', 'WAITING_CONFIRM'].includes(raw)) return 'PENDING';
+    if (['CONFIRMED', 'PROCESSING'].includes(raw)) return 'CONFIRMED';
+    if (['SHIPPING', 'DELIVERING'].includes(raw)) return 'SHIPPING';
+    if (['COMPLETED', 'DONE', 'DELIVERED', 'SUCCESS'].includes(raw)) return 'COMPLETED';
+    if (['CANCELLED', 'CANCELED'].includes(raw)) return 'CANCELLED';
+
+    return raw;
+  };
+
+  const normalizeOrderType = (order: Order): 'POS' | 'ONLINE' => {
+    const raw = String(order.orderType ?? '').trim().toUpperCase();
+
+    if (['POS', 'OFFLINE', 'COUNTER', 'AT_COUNTER'].includes(raw)) {
+      return 'POS';
+    }
+
+    if (['ONLINE', 'DELIVERY', 'WEB', 'ECOMMERCE'].includes(raw)) {
+      return 'ONLINE';
+    }
+
+    const hasShippingAddress = Boolean(
+      order.fullAddress ||
+      order.address ||
+      order.province ||
+      order.district ||
+      order.ward
+    );
+
+    if (hasShippingAddress) {
+      return 'ONLINE';
+    }
+
+    return 'POS';
+  };
+
+  const getDisplayAddress = (order: Order) => {
+    if (normalizeOrderType(order) === 'POS') {
+      return 'Bán tại quầy';
+    }
+
+    if (order.fullAddress) {
+      return order.fullAddress;
+    }
+
+    const parts = [order.address, order.ward, order.district, order.province]
+      .filter(Boolean)
+      .map((item) => String(item).trim());
+
+    if (parts.length > 0) {
+      return parts.join(', ');
+    }
+
+    return 'Chưa có địa chỉ';
+  };
+
   const getStatusTag = (status: string) => {
-    switch (status) {
-      case "DRAFT":
+    switch (normalizeStatus(status)) {
+      case 'DRAFT':
         return <Tag color="default">Nháp</Tag>;
       case "PENDING":
         return <Tag color="gold">Chờ xác nhận</Tag>;
@@ -159,14 +218,16 @@ const OrderManagementPage = () => {
     }
   };
 
-  const getOrderTypeTag = (orderType?: string | null) => {
-    switch (orderType) {
-      case "POS":
+  const getOrderTypeTag = (order: Order) => {
+    const type = normalizeOrderType(order);
+
+    switch (type) {
+      case 'POS':
         return <Tag color="blue">Tại quầy</Tag>;
       case "ONLINE":
         return <Tag color="geekblue">Online</Tag>;
       default:
-        return <Tag>Không xác định</Tag>;
+        return <Tag color="geekblue">Online</Tag>;
     }
   };
 
@@ -174,6 +235,8 @@ const OrderManagementPage = () => {
 
   const baseFilteredOrders = useMemo(() => {
     return allOrders.filter((order) => {
+      const displayAddress = getDisplayAddress(order);
+
       const matchesKeyword =
         !normalizedKeyword ||
         [
@@ -183,6 +246,12 @@ const OrderManagementPage = () => {
           order.phone,
           order.fullAddress,
           order.address,
+          order.province,
+          order.district,
+          order.ward,
+          displayAddress,
+          normalizeOrderType(order) === 'POS' ? 'bán tại quầy' : 'online',
+          normalizeOrderType(order) === 'POS' ? 'tại quầy' : 'bán online',
         ]
           .filter(Boolean)
           .some((value) =>
@@ -190,7 +259,7 @@ const OrderManagementPage = () => {
           );
 
       const matchesOrderType =
-        !orderTypeFilter || order.orderType === orderTypeFilter;
+        !orderTypeFilter || normalizeOrderType(order) === orderTypeFilter;
 
       const matchesDateRange = (() => {
         if (!dateRange || !dateRange[0] || !dateRange[1] || !order.createdAt) {
@@ -245,15 +314,17 @@ const OrderManagementPage = () => {
       key: "fullAddress",
       width: 320,
       render: (_, record) => {
-        if (record.orderType === "POS") {
-          return <Text type="secondary">Bán tại quầy</Text>;
+        const displayAddress = getDisplayAddress(record);
+
+        if (displayAddress === 'Bán tại quầy') {
+          return <Text type="secondary">{displayAddress}</Text>;
         }
 
-        return record.fullAddress ? (
-          <Text>{record.fullAddress}</Text>
-        ) : (
-          <Text type="secondary">Chưa có địa chỉ</Text>
-        );
+        if (displayAddress === 'Chưa có địa chỉ') {
+          return <Text type="secondary">{displayAddress}</Text>;
+        }
+
+        return <Text>{displayAddress}</Text>;
       },
     },
     {
@@ -305,7 +376,7 @@ const OrderManagementPage = () => {
       dataIndex: "orderType",
       key: "orderType",
       width: 120,
-      render: (_, record) => getOrderTypeTag(record.orderType),
+      render: (_, record) => getOrderTypeTag(record),
     },
     {
       title: "Thao tác",
