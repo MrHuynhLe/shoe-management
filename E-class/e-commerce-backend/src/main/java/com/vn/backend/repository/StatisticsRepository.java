@@ -118,7 +118,9 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
             o.customer_id AS customer_id,
             COALESCE(SUM(oi.quantity), 0) AS total_products_sold,
             GREATEST(
-                COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0) - COALESCE(o.discount_amount, 0),
+                COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0)
+                - COALESCE(o.discount_amount, 0)
+                - COALESCE(o.shipping_fee, 0),
                 0
             ) AS total_revenue
         FROM orders o
@@ -126,7 +128,7 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
         WHERE o.status = 'COMPLETED'
           AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
           AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
-        GROUP BY o.id, o.customer_id, o.discount_amount
+        GROUP BY o.id, o.customer_id, o.discount_amount, o.shipping_fee
     )
     SELECT
         COUNT(order_id) AS totalOrders,

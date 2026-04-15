@@ -47,4 +47,7 @@ public class Product {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "supplier_id")
     private Supplier supplier;
+
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    private java.util.Set<FavoriteProduct> favoriteProducts = new java.util.HashSet<>();
 }

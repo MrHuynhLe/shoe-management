@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+﻿import { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   Row,
@@ -461,13 +461,6 @@ const ProductDetailPage = () => {
               </Space>
             </div>
 
-            <div style={{ marginTop: 8 }}>
-              <Text strong>Thêm vào yêu thích:</Text>
-              <Space style={{ marginLeft: 12 }}>
-                <FavoriteButton productId={product.id} />
-              </Space>
-            </div>
-
             <Divider />
 
             <div>
@@ -847,87 +840,3 @@ const ReviewSection = ({ productId }: { productId: number }) => {
 };
 
 export default ProductDetailPage;
-
-const FavoriteButton = ({ productId }: { productId: number }) => {
-  const { isAuthenticated } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [isFavorite, setIsFavorite] = useState(false);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const fetchFavorite = async () => {
-      if (!isAuthenticated) {
-        setIsFavorite(false);
-        return;
-      }
-
-      setLoading(true);
-      try {
-        const res = await apiClient.get(`/v1/favorites/${productId}/check`);
-        if (!mounted) return;
-        // Kiểm tra nếu response.data = true thì set isFavorite = true
-        setIsFavorite(res.data === true);
-      } catch (err: any) {
-        if (!mounted) return;
-        // Nếu 404 hoặc lỗi khác, coi như chưa thích
-        setIsFavorite(false);
-        if (err?.response?.status !== 404) {
-          console.error('fetch favorite error', err);
-        }
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
-    fetchFavorite();
-
-    return () => {
-      mounted = false;
-    };
-  }, [productId, isAuthenticated]);
-
-  const handleToggleFavorite = async () => {
-    if (!isAuthenticated) {
-      message.error("Bạn chưa đăng nhập. Vui lòng đăng nhập để thêm yêu thích.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      if (isFavorite) {
-        // Nếu đã tích, gọi DELETE để xóa khỏi danh sách yêu thích
-        await apiClient.delete(`/v1/favorites/${productId}`);
-        setIsFavorite(false);
-        message.success('Đã xóa khỏi danh sách yêu thích');
-      } else {
-        // Nếu chưa tích, gọi POST để thêm vào danh sách yêu thích
-        await apiClient.post(`/v1/favorites/${productId}`);
-        setIsFavorite(true);
-        message.success('Đã thêm vào danh sách yêu thích');
-      }
-    } catch (error: any) {
-      console.error('favorite error', error);
-      message.error(
-        error?.response?.data?.message || 'Thao tác yêu thích thất bại. Vui lòng thử lại.',
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Button
-      type="text"
-      icon={
-        isFavorite ? (
-          <HeartFilled style={{ color: "#ff4d4f" }} />
-        ) : (
-          <HeartOutlined />
-        )
-      }
-      onClick={handleToggleFavorite}
-      loading={loading}
-    />
-  );
-};

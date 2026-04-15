@@ -37,6 +37,7 @@ import com.vn.backend.repository.StoreRepository;
 import com.vn.backend.service.PosService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.vn.backend.entity.Coupon;
@@ -95,7 +96,7 @@ public class PosServiceImpl implements PosService {
     private static final String INVENTORY_OUT = "OUT";
 
     @Override
-    public PosOrderResponse createOrder(PosCreateOrderRequest request) {
+    public PosOrderResponse createOrder(PosCreateOrderRequest request) throws Exception {
         Employee employee = employeeRepository.findById(request.getEmployeeId().longValue())
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy nhân viên"));
 
@@ -106,6 +107,9 @@ public class PosServiceImpl implements PosService {
         if (request.getCustomerId() != null) {
             customer = customerRepository.findById(request.getCustomerId().longValue())
                     .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy khách hàng"));
+        }
+        if(orderRepository.findByOrderTypeAndStatusAndEmployeeId(ORDER_TYPE_POS, ORDER_STATUS_DRAFT, employee.getId()).size() > 10) {
+            throw new Exception("Số lượng hóa đơn nháp giới hạn là 10, không thể tạo thêm.");
         }
 
         Order order = Order.builder()
@@ -1086,5 +1090,14 @@ public class PosServiceImpl implements PosService {
         transaction.setCreatedAt(LocalDateTime.now());
 
         inventoryTransactionRepository.save(transaction);
+    }
+
+    @Scheduled(cron = "0 59 23 * * ?")
+//    @Scheduled(fixedRate = 30000) // 30000ms = 30 giây để test
+    public void runEndOfDayJobToRemoteDraft() {
+        System.out.println("Chạy job cuối ngày: " + LocalDateTime.now());
+
+        List<Order> orders = orderRepository.findByOrderTypeAndStatus(ORDER_TYPE_POS, ORDER_STATUS_DRAFT);
+        if(!orders.isEmpty()) {orderRepository.deleteAll(orders);}
     }
 }
