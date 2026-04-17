@@ -23,7 +23,7 @@ public class PosController {
     private final VnpayService vnpayService;
 
     @PostMapping("/orders")
-    public ResponseEntity<PosOrderResponse> createOrder( @Valid @RequestBody PosCreateOrderRequest request ) {
+    public ResponseEntity<PosOrderResponse> createOrder( @Valid @RequestBody PosCreateOrderRequest request ) throws Exception {
         return ResponseEntity.ok(posService.createOrder(request));
     }
     @GetMapping("/orders/drafts")
