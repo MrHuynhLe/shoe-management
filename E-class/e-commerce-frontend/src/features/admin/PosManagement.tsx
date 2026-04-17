@@ -211,10 +211,14 @@ const PosManagement = () => {
       setLoadingDiscounts(true);
       const data = await posService.getAvailableDiscounts(orderId);
 
-      setAvailableDiscounts(data);
+      const couponOnly = (data || []).filter(
+        (item) => item.voucherType === "COUPON",
+      );
+
+      setAvailableDiscounts(couponOnly);
 
       if (selectedDiscount) {
-        const stillExists = data.find(
+        const stillExists = couponOnly.find(
           (item) =>
             item.voucherType === selectedDiscount.voucherType &&
             item.id === selectedDiscount.id,
@@ -431,7 +435,7 @@ const PosManagement = () => {
       ...prev,
       customerPaid: Math.max(
         (selectedOrder?.totalAmount ?? 0) -
-          (discount.estimatedDiscountAmount ?? 0),
+        (discount.estimatedDiscountAmount ?? 0),
         0,
       ),
     }));
@@ -446,17 +450,18 @@ const PosManagement = () => {
       customerPaid: selectedOrder?.totalAmount ?? 0,
     }));
   };
-  
+
   const loadPaymentMethods = async () => {
-  try {
-    const data = await paymentMethodService.getAll();
-    setPaymentMethods(data);
-  } catch (error: any) {
-    message.error(
-      error?.response?.data?.message || "Không tải được phương thức thanh toán",
-    );
-  }
-};
+    try {
+      const data = await paymentMethodService.getAll();
+      setPaymentMethods(data);
+    } catch (error: any) {
+      message.error(
+        error?.response?.data?.message ||
+        "Không tải được phương thức thanh toán",
+      );
+    }
+  };
 
   const handleCheckout = async () => {
     if (!selectedOrderId) {
@@ -473,14 +478,8 @@ const PosManagement = () => {
       const payload = {
         paymentMethodId: checkoutData.paymentMethodId,
         customerPaid: isCashPayment ? checkoutData.customerPaid : 0,
-        couponId:
-          selectedDiscount?.voucherType === "COUPON"
-            ? selectedDiscount.id
-            : null,
-        promotionId:
-          selectedDiscount?.voucherType === "PROMOTION"
-            ? selectedDiscount.id
-            : null,
+        couponId: selectedDiscount?.id ?? null,
+        promotionId: null,
         note: checkoutData.note,
       };
 
@@ -713,6 +712,7 @@ const PosManagement = () => {
 
   const isCashPayment = selectedPaymentMethod?.code === "CASH";
   const isVnpayPayment = selectedPaymentMethod?.code === "VNPAY";
+
   return (
     <div style={{ padding: 20 }}>
       <Row gutter={[16, 16]} align="top">
@@ -889,7 +889,7 @@ const PosManagement = () => {
                         {availableDiscounts.map((discount) => {
                           const selected =
                             selectedDiscount?.voucherType ===
-                              discount.voucherType &&
+                            discount.voucherType &&
                             selectedDiscount?.id === discount.id;
 
                           return (
@@ -924,17 +924,7 @@ const PosManagement = () => {
                                       <Tag color="blue">Đã chọn</Tag>
                                     )}
 
-                                    <Tag
-                                      color={
-                                        discount.voucherType === "COUPON"
-                                          ? "gold"
-                                          : "blue"
-                                      }
-                                    >
-                                      {discount.voucherType === "COUPON"
-                                        ? "Coupon"
-                                        : "Khuyến mãi"}
-                                    </Tag>
+                                    <Tag color="gold">Coupon</Tag>
                                   </Space>
                                 </Row>
 
