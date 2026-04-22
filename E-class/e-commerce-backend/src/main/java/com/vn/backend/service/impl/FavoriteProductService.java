@@ -1,14 +1,20 @@
 package com.vn.backend.service.impl;
 
+import com.vn.backend.dto.response.PageResponse;
+import com.vn.backend.dto.response.ProductListResponse;
 import com.vn.backend.entity.Customer;
 import com.vn.backend.entity.FavoriteProduct;
 import com.vn.backend.entity.Product;
 import com.vn.backend.entity.User;
+import com.vn.backend.mapper.PageMapper;
 import com.vn.backend.repository.CustomerRepository;
 import com.vn.backend.repository.FavoriteProductRepository;
 import com.vn.backend.repository.ProductRepository;
 import com.vn.backend.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,12 +71,14 @@ public class FavoriteProductService {
     }
 
     @Transactional(readOnly = true)
-    public List<FavoriteProduct> getMyFavorites(CustomUserDetails user) {
+    public PageResponse<ProductListResponse> getMyFavorites(int page, int size,CustomUserDetails user) {
         Long userProfileId = user.getUserId();
+        Pageable pageable = PageRequest.of(page, size);
 
         Customer customer = customerRepository.findByUserProfileId(userProfileId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy khách hàng"));
+        Page<ProductListResponse> pageData = favoriteProductRepository.findFavoriteProductList(customer.getId(), null, pageable);
+        return PageMapper.toPageResponse(pageData, dto -> dto);
 
-        return favoriteProductRepository.findAllByCustomerIdOrderByCreatedAtDesc(customer.getId());
     }
 }

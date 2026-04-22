@@ -15,11 +15,13 @@ import { ClearOutlined } from "@ant-design/icons";
 import ProductListDisplay from "./Products";
 import { productService } from "@/services/product.service";
 import { PageResponse, ProductList as ProductItem } from "./product.model";
+import useAuth from "@/hooks/useAuth";
 
 const { Sider, Content } = Layout;
 const { Title } = Typography;
 
 const ProductPage = () => {
+  const { user } = useAuth();
   const [products, setProducts] = useState<PageResponse<ProductItem>>();
   const [categories, setCategories] = useState<any[]>([]);
   const [brands, setBrands] = useState<any[]>([]);
@@ -31,19 +33,29 @@ const ProductPage = () => {
     categoryId: null,
     brandId: null,
   });
+  const [isViewingFavorites, setIsViewingFavorites] = useState(false);
   const [pagination, setPagination] = useState({ current: 1, pageSize: 12 });
 
   useEffect(() => {
     const fetchProducts = async () => {
       setLoading(true);
       try {
-        const params = {
-          page: pagination.current - 1,
-          size: pagination.pageSize,
-          categoryId: filters.categoryId,
-          brandId: filters.brandId,
-        };
-        const res = await productService.getProducts(params);
+        let res;
+        if (isViewingFavorites) {
+          // Gọi API favorites
+          res = await productService.getFavorites({
+            page: pagination.current - 1,
+            size: pagination.pageSize,
+          });
+        } else {
+          const params = {
+            page: pagination.current - 1,
+            size: pagination.pageSize,
+            categoryId: filters.categoryId,
+            brandId: filters.brandId,
+          };
+          res = await productService.getProducts(params);
+        }
         console.log("🔥 PRODUCT API RESPONSE:", res.data);
         console.log("🔥 PRODUCT FIRST ITEM:", res.data?.content?.[0]);
         setProducts(res.data);
@@ -54,7 +66,7 @@ const ProductPage = () => {
       }
     };
     fetchProducts();
-  }, [filters, pagination]);
+  }, [filters, pagination, isViewingFavorites]);
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -77,7 +89,17 @@ const ProductPage = () => {
   }, []);
 
   const handleCategoryChange = (categoryId: any) => {
-    setFilters((prevFilters) => ({ ...prevFilters, categoryId }));
+    if (categoryId === "favorites") {
+      if (!user) {
+        message.warning("Vui lòng đăng nhập để xem sản phẩm yêu thích!");
+        return;
+      }
+      setIsViewingFavorites(true);
+      setFilters({ categoryId: null, brandId: null });
+    } else {
+      setIsViewingFavorites(false);
+      setFilters((prevFilters) => ({ ...prevFilters, categoryId: categoryId === "all" ? null : categoryId }));
+    }
     setPagination((prev) => ({ ...prev, current: 1 }));
   };
   const handleBrandChange = (brandId: any) => {
@@ -87,6 +109,7 @@ const ProductPage = () => {
 
   const handleResetFilters = () => {
     setFilters({ categoryId: null, brandId: null });
+    setIsViewingFavorites(false);
     setPagination((prev) => ({ ...prev, current: 1 }));
   };
 
@@ -136,14 +159,15 @@ const ProductPage = () => {
         </Title>
         <Menu
           onClick={(e) =>
-            handleCategoryChange(e.key === "all" ? null : Number(e.key))
+            handleCategoryChange(e.key)
           }
           selectedKeys={
-            filters.categoryId ? [String(filters.categoryId)] : ["all"]
+            isViewingFavorites ? ["favorites"] : (filters.categoryId ? [String(filters.categoryId)] : ["all"])
           }
           mode="inline"
           style={{ border: "none", background: "transparent" }}
           items={[
+            { key: "favorites", label: "❤️ Sản phẩm yêu thích" },
             { key: "all", label: "Tất cả" },
             ...categories.map((cat) => ({ key: cat.id, label: cat.name })),
           ]}

@@ -5,6 +5,10 @@ export const productService = {
     return axiosClient.get("/v1/products", { params });
   },
 
+  getFavorites: (params?: any) => {
+    return axiosClient.get("/v1/favorites", { params });
+  },
+
   getProductById: (productId: number) =>
     axiosClient.get(`/v1/products/${productId}`),
 
