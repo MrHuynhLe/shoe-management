@@ -57,6 +57,14 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
   const [loading, setLoading] = useState(false);
   const [variantRows, setVariantRows] = useState<VariantItem[]>([]);
 
+  const [quickCostPrice, setQuickCostPrice] = useState<number | null>(null);
+  const [quickSellingPrice, setQuickSellingPrice] = useState<number | null>(
+    null,
+  );
+  const [quickStockQuantity, setQuickStockQuantity] = useState<number | null>(
+    0,
+  );
+
   const selectedColorIds = Form.useWatch("selected_color_ids", form) || [];
   const selectedSizeIds = Form.useWatch("selected_size_ids", form) || [];
   const selectedMaterialIds =
@@ -168,17 +176,15 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
     return new Map(materials.map((item) => [item.value, item.label]));
   }, [materials]);
 
-  const handleGenerateVariants = () => {
-    if (
-      !selectedColorIds.length ||
-      !selectedSizeIds.length ||
-      !selectedMaterialIds.length
-    ) {
-      message.warning("Vui lòng chọn ít nhất 1 màu, 1 size và 1 chất liệu");
-      return;
-    }
+  const buildVariants = (
+    colorIds: number[],
+    sizeIds: number[],
+    materialIds: number[],
+  ) => {
+    const oldVariants: VariantItem[] = variantRows.length
+      ? variantRows
+      : form.getFieldValue("variants") || [];
 
-    const oldVariants: VariantItem[] = form.getFieldValue("variants") || [];
     const oldVariantMap = new Map(
       oldVariants.map((item) => [
         `${item.color_id}-${item.size_id}-${item.material_id}`,
@@ -188,9 +194,9 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
 
     const generated: VariantItem[] = [];
 
-    selectedColorIds.forEach((colorId: number) => {
-      selectedSizeIds.forEach((sizeId: number) => {
-        selectedMaterialIds.forEach((materialId: number) => {
+    colorIds.forEach((colorId: number) => {
+      sizeIds.forEach((sizeId: number) => {
+        materialIds.forEach((materialId: number) => {
           const key = `${colorId}-${sizeId}-${materialId}`;
           const oldItem = oldVariantMap.get(key);
 
@@ -216,7 +222,81 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
 
     setVariantRows(generated);
     form.setFieldsValue({ variants: generated });
-    message.success("Đã tạo danh sách biến thể");
+
+    return generated.length;
+  };
+
+  const handleGenerateVariants = () => {
+    if (
+      !selectedColorIds.length ||
+      !selectedSizeIds.length ||
+      !selectedMaterialIds.length
+    ) {
+      message.warning("Vui lòng chọn ít nhất 1 màu, 1 size và 1 chất liệu");
+      return;
+    }
+
+    const total = buildVariants(
+      selectedColorIds,
+      selectedSizeIds,
+      selectedMaterialIds,
+    );
+
+    message.success(`Đã tạo ${total} biến thể`);
+  };
+
+  const handleQuickGenerateVariants = () => {
+    const allColorIds = colors.map((item) => item.value);
+    const allSizeIds = sizes.map((item) => item.value);
+    const allMaterialIds = materials.map((item) => item.value);
+
+    if (!allColorIds.length || !allSizeIds.length || !allMaterialIds.length) {
+      message.warning("Chưa có đủ dữ liệu màu, size hoặc chất liệu để tạo nhanh");
+      return;
+    }
+
+    form.setFieldsValue({
+      selected_color_ids: allColorIds,
+      selected_size_ids: allSizeIds,
+      selected_material_ids: allMaterialIds,
+    });
+
+    const total = buildVariants(allColorIds, allSizeIds, allMaterialIds);
+
+    message.success(`Đã tạo nhanh ${total} biến thể`);
+  };
+
+  const handleQuickApplyVariantValues = () => {
+    if (!variantRows.length) {
+      message.warning("Vui lòng tạo biến thể trước khi áp dụng nhanh");
+      return;
+    }
+
+    if (
+      quickCostPrice == null ||
+      quickSellingPrice == null ||
+      quickStockQuantity == null
+    ) {
+      message.warning("Vui lòng nhập đủ giá nhập, giá bán và tồn kho");
+      return;
+    }
+
+    if (quickCostPrice < 0 || quickSellingPrice < 0 || quickStockQuantity < 0) {
+      message.warning("Giá nhập, giá bán và tồn kho không được nhỏ hơn 0");
+      return;
+    }
+
+    const next = variantRows.map((item) => ({
+      ...item,
+      cost_price: quickCostPrice,
+      selling_price: quickSellingPrice,
+      stock_quantity: quickStockQuantity,
+    }));
+
+    setVariantRows(next);
+    form.setFieldsValue({ variants: next });
+
+    message.success(`Đã áp dụng nhanh cho ${next.length} biến thể`);
   };
 
   const handleVariantChange = (
@@ -460,9 +540,20 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
 
         <Col span={4}>
           <Form.Item label=" ">
-            <Button type="dashed" block onClick={handleGenerateVariants}>
-              Tạo biến thể
-            </Button>
+            <Space direction="vertical" style={{ width: "100%" }}>
+              <Button
+                type="primary"
+                block
+                onClick={handleQuickGenerateVariants}
+                loading={loading}
+              >
+                Tạo nhanh biến thể
+              </Button>
+
+              <Button type="dashed" block onClick={handleGenerateVariants}>
+                Tạo biến thể
+              </Button>
+            </Space>
           </Form.Item>
         </Col>
       </Row>
@@ -472,6 +563,69 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
       </Form.Item>
 
       <Divider orientation="left">Danh sách biến thể</Divider>
+
+      <Card
+        size="small"
+        title="Nhập nhanh giá và tồn kho"
+        style={{ marginBottom: 16 }}
+      >
+        <Row gutter={16}>
+          <Col span={6}>
+            <Form.Item label="Giá nhập chung">
+              <InputNumber
+                style={{ width: "100%" }}
+                min={0}
+                value={quickCostPrice}
+                onChange={(value) =>
+                  setQuickCostPrice(value == null ? null : Number(value))
+                }
+                placeholder="Nhập giá nhập"
+              />
+            </Form.Item>
+          </Col>
+
+          <Col span={6}>
+            <Form.Item label="Giá bán chung">
+              <InputNumber
+                style={{ width: "100%" }}
+                min={0}
+                value={quickSellingPrice}
+                onChange={(value) =>
+                  setQuickSellingPrice(value == null ? null : Number(value))
+                }
+                placeholder="Nhập giá bán"
+              />
+            </Form.Item>
+          </Col>
+
+          <Col span={6}>
+            <Form.Item label="Tồn kho chung">
+              <InputNumber
+                style={{ width: "100%" }}
+                min={0}
+                value={quickStockQuantity}
+                onChange={(value) =>
+                  setQuickStockQuantity(value == null ? 0 : Number(value))
+                }
+                placeholder="Nhập tồn kho"
+              />
+            </Form.Item>
+          </Col>
+
+          <Col span={6}>
+            <Form.Item label=" ">
+              <Button
+                type="primary"
+                block
+                onClick={handleQuickApplyVariantValues}
+                disabled={!variantRows.length}
+              >
+                Áp dụng cho tất cả biến thể
+              </Button>
+            </Form.Item>
+          </Col>
+        </Row>
+      </Card>
 
       {variantRows.length === 0 ? (
         <Empty description="Chưa có biến thể. Hãy chọn màu, size và bấm Tạo biến thể" />
@@ -491,7 +645,11 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
                       min={0}
                       value={variant.cost_price}
                       onChange={(value) =>
-                        handleVariantChange(index, "cost_price", value)
+                        handleVariantChange(
+                          index,
+                          "cost_price",
+                          value == null ? null : Number(value),
+                        )
                       }
                       placeholder="Giá nhập"
                     />
@@ -505,7 +663,11 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
                       min={0}
                       value={variant.selling_price}
                       onChange={(value) =>
-                        handleVariantChange(index, "selling_price", value)
+                        handleVariantChange(
+                          index,
+                          "selling_price",
+                          value == null ? null : Number(value),
+                        )
                       }
                       placeholder="Giá bán"
                     />
@@ -519,7 +681,11 @@ const AddProductForm = ({ onFinish, onCancel }: AddProductFormProps) => {
                       min={0}
                       value={variant.stock_quantity}
                       onChange={(value) =>
-                        handleVariantChange(index, "stock_quantity", value ?? 0)
+                        handleVariantChange(
+                          index,
+                          "stock_quantity",
+                          value == null ? 0 : Number(value),
+                        )
                       }
                       placeholder="Số lượng"
                     />
