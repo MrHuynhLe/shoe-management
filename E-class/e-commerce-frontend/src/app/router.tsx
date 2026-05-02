@@ -15,7 +15,6 @@ import CustomerManagementPage from "@/features/admin/CustomerManagement";
 import EmployeeManagementPage from "@/features/admin/EmployeeManagement";
 import InventoryManagementPage from "@/features/admin/InventoryManagement";
 import OrderManagementPage from "@/features/admin/OrderManagement";
-import RevenueStatisticPage from "@/features/admin/RevenueStatistic";
 import BrandManagementPage from "@/features/admin/BrandManagement";
 import CategoryManagementPage from "@/features/admin/CategoryManagement";
 import ColorManagementPage from "@/features/admin/ColorManagement";
@@ -65,7 +64,7 @@ export const router = createBrowserRouter([
         children: [
           { path: "colors", element: <ColorManagementPage /> },
           { path: "sizes", element: <SizeManagementPage /> },
-           { path: "materials", element: <MaterialManagementPage /> },
+          { path: "materials", element: <MaterialManagementPage /> },
         ],
       },
 
@@ -75,8 +74,8 @@ export const router = createBrowserRouter([
       { path: "pos", element: <PosManagementPage /> },
       { path: "pos/vnpay-return", element: <PosVnpayReturn /> },
       { path: "orders", element: <OrderManagementPage /> },
-      
-      { path: "revenue", element: <RevenueStatisticPage /> },
+
+      { path: "revenue", element: <DashboardPage /> },
     ],
   },
   { path: "/login", element: <Login /> },

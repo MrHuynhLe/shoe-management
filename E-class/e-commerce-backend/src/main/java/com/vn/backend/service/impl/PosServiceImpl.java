@@ -74,6 +74,8 @@ public class PosServiceImpl implements PosService {
     private static final String ORDER_TYPE_POS = "POS";
     private static final String PAYMENT_STATUS_PAID = "PAID";
 
+    private static final int MAX_DRAFT_POS_ORDERS = 5;
+
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final ProductVariantRepository productVariantRepository;
@@ -96,6 +98,18 @@ public class PosServiceImpl implements PosService {
 
     @Override
     public PosOrderResponse createOrder(PosCreateOrderRequest request) {
+        long currentDraftCount = orderRepository.countByStatusAndOrderType(
+                ORDER_STATUS_DRAFT,
+                ORDER_TYPE_POS
+        );
+
+        if (currentDraftCount >= MAX_DRAFT_POS_ORDERS) {
+            throw new IllegalArgumentException(
+                    "Chỉ được tạo tối đa " + MAX_DRAFT_POS_ORDERS
+                            + " hóa đơn nháp. Vui lòng thanh toán hoặc hủy bớt hóa đơn trước khi tạo mới."
+            );
+        }
+
         Employee employee = employeeRepository.findById(request.getEmployeeId().longValue())
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy nhân viên"));
 
