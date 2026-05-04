@@ -84,7 +84,7 @@ const AdminLayout = () => {
             {
               key: "/admin",
               path: "/admin",
-              name: "Dashboard",
+              name: "Dashboard & Thống kê",
               icon: <DashboardOutlined />,
             },
             {
@@ -170,12 +170,6 @@ const AdminLayout = () => {
                   name: "Mã giảm giá (Coupon)",
                 },
               ],
-            },
-            {
-              key: "/admin/revenue",
-              path: "/admin/revenue",
-              name: "Thống kê doanh thu",
-              icon: <LineChartOutlined />,
             },
           ]}
           menuItemRender={(menuItemProps, defaultDom) => {

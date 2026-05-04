@@ -43,6 +43,8 @@ const { Title, Text } = Typography;
 const DEFAULT_EMPLOYEE_ID = 2;
 const DEFAULT_STORE_ID = 1;
 
+const MAX_DRAFT_POS_ORDERS = 5;
+
 const POS_PAYMENT_CODES = ["CASH", "VNPAY"];
 
 const currency = (value?: number | null) =>
@@ -122,6 +124,45 @@ const voucherCardBaseStyle: CSSProperties = {
   borderRadius: 12,
 };
 
+const softPanelStyle: CSSProperties = {
+  borderRadius: 14,
+  border: "1px solid #f0f0f0",
+  background: "#fafafa",
+  boxShadow: "none",
+};
+
+const summaryBoxStyle: CSSProperties = {
+  borderRadius: 14,
+  padding: 14,
+  border: "1px solid #eef2f6",
+  background: "linear-gradient(180deg, #ffffff 0%, #fafcff 100%)",
+  minHeight: 96,
+};
+
+const infoLabelStyle: CSSProperties = {
+  fontSize: 12,
+  color: "#8c8c8c",
+  display: "block",
+  marginBottom: 6,
+};
+
+const infoValueStyle: CSSProperties = {
+  fontSize: 18,
+  fontWeight: 700,
+  color: "#1f1f1f",
+};
+
+const getDraftOrderStyle = (active: boolean): CSSProperties => ({
+  cursor: "pointer",
+  borderRadius: 12,
+  padding: 14,
+  marginBottom: 10,
+  border: active ? "1px solid #91caff" : "1px solid #f0f0f0",
+  background: active ? "#f0f7ff" : "#fff",
+  transition: "all 0.2s ease",
+  boxShadow: active ? "0 8px 18px rgba(22, 119, 255, 0.10)" : "none",
+});
+
 const PosManagement = () => {
   const [draftOrders, setDraftOrders] = useState<PosOrderResponse[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
@@ -151,6 +192,8 @@ const PosManagement = () => {
   const [loadingDiscounts, setLoadingDiscounts] = useState(false);
   const [selectedDiscount, setSelectedDiscount] =
     useState<PosAvailableDiscountResponse | null>(null);
+
+  const [voucherPickerOpen, setVoucherPickerOpen] = useState(false);
 
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodResponse[]>(
     [],
@@ -254,6 +297,13 @@ const PosManagement = () => {
   }, [selectedOrderId]);
 
   const handleCreateOrder = async () => {
+    if (draftOrders.length >= MAX_DRAFT_POS_ORDERS) {
+      message.warning(
+        `Chỉ được tạo tối đa ${MAX_DRAFT_POS_ORDERS} hóa đơn nháp. Vui lòng thanh toán hoặc hủy bớt hóa đơn trước khi tạo mới.`,
+      );
+      return;
+    }
+
     try {
       setCreating(true);
 
@@ -440,6 +490,7 @@ const PosManagement = () => {
       ),
     }));
 
+    setVoucherPickerOpen(false);
     message.success(`Đã chọn voucher ${discount.code}`);
   };
 
@@ -449,6 +500,8 @@ const PosManagement = () => {
       ...prev,
       customerPaid: selectedOrder?.totalAmount ?? 0,
     }));
+
+    message.success("Đã bỏ chọn voucher");
   };
 
   const loadPaymentMethods = async () => {
@@ -458,7 +511,7 @@ const PosManagement = () => {
     } catch (error: any) {
       message.error(
         error?.response?.data?.message ||
-        "Không tải được phương thức thanh toán",
+          "Không tải được phương thức thanh toán",
       );
     }
   };
@@ -606,6 +659,82 @@ const PosManagement = () => {
     },
   ];
 
+  const voucherPickerColumns = [
+    {
+      title: "Voucher",
+      key: "voucher",
+      render: (_: any, record: PosAvailableDiscountResponse) => {
+        const selected =
+          selectedDiscount?.voucherType === record.voucherType &&
+          selectedDiscount?.id === record.id;
+
+        return (
+          <Space direction="vertical" size={4}>
+            <Space wrap>
+              <Text strong style={{ fontSize: 15 }}>
+                {record.code}
+              </Text>
+
+              {record.bestVoucher && <Tag color="green">Tốt nhất</Tag>}
+
+              {selected && <Tag color="blue">Đang chọn</Tag>}
+
+              <Tag color={record.voucherType === "COUPON" ? "gold" : "cyan"}>
+                {record.voucherType === "COUPON" ? "Coupon" : "Khuyến mãi"}
+              </Tag>
+            </Space>
+
+            <Text>{record.name}</Text>
+
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {record.discountType === "PERCENTAGE"
+                ? `Giảm ${record.discountValue}%`
+                : `Giảm ${currency(record.discountValue)} đ`}
+              {record.minOrderValue
+                ? ` • Đơn tối thiểu ${currency(record.minOrderValue)} đ`
+                : ""}
+            </Text>
+
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Phát hành: {formatUsageNumber(record.issuedQuantity)} | Còn lại:{" "}
+              {formatUsageNumber(record.remainingCount)}
+            </Text>
+          </Space>
+        );
+      },
+    },
+    {
+      title: "Giảm dự kiến",
+      dataIndex: "estimatedDiscountAmount",
+      key: "estimatedDiscountAmount",
+      width: 150,
+      render: (value: number) => (
+        <Text strong style={{ color: "#cf1322" }}>
+          - {currency(value)} đ
+        </Text>
+      ),
+    },
+    {
+      title: "Thao tác",
+      key: "action",
+      width: 120,
+      render: (_: any, record: PosAvailableDiscountResponse) => {
+        const selected =
+          selectedDiscount?.voucherType === record.voucherType &&
+          selectedDiscount?.id === record.id;
+
+        return (
+          <Button
+            type={selected ? "default" : "primary"}
+            onClick={() => handleSelectDiscount(record)}
+          >
+            {selected ? "Đã chọn" : "Áp dụng"}
+          </Button>
+        );
+      },
+    },
+  ];
+
   const productColumns = [
     {
       title: "Ảnh",
@@ -713,508 +842,671 @@ const PosManagement = () => {
   const isCashPayment = selectedPaymentMethod?.code === "CASH";
   const isVnpayPayment = selectedPaymentMethod?.code === "VNPAY";
 
+  const selectedItemCount = useMemo(
+    () =>
+      (selectedOrder?.items || []).reduce(
+        (total, item) => total + (item.quantity || 0),
+        0,
+      ),
+    [selectedOrder],
+  );
+  //
   return (
-    <div style={{ padding: 20 }}>
-      <Row gutter={[16, 16]} align="top">
-        <Col xs={24} xl={5}>
-          <Card
-            title="Hóa đơn nháp"
-            extra={
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                loading={creating}
-                onClick={handleCreateOrder}
-              >
-                Tạo hóa đơn
-              </Button>
-            }
-            style={panelCardStyle}
-          >
-            {draftOrders.length === 0 ? (
-              <Empty description="Chưa có hóa đơn nháp" />
-            ) : (
-              <List
-                dataSource={draftOrders}
-                renderItem={(item) => (
-                  <List.Item
-                    onClick={() => setSelectedOrderId(item.orderId)}
-                    style={{
-                      cursor: "pointer",
-                      borderRadius: 8,
-                      padding: 12,
-                      marginBottom: 8,
-                      background:
-                        selectedOrderId === item.orderId
-                          ? "#e6f4ff"
-                          : "#fafafa",
-                      border: "1px solid #f0f0f0",
-                    }}
-                  >
-                    <div style={{ width: "100%" }}>
-                      <div style={{ fontWeight: 600 }}>{item.orderCode}</div>
-                      <div>Khách: {item.customerName || "Khách lẻ"}</div>
-                      <div>Tổng: {currency(item.finalAmount)} đ</div>
-                      <Tag color="blue">{item.status}</Tag>
-                    </div>
-                  </List.Item>
-                )}
-              />
-            )}
-          </Card>
-        </Col>
+    <div
+      style={{
+        padding: 20,
+        background: "#f5f7fb",
+        minHeight: "100vh",
+      }}
+    >
+      <Space direction="vertical" size={16} style={{ width: "100%" }}>
+        <Card style={{ ...panelCardStyle, borderRadius: 20 }}>
+          <Row gutter={[16, 16]} justify="space-between" align="middle">
+            <Col>
+              <Space direction="vertical" size={4}>
+                <Title level={3} style={{ margin: 0 }}>
+                  Bán hàng tại quầy (POS)
+                </Title>
+                <Text type="secondary">
+                  Khu vực phía trên là hóa đơn đang xử lý, phía dưới là danh
+                  sách sản phẩm để thao tác nhanh và trực quan hơn.
+                </Text>
+              </Space>
+            </Col>
 
-        <Col xs={24} xl={10}>
-          <Card
-            title="Danh sách sản phẩm"
-            extra={
-              <Space>
-                <Input
-                  placeholder="Tìm theo tên, mã, barcode..."
-                  value={keyword}
-                  onChange={(e) => setKeyword(e.target.value)}
-                  onPressEnter={handleSearchProducts}
-                  style={{ width: 260 }}
-                />
+            <Col>
+              <Space wrap>
+                <Tag
+                  color={
+                    draftOrders.length >= MAX_DRAFT_POS_ORDERS ? "red" : "blue"
+                  }
+                >
+                  Hóa đơn nháp: {draftOrders.length}/{MAX_DRAFT_POS_ORDERS}
+                </Tag>
                 <Button
                   type="primary"
-                  icon={<SearchOutlined />}
-                  loading={searching}
-                  onClick={handleSearchProducts}
+                  icon={<PlusOutlined />}
+                  loading={creating}
+                  onClick={handleCreateOrder}
                 >
-                  Tìm
+                  Tạo hóa đơn
                 </Button>
               </Space>
-            }
-            style={panelCardStyle}
-          >
+            </Col>
+          </Row>
+        </Card>
+
+        <Row gutter={[16, 16]} align="top">
+          <Col xs={24} xl={6}>
+            <Card
+              title="Danh sách hóa đơn nháp"
+              style={{ ...panelCardStyle, height: "100%" }}
+            >
+              {draftOrders.length === 0 ? (
+                <Empty description="Chưa có hóa đơn nháp" />
+              ) : (
+                <List
+                  dataSource={draftOrders}
+                  renderItem={(item) => {
+                    const active = selectedOrderId === item.orderId;
+
+                    return (
+                      <List.Item
+                        onClick={() => setSelectedOrderId(item.orderId)}
+                        style={getDraftOrderStyle(active)}
+                      >
+                        <div style={{ width: "100%" }}>
+                          <Row justify="space-between" align="middle">
+                            <Text strong>{item.orderCode}</Text>
+                            <Tag color={active ? "processing" : "default"}>
+                              {item.status}
+                            </Tag>
+                          </Row>
+
+                          <div style={{ marginTop: 8 }}>
+                            <Text type="secondary">
+                              Khách: {item.customerName || "Khách lẻ"}
+                            </Text>
+                          </div>
+
+                          <div style={{ marginTop: 4 }}>
+                            <Text strong style={{ color: "#cf1322" }}>
+                              {currency(item.finalAmount)} đ
+                            </Text>
+                          </div>
+                        </div>
+                      </List.Item>
+                    );
+                  }}
+                />
+              )}
+            </Card>
+          </Col>
+
+          <Col xs={24} xl={18}>
+            <Card
+              loading={loadingOrder}
+              style={panelCardStyle}
+              title={
+                <Space>
+                  <ShoppingCartOutlined />
+                  <span>Hóa đơn đang chọn</span>
+                </Space>
+              }
+            >
+              {!selectedOrder ? (
+                <Empty description="Chưa chọn hóa đơn" />
+              ) : (
+                <Space direction="vertical" size={16} style={{ width: "100%" }}>
+                  <Row gutter={[12, 12]}>
+                    <Col xs={24} sm={12} lg={6}>
+                      <div style={summaryBoxStyle}>
+                        <span style={infoLabelStyle}>Mã hóa đơn</span>
+                        <div style={infoValueStyle}>
+                          {selectedOrder.orderCode}
+                        </div>
+                      </div>
+                    </Col>
+
+                    <Col xs={24} sm={12} lg={6}>
+                      <div style={summaryBoxStyle}>
+                        <span style={infoLabelStyle}>Khách hàng</span>
+                        <div style={{ ...infoValueStyle, fontSize: 16 }}>
+                          {selectedOrder.customerName || "Khách lẻ"}
+                        </div>
+                      </div>
+                    </Col>
+
+                    <Col xs={24} sm={12} lg={6}>
+                      <div style={summaryBoxStyle}>
+                        <span style={infoLabelStyle}>Tổng số món</span>
+                        <div style={infoValueStyle}>{selectedItemCount}</div>
+                      </div>
+                    </Col>
+
+                    <Col xs={24} sm={12} lg={6}>
+                      <div style={summaryBoxStyle}>
+                        <span style={infoLabelStyle}>Cần thanh toán</span>
+                        <div
+                          style={{
+                            ...infoValueStyle,
+                            color: "#cf1322",
+                          }}
+                        >
+                          {currency(summary.final)} đ
+                        </div>
+                      </div>
+                    </Col>
+                  </Row>
+
+                  <Card size="small" style={softPanelStyle}>
+                    <Row
+                      gutter={[12, 12]}
+                      justify="space-between"
+                      align="middle"
+                    >
+                      <Col xs={24} lg={14}>
+                        <Space direction="vertical" size={4}>
+                          <Text strong>Thông tin khách hàng</Text>
+                          <Text>
+                            {selectedOrder.customerName || "Khách lẻ"}
+                          </Text>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            Tạo nhanh khách bằng tên và số điện thoại, hệ thống
+                            sẽ tự gắn vào hóa đơn.
+                          </Text>
+                        </Space>
+                      </Col>
+
+                      <Col xs={24} lg={10}>
+                        <Space wrap>
+                          <Button
+                            type="primary"
+                            onClick={handleOpenQuickCustomerModal}
+                          >
+                            + Khách mới
+                          </Button>
+
+                          <Button
+                            danger
+                            onClick={handleClearCustomer}
+                            disabled={!selectedOrder.customerId}
+                          >
+                            Bỏ khách
+                          </Button>
+                        </Space>
+                      </Col>
+                    </Row>
+                  </Card>
+
+                  <Card
+                    size="small"
+                    style={softPanelStyle}
+                    title="Chi tiết sản phẩm trong hóa đơn"
+                  >
+                    <Table
+                      rowKey="itemId"
+                      columns={orderColumns}
+                      dataSource={selectedOrder.items || []}
+                      pagination={false}
+                      scroll={{ x: 900, y: 320 }}
+                      locale={{ emptyText: "Chưa có sản phẩm" }}
+                    />
+                  </Card>
+
+                  <Row gutter={[16, 16]}>
+                    <Col xs={24} xl={15}>
+                      <Card
+                        size="small"
+                        title={
+                          <Space>
+                            <GiftOutlined />
+                            <span>Voucher</span>
+                          </Space>
+                        }
+                        style={softPanelStyle}
+                      >
+                        <div
+                          onClick={() => setVoucherPickerOpen(true)}
+                          style={{
+                            border: "1px dashed #ff7a45",
+                            background: "#fff7e6",
+                            borderRadius: 12,
+                            padding: 14,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <Row
+                            justify="space-between"
+                            align="middle"
+                            gutter={[12, 12]}
+                          >
+                            <Col xs={24} md={16}>
+                              <Space direction="vertical" size={4}>
+                                <Space>
+                                  <GiftOutlined style={{ color: "#fa541c" }} />
+                                  <Text strong>
+                                    {selectedDiscount
+                                      ? selectedDiscount.code
+                                      : "Chọn voucher"}
+                                  </Text>
+                                </Space>
+
+                                {selectedDiscount ? (
+                                  <>
+                                    <Text type="secondary">
+                                      {selectedDiscount.name}
+                                    </Text>
+
+                                    <Text strong style={{ color: "#cf1322" }}>
+                                      Giảm{" "}
+                                      {currency(
+                                        selectedDiscount.estimatedDiscountAmount,
+                                      )}{" "}
+                                      đ
+                                    </Text>
+                                  </>
+                                ) : (
+                                  <Text type="secondary">
+                                    Bấm để xem danh sách voucher khả dụng cho
+                                    hóa đơn này
+                                  </Text>
+                                )}
+                              </Space>
+                            </Col>
+
+                            <Col xs={24} md={8} style={{ textAlign: "right" }}>
+                              <Space>
+                                {selectedDiscount && (
+                                  <Button
+                                    danger
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      handleClearDiscount();
+                                    }}
+                                  >
+                                    Bỏ chọn
+                                  </Button>
+                                )}
+
+                                <Button type="primary">
+                                  {selectedDiscount
+                                    ? "Đổi voucher"
+                                    : "Chọn voucher"}
+                                </Button>
+                              </Space>
+                            </Col>
+                          </Row>
+                        </div>
+                      </Card>
+                    </Col>
+
+                    <Col xs={24} xl={9}>
+                      <Card
+                        size="small"
+                        title="Tổng thanh toán"
+                        style={softPanelStyle}
+                      >
+                        <Space
+                          direction="vertical"
+                          style={{ width: "100%" }}
+                          size={10}
+                        >
+                          <Row justify="space-between">
+                            <Text>Tạm tính</Text>
+                            <Text>{currency(summary.total)} đ</Text>
+                          </Row>
+
+                          <Row justify="space-between">
+                            <Text>Giảm giá</Text>
+                            <Text style={{ color: "#cf1322", fontWeight: 500 }}>
+                              - {currency(summary.discount)} đ
+                            </Text>
+                          </Row>
+
+                          {selectedDiscount?.code && (
+                            <Row justify="space-between">
+                              <Text>Mã voucher</Text>
+                              <Text strong>{selectedDiscount.code}</Text>
+                            </Row>
+                          )}
+
+                          <Row justify="space-between" align="middle">
+                            <Title level={5} style={{ margin: 0 }}>
+                              Cần thanh toán
+                            </Title>
+                            <Title
+                              level={4}
+                              style={{ margin: 0, color: "#cf1322" }}
+                            >
+                              {currency(summary.final)} đ
+                            </Title>
+                          </Row>
+
+                          <Space
+                            direction="vertical"
+                            style={{ width: "100%", marginTop: 8 }}
+                            size={10}
+                          >
+                            <Popconfirm
+                              title="Bạn chắc chắn muốn hủy hóa đơn?"
+                              onConfirm={handleCancelOrder}
+                            >
+                              <Button danger block>
+                                Hủy hóa đơn
+                              </Button>
+                            </Popconfirm>
+
+                            <Button
+                              type="primary"
+                              block
+                              onClick={() => {
+                                const cashMethod = paymentMethods.find(
+                                  (item) => item.code === "CASH",
+                                );
+
+                                setCheckoutData((prev) => ({
+                                  ...prev,
+                                  paymentMethodId:
+                                    prev.paymentMethodId ??
+                                    cashMethod?.id ??
+                                    paymentOptions[0]?.value ??
+                                    null,
+                                  customerPaid: summary.final,
+                                  note: selectedOrder?.note || "",
+                                }));
+
+                                setCheckoutOpen(true);
+                              }}
+                              disabled={!selectedOrder.items?.length}
+                            >
+                              Thanh toán
+                            </Button>
+                          </Space>
+                        </Space>
+                      </Card>
+                    </Col>
+                  </Row>
+                </Space>
+              )}
+            </Card>
+          </Col>
+        </Row>
+
+        <Card
+          title="Danh sách sản phẩm"
+          extra={
+            <Space wrap>
+              <Input
+                placeholder="Tìm theo tên, mã, barcode..."
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                onPressEnter={handleSearchProducts}
+                style={{ width: 280 }}
+              />
+              <Button
+                type="primary"
+                icon={<SearchOutlined />}
+                loading={searching}
+                onClick={handleSearchProducts}
+              >
+                Tìm
+              </Button>
+            </Space>
+          }
+          style={panelCardStyle}
+        >
+          <Space direction="vertical" size={12} style={{ width: "100%" }}>
+            <Text type="secondary">
+              Chọn sản phẩm bên dưới để thêm nhanh vào hóa đơn đang chọn.
+            </Text>
+
             <Table
               rowKey="productVariantId"
               columns={productColumns}
               dataSource={products}
               loading={searching}
-              pagination={{ pageSize: 5 }}
+              pagination={{ pageSize: 8, showSizeChanger: false }}
+              scroll={{ x: 900 }}
             />
-          </Card>
-        </Col>
+          </Space>
+        </Card>
 
-        <Col xs={24} xl={9}>
-          <Card
-            style={panelCardStyle}
-            title={
+        <Modal
+          title={
+            <Space>
+              <GiftOutlined />
+              <span>Chọn voucher cho hóa đơn</span>
+            </Space>
+          }
+          open={voucherPickerOpen}
+          onCancel={() => setVoucherPickerOpen(false)}
+          footer={
+            <Space style={{ width: "100%", justifyContent: "space-between" }}>
+              <Text type="secondary">
+                {availableDiscounts.length > 0
+                  ? `Có ${availableDiscounts.length} voucher khả dụng`
+                  : "Không có voucher phù hợp"}
+              </Text>
+
               <Space>
-                <ShoppingCartOutlined />
-                <span>Hóa đơn đang chọn</span>
+                {selectedDiscount && (
+                  <Button danger onClick={handleClearDiscount}>
+                    Bỏ voucher
+                  </Button>
+                )}
+
+                <Button onClick={() => setVoucherPickerOpen(false)}>
+                  Đóng
+                </Button>
               </Space>
-            }
-            loading={loadingOrder}
-          >
-            {!selectedOrder ? (
-              <Empty description="Chưa chọn hóa đơn" />
+            </Space>
+          }
+          width={760}
+        >
+          <Space direction="vertical" style={{ width: "100%" }} size={12}>
+            <div
+              style={{
+                background: "#fff7e6",
+                border: "1px solid #ffd591",
+                borderRadius: 12,
+                padding: 12,
+              }}
+            >
+              <Row justify="space-between" align="middle">
+                <Col>
+                  <Text strong>Tạm tính: </Text>
+                  <Text>{currency(summary.total)} đ</Text>
+                </Col>
+
+                <Col>
+                  <Text strong>Giảm giá: </Text>
+                  <Text style={{ color: "#cf1322" }}>
+                    - {currency(summary.discount)} đ
+                  </Text>
+                </Col>
+
+                <Col>
+                  <Text strong>Cần thanh toán: </Text>
+                  <Text strong style={{ color: "#cf1322" }}>
+                    {currency(summary.final)} đ
+                  </Text>
+                </Col>
+              </Row>
+            </div>
+
+            {availableDiscounts.length === 0 ? (
+              <Empty description="Chưa có voucher phù hợp với hóa đơn này" />
             ) : (
-              <Space direction="vertical" style={{ width: "100%" }} size={12}>
+              <Table
+                rowKey={(record) => `${record.voucherType}-${record.id}`}
+                columns={voucherPickerColumns}
+                dataSource={availableDiscounts}
+                loading={loadingDiscounts}
+                pagination={false}
+                scroll={{ y: 360 }}
+              />
+            )}
+          </Space>
+        </Modal>
+
+        <Modal
+          title="Thêm khách hàng mới"
+          open={quickCustomerOpen}
+          onCancel={() => {
+            setQuickCustomerOpen(false);
+            resetQuickCustomerForm();
+          }}
+          onOk={handleQuickCreateCustomer}
+          okText="Lưu và gắn vào hóa đơn"
+          confirmLoading={creatingCustomer}
+        >
+          <Space direction="vertical" style={{ width: "100%" }} size={12}>
+            <div>
+              <Text strong>Họ và tên</Text>
+              <Input
+                style={{ marginTop: 6 }}
+                placeholder="Nhập tên khách hàng"
+                value={quickCustomerData.fullName}
+                onChange={(e) =>
+                  setQuickCustomerData((prev) => ({
+                    ...prev,
+                    fullName: e.target.value,
+                  }))
+                }
+              />
+            </div>
+
+            <div>
+              <Text strong>Số điện thoại</Text>
+              <Input
+                style={{ marginTop: 6 }}
+                placeholder="Nhập số điện thoại"
+                value={quickCustomerData.phone}
+                onChange={(e) =>
+                  setQuickCustomerData((prev) => ({
+                    ...prev,
+                    phone: e.target.value,
+                  }))
+                }
+              />
+            </div>
+
+            <div>
+              <Text strong>Địa chỉ</Text>
+              <Input.TextArea
+                rows={3}
+                style={{ marginTop: 6 }}
+                placeholder="Nhập địa chỉ (không bắt buộc)"
+                value={quickCustomerData.address}
+                onChange={(e) =>
+                  setQuickCustomerData((prev) => ({
+                    ...prev,
+                    address: e.target.value,
+                  }))
+                }
+              />
+            </div>
+          </Space>
+        </Modal>
+
+        <Modal
+          title="Thanh toán hóa đơn"
+          open={checkoutOpen}
+          onCancel={() => setCheckoutOpen(false)}
+          onOk={handleCheckout}
+          okText="Xác nhận thanh toán"
+        >
+          <Space direction="vertical" style={{ width: "100%" }} size={12}>
+            <div>
+              <Text strong>Tạm tính:</Text> {currency(summary.total)} đ
+            </div>
+
+            <div>
+              <Text strong>Giảm giá áp dụng:</Text> {currency(summary.discount)}{" "}
+              đ
+            </div>
+
+            {selectedDiscount?.code && (
+              <div>
+                <Text strong>Voucher đã chọn:</Text> {selectedDiscount.code}
+              </div>
+            )}
+
+            <div>
+              <Text strong>Cần thanh toán:</Text> {currency(summary.final)} đ
+            </div>
+
+            <div>
+              <Text strong>Phương thức thanh toán</Text>
+              <Select
+                style={{ width: "100%", marginTop: 6 }}
+                options={paymentOptions}
+                value={checkoutData.paymentMethodId}
+                onChange={(value) =>
+                  setCheckoutData((prev) => ({
+                    ...prev,
+                    paymentMethodId: value,
+                  }))
+                }
+              />
+            </div>
+
+            {isCashPayment && (
+              <>
                 <div>
-                  <Text strong>Mã hóa đơn:</Text> {selectedOrder.orderCode}
-                </div>
-
-                <div>
-                  <Text strong>Khách hàng:</Text>{" "}
-                  {selectedOrder.customerName || "Khách lẻ"}
-                </div>
-
-                <Card size="small" style={{ borderRadius: 12 }}>
-                  <Space
-                    direction="vertical"
-                    style={{ width: "100%" }}
-                    size={10}
-                  >
-                    <div>
-                      <Text strong>Khách hàng:</Text>{" "}
-                      {selectedOrder.customerName || "Khách lẻ"}
-                    </div>
-
-                    <Space wrap>
-                      <Button
-                        type="primary"
-                        onClick={handleOpenQuickCustomerModal}
-                      >
-                        + Khách mới
-                      </Button>
-
-                      <Button
-                        danger
-                        onClick={handleClearCustomer}
-                        disabled={!selectedOrder.customerId}
-                      >
-                        Bỏ khách
-                      </Button>
-                    </Space>
-
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      Tạo nhanh khách bằng tên và số điện thoại, hệ thống sẽ tự
-                      gắn vào hóa đơn.
-                    </Text>
-                  </Space>
-                </Card>
-
-                <Table
-                  rowKey="itemId"
-                  columns={orderColumns}
-                  dataSource={selectedOrder.items || []}
-                  pagination={false}
-                  scroll={{ y: 300 }}
-                  locale={{ emptyText: "Chưa có sản phẩm" }}
-                />
-
-                <Card size="small" style={panelCardStyle}>
-                  <Card
-                    size="small"
-                    title={
-                      <Space>
-                        <GiftOutlined />
-                        <span>Voucher khả dụng</span>
-                      </Space>
-                    }
-                    loading={loadingDiscounts}
-                    style={{ marginBottom: 12 }}
-                  >
-                    {availableDiscounts.length === 0 ? (
-                      <Text type="secondary">Chưa có voucher phù hợp</Text>
-                    ) : (
-                      <Space
-                        direction="vertical"
-                        style={{ width: "100%" }}
-                        size={8}
-                      >
-                        {availableDiscounts.map((discount) => {
-                          const selected =
-                            selectedDiscount?.voucherType ===
-                            discount.voucherType &&
-                            selectedDiscount?.id === discount.id;
-
-                          return (
-                            <Card
-                              key={`${discount.voucherType}-${discount.id}`}
-                              size="small"
-                              hoverable
-                              onClick={() => handleSelectDiscount(discount)}
-                              style={{
-                                ...voucherCardBaseStyle,
-                                border: selected
-                                  ? "1px solid #1677ff"
-                                  : "1px solid #f0f0f0",
-                                background: selected ? "#f0f7ff" : "#fff",
-                                cursor: "pointer",
-                              }}
-                            >
-                              <Space
-                                direction="vertical"
-                                size={6}
-                                style={{ width: "100%" }}
-                              >
-                                <Row justify="space-between" align="middle">
-                                  <Text strong>{discount.code}</Text>
-
-                                  <Space wrap>
-                                    {discount.bestVoucher && (
-                                      <Tag color="green">Tốt nhất</Tag>
-                                    )}
-
-                                    {selected && (
-                                      <Tag color="blue">Đã chọn</Tag>
-                                    )}
-
-                                    <Tag color="gold">Coupon</Tag>
-                                  </Space>
-                                </Row>
-
-                                <Text strong>{discount.name}</Text>
-
-                                <Text type="secondary">
-                                  Giảm dự kiến:{" "}
-                                  <Text strong>
-                                    {currency(discount.estimatedDiscountAmount)}{" "}
-                                    đ
-                                  </Text>
-                                </Text>
-
-                                <Text type="secondary">
-                                  Hình thức:{" "}
-                                  {discount.discountType === "PERCENTAGE"
-                                    ? `${discount.discountValue}%`
-                                    : `${currency(discount.discountValue)} đ`}
-                                </Text>
-
-                                {discount.minOrderValue ? (
-                                  <Text type="secondary">
-                                    Đơn tối thiểu:{" "}
-                                    {currency(discount.minOrderValue)} đ
-                                  </Text>
-                                ) : null}
-
-                                <Text type="secondary">
-                                  Phát hành:{" "}
-                                  {formatUsageNumber(discount.issuedQuantity)} |{" "}
-                                  Còn lại:{" "}
-                                  {formatUsageNumber(discount.remainingCount)}
-                                </Text>
-
-                                <Text type="secondary">
-                                  Đã dùng:{" "}
-                                  {formatUsagePercent(discount.usedPercent)} |{" "}
-                                  Còn:{" "}
-                                  {formatUsagePercent(
-                                    discount.remainingPercent,
-                                  )}
-                                </Text>
-
-                                <Text type="secondary">
-                                  {discount.endDate
-                                    ? `Hết hạn: ${new Date(discount.endDate).toLocaleString("vi-VN")}`
-                                    : "Không giới hạn thời gian"}
-                                </Text>
-                              </Space>
-                            </Card>
-                          );
-                        })}
-
-                        {selectedDiscount && (
-                          <Button danger onClick={handleClearDiscount}>
-                            Bỏ chọn voucher
-                          </Button>
-                        )}
-                      </Space>
-                    )}
-                  </Card>
-
-                  <Space
-                    direction="vertical"
-                    style={{ width: "100%" }}
-                    size={6}
-                  >
-                    <Row justify="space-between">
-                      <Text>Tạm tính</Text>
-                      <Text>{currency(summary.total)} đ</Text>
-                    </Row>
-
-                    <Row justify="space-between">
-                      <Text>Giảm giá</Text>
-                      <Text style={{ color: "#cf1322", fontWeight: 500 }}>
-                        - {currency(summary.discount)} đ
-                      </Text>
-                    </Row>
-
-                    {selectedDiscount?.code && (
-                      <Row justify="space-between">
-                        <Text>Mã voucher</Text>
-                        <Text strong>{selectedDiscount.code}</Text>
-                      </Row>
-                    )}
-
-                    <Row justify="space-between" align="middle">
-                      <Title level={5} style={{ margin: 0 }}>
-                        Cần thanh toán
-                      </Title>
-                      <Title level={5} style={{ margin: 0, color: "#cf1322" }}>
-                        {currency(summary.final)} đ
-                      </Title>
-                    </Row>
-                  </Space>
-                </Card>
-
-                <Space
-                  style={{ width: "100%", justifyContent: "space-between" }}
-                >
-                  <Popconfirm
-                    title="Bạn chắc chắn muốn hủy hóa đơn?"
-                    onConfirm={handleCancelOrder}
-                  >
-                    <Button danger>Hủy hóa đơn</Button>
-                  </Popconfirm>
-
-                  <Button
-                    type="primary"
-                    onClick={() => {
-                      const cashMethod = paymentMethods.find(
-                        (item) => item.code === "CASH",
-                      );
-
+                  <Text strong>Tiền khách đưa</Text>
+                  <InputNumber
+                    style={{ width: "100%", marginTop: 6 }}
+                    min={0}
+                    value={checkoutData.customerPaid}
+                    onChange={(value) =>
                       setCheckoutData((prev) => ({
                         ...prev,
-                        paymentMethodId:
-                          prev.paymentMethodId ??
-                          cashMethod?.id ??
-                          paymentOptions[0]?.value ??
-                          null,
-                        customerPaid: summary.final,
-                        note: selectedOrder?.note || "",
-                      }));
+                        customerPaid: Number(value || 0),
+                      }))
+                    }
+                  />
+                </div>
 
-                      setCheckoutOpen(true);
-                    }}
-                    disabled={!selectedOrder.items?.length}
-                  >
-                    Thanh toán
-                  </Button>
-                </Space>
-              </Space>
+                <div>
+                  <Text strong>Tiền thừa:</Text>{" "}
+                  {currency(
+                    Math.max(
+                      (checkoutData.customerPaid || 0) - summary.final,
+                      0,
+                    ),
+                  )}{" "}
+                  đ
+                </div>
+              </>
             )}
-          </Card>
-        </Col>
-      </Row>
 
-      <Modal
-        title="Thêm khách hàng mới"
-        open={quickCustomerOpen}
-        onCancel={() => {
-          setQuickCustomerOpen(false);
-          resetQuickCustomerForm();
-        }}
-        onOk={handleQuickCreateCustomer}
-        okText="Lưu và gắn vào hóa đơn"
-        confirmLoading={creatingCustomer}
-      >
-        <Space direction="vertical" style={{ width: "100%" }} size={12}>
-          <div>
-            <Text strong>Họ và tên</Text>
-            <Input
-              style={{ marginTop: 6 }}
-              placeholder="Nhập tên khách hàng"
-              value={quickCustomerData.fullName}
-              onChange={(e) =>
-                setQuickCustomerData((prev) => ({
-                  ...prev,
-                  fullName: e.target.value,
-                }))
-              }
-            />
-          </div>
-
-          <div>
-            <Text strong>Số điện thoại</Text>
-            <Input
-              style={{ marginTop: 6 }}
-              placeholder="Nhập số điện thoại"
-              value={quickCustomerData.phone}
-              onChange={(e) =>
-                setQuickCustomerData((prev) => ({
-                  ...prev,
-                  phone: e.target.value,
-                }))
-              }
-            />
-          </div>
-
-          <div>
-            <Text strong>Địa chỉ</Text>
-            <Input.TextArea
-              rows={3}
-              style={{ marginTop: 6 }}
-              placeholder="Nhập địa chỉ (không bắt buộc)"
-              value={quickCustomerData.address}
-              onChange={(e) =>
-                setQuickCustomerData((prev) => ({
-                  ...prev,
-                  address: e.target.value,
-                }))
-              }
-            />
-          </div>
-        </Space>
-      </Modal>
-
-      <Modal
-        title="Thanh toán hóa đơn"
-        open={checkoutOpen}
-        onCancel={() => setCheckoutOpen(false)}
-        onOk={handleCheckout}
-        okText="Xác nhận thanh toán"
-      >
-        <Space direction="vertical" style={{ width: "100%" }} size={12}>
-          <div>
-            <Text strong>Tạm tính:</Text> {currency(summary.total)} đ
-          </div>
-
-          <div>
-            <Text strong>Giảm giá áp dụng:</Text> {currency(summary.discount)} đ
-          </div>
-
-          {selectedDiscount?.code && (
-            <div>
-              <Text strong>Voucher đã chọn:</Text> {selectedDiscount.code}
-            </div>
-          )}
-
-          <div>
-            <Text strong>Cần thanh toán:</Text> {currency(summary.final)} đ
-          </div>
-
-          <div>
-            <Text strong>Phương thức thanh toán</Text>
-            <Select
-              style={{ width: "100%", marginTop: 6 }}
-              options={paymentOptions}
-              value={checkoutData.paymentMethodId}
-              onChange={(value) =>
-                setCheckoutData((prev) => ({
-                  ...prev,
-                  paymentMethodId: value,
-                }))
-              }
-            />
-          </div>
-
-          {isCashPayment && (
-            <>
+            {isVnpayPayment && (
               <div>
-                <Text strong>Tiền khách đưa</Text>
-                <InputNumber
-                  style={{ width: "100%", marginTop: 6 }}
-                  min={0}
-                  value={checkoutData.customerPaid}
-                  onChange={(value) =>
-                    setCheckoutData((prev) => ({
-                      ...prev,
-                      customerPaid: Number(value || 0),
-                    }))
-                  }
-                />
+                <Text type="secondary">
+                  Khi bấm xác nhận, hệ thống sẽ tạo đúng link thanh toán VNPAY
+                  theo số tiền sau giảm giá hiện tại.
+                </Text>
               </div>
+            )}
 
-              <div>
-                <Text strong>Tiền thừa:</Text>{" "}
-                {currency(
-                  Math.max((checkoutData.customerPaid || 0) - summary.final, 0),
-                )}{" "}
-                đ
-              </div>
-            </>
-          )}
-
-          {isVnpayPayment && (
             <div>
-              <Text type="secondary">
-                Khi bấm xác nhận, hệ thống sẽ tạo đúng link thanh toán VNPAY
-                theo số tiền sau giảm giá hiện tại.
-              </Text>
+              <Text strong>Ghi chú</Text>
+              <Input.TextArea
+                rows={3}
+                value={checkoutData.note}
+                onChange={(e) =>
+                  setCheckoutData((prev) => ({
+                    ...prev,
+                    note: e.target.value,
+                  }))
+                }
+              />
             </div>
-          )}
-
-          <div>
-            <Text strong>Ghi chú</Text>
-            <Input.TextArea
-              rows={3}
-              value={checkoutData.note}
-              onChange={(e) =>
-                setCheckoutData((prev) => ({
-                  ...prev,
-                  note: e.target.value,
-                }))
-              }
-            />
-          </div>
-        </Space>
-      </Modal>
+          </Space>
+        </Modal>
+      </Space>
     </div>
   );
 };

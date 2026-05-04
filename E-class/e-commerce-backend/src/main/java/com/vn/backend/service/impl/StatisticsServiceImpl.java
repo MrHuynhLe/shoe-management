@@ -23,8 +23,9 @@ public class StatisticsServiceImpl implements StatisticsService {
     @Override
     public OverviewStatisticsResponse getOverview(StatisticsQuery query) {
         OverviewStatisticsProjection result = statisticsRepository.getOverviewStatistics(
-                query.getFrom() != null ? query.getFrom().toString() : null,
-                query.getTo() != null ? query.getTo().toString() : null
+                getFromDate(query),
+                getToDate(query),
+                getOrderType(query)
         );
 
         if (result == null) {
@@ -44,24 +45,15 @@ public class StatisticsServiceImpl implements StatisticsService {
     public DashboardResponse getDashboard(StatisticsQuery query) {
         OverviewStatisticsResponse overview = getOverview(query);
 
-        BigDecimal totalRevenue = BigDecimal.valueOf(
-                overview.getTotalRevenue() != null ? overview.getTotalRevenue() : 0.0
-        );
-
-        BigDecimal totalProfit = BigDecimal.valueOf(
-                overview.getTotalProfit() != null ? overview.getTotalProfit() : 0.0
-        );
-
         return new DashboardResponse(
                 overview.getTotalOrders() != null ? overview.getTotalOrders() : 0L,
-                totalRevenue,
+                BigDecimal.valueOf(overview.getTotalRevenue() != null ? overview.getTotalRevenue() : 0.0),
                 overview.getTotalProductsSold() != null ? overview.getTotalProductsSold() : 0L,
-                totalProfit,
+                BigDecimal.valueOf(overview.getTotalProfit() != null ? overview.getTotalProfit() : 0.0),
                 0L,
                 0L
         );
     }
-
 
     @Override
     public DashboardCompareResponse getDashboardCompare(StatisticsQuery query) {
@@ -82,32 +74,36 @@ public class StatisticsServiceImpl implements StatisticsService {
 
     @Override
     public List<RevenueChartItemResponse> getRevenue(String groupBy, StatisticsQuery query) {
-        String fromDate = query.getFrom() != null ? query.getFrom().toString() : null;
-        String toDate = query.getTo() != null ? query.getTo().toString() : null;
+        String fromDate = getFromDate(query);
+        String toDate = getToDate(query);
+        String orderType = getOrderType(query);
 
         List<Object[]> rows;
 
         switch (groupBy == null ? "day" : groupBy.toLowerCase()) {
-            case "week" -> rows = statisticsRepository.getRevenueByWeek(fromDate, toDate);
-            case "month" -> rows = statisticsRepository.getRevenueByMonth(fromDate, toDate);
-            default -> rows = statisticsRepository.getRevenueByDay(fromDate, toDate);
+            case "week" -> rows = statisticsRepository.getRevenueByWeek(fromDate, toDate, orderType);
+            case "month" -> rows = statisticsRepository.getRevenueByMonth(fromDate, toDate, orderType);
+            default -> rows = statisticsRepository.getRevenueByDay(fromDate, toDate, orderType);
         }
 
-        return rows.stream().map(row -> new RevenueChartItemResponse(
-                row[0] != null ? row[0].toString() : "",
-                row[1] != null ? ((Number) row[1]).longValue() : 0L,
-                row[2] != null ? new BigDecimal(row[2].toString()) : BigDecimal.ZERO,
-                row[3] != null ? ((Number) row[3]).longValue() : 0L,
-                row[4] != null ? new BigDecimal(row[4].toString()) : BigDecimal.ZERO
-        )).toList();
+        return rows.stream()
+                .map(row -> new RevenueChartItemResponse(
+                        row[0] != null ? row[0].toString() : "",
+                        toLong(row[1]),
+                        toBigDecimal(row[2]),
+                        toLong(row[3]),
+                        toBigDecimal(row[4])
+                ))
+                .toList();
     }
 
     @Override
     public PageResponse<TopProductResponse> getTopProducts(StatisticsQuery query, int page, int size) {
         Page<TopProductResponse> pageData = statisticsRepository.getTopProducts(
-                query.getFrom() != null ? query.getFrom().toString() : null,
-                query.getTo() != null ? query.getTo().toString() : null,
-                PageRequest.of(page, size)
+                getFromDate(query),
+                getToDate(query),
+                getOrderType(query),
+                PageRequest.of(Math.max(page, 0), Math.max(size, 1))
         );
 
         PageResponse<TopProductResponse> response = new PageResponse<>();
@@ -138,18 +134,20 @@ public class StatisticsServiceImpl implements StatisticsService {
 
     @Override
     public List<OrderStatusResponse> getOrderStatusStatistics(StatisticsQuery query) {
-        String fromDate = query.getFrom() != null ? query.getFrom().toString() : null;
-        String toDate = query.getTo() != null ? query.getTo().toString() : null;
-
-        return statisticsRepository.getOrderStatusStatistics(fromDate, toDate)
+        return statisticsRepository.getOrderStatusStatistics(
+                        getFromDate(query),
+                        getToDate(query),
+                        getOrderType(query)
+                )
                 .stream()
                 .map(row -> new OrderStatusResponse(
                         row[0] != null ? row[0].toString() : "UNKNOWN",
-                        row[1] != null ? ((Number) row[1]).longValue() : 0L,
-                        row[2] != null ? new BigDecimal(row[2].toString()) : BigDecimal.ZERO
+                        toLong(row[1]),
+                        toBigDecimal(row[2])
                 ))
                 .toList();
     }
+
     @Override
     public PageResponse<TopRatedProductResponse> getTopRatedProducts(StatisticsQuery query, int page, int size) {
         return new PageResponse<>();
@@ -157,36 +155,72 @@ public class StatisticsServiceImpl implements StatisticsService {
 
     @Override
     public List<PaymentMethodRevenueResponse> getRevenueByPaymentMethod(StatisticsQuery query) {
-        String fromDate = query.getFrom() != null ? query.getFrom().toString() : null;
-        String toDate = query.getTo() != null ? query.getTo().toString() : null;
-
-        return statisticsRepository.getRevenueByPaymentMethod(fromDate, toDate)
+        return statisticsRepository.getRevenueByPaymentMethod(
+                        getFromDate(query),
+                        getToDate(query),
+                        getOrderType(query)
+                )
                 .stream()
                 .map(row -> new PaymentMethodRevenueResponse(
                         row[0] != null ? row[0].toString() : "UNKNOWN",
                         row[1] != null ? row[1].toString() : "Khác",
-                        row[2] != null ? ((Number) row[2]).longValue() : 0L,
-                        row[3] != null ? new BigDecimal(row[3].toString()) : BigDecimal.ZERO
+                        toLong(row[2]),
+                        toBigDecimal(row[3])
                 ))
                 .toList();
     }
+
+    private String getFromDate(StatisticsQuery query) {
+        return query != null && query.getFrom() != null
+                ? query.getFrom().toString()
+                : null;
+    }
+
+    private String getToDate(StatisticsQuery query) {
+        return query != null && query.getTo() != null
+                ? query.getTo().toString()
+                : null;
+    }
+
+    private String getOrderType(StatisticsQuery query) {
+        if (query == null || query.getOrderType() == null || query.getOrderType().isBlank()) {
+            return "ALL";
+        }
+
+        String orderType = query.getOrderType().trim().toUpperCase();
+
+        if (!orderType.equals("ALL") && !orderType.equals("POS") && !orderType.equals("ONLINE")) {
+            return "ALL";
+        }
+
+        return orderType;
+    }
+
     private Long toLong(Object value) {
-        if (value == null) return 0L;
+        if (value == null) {
+            return 0L;
+        }
+
         if (value instanceof Number number) {
             return number.longValue();
         }
+
         return Long.parseLong(value.toString());
     }
 
-    private Double toDouble(Object value) {
-        if (value == null) return 0.0;
-        if (value instanceof Number number) {
-            return number.doubleValue();
+    private BigDecimal toBigDecimal(Object value) {
+        if (value == null) {
+            return BigDecimal.ZERO;
         }
-        return Double.parseDouble(value.toString());
+
+        if (value instanceof BigDecimal bigDecimal) {
+            return bigDecimal;
+        }
+
+        if (value instanceof Number number) {
+            return BigDecimal.valueOf(number.doubleValue());
+        }
+
+        return new BigDecimal(value.toString());
     }
-
-
-
-
 }

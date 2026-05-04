@@ -21,4 +21,11 @@ public class StatisticsQuery {
     private Integer employeeId;
     private Integer customerId;
     private String status;
+
+    /**
+     * ALL = tất cả đơn hàng
+     * POS = bán tại quầy
+     * ONLINE = đơn online
+     */
+    private String orderType = "ALL";
 }
