@@ -1,0 +1,16 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\E-class",
+    "\\E-class\\e-commerce-frontend",
+    "\\E-class\\e-commerce-frontend\\src",
+    "\\E-class\\e-commerce-frontend\\src\\app",
+    "\\E-class\\e-commerce-frontend\\src\\features",
+    "\\E-class\\e-commerce-frontend\\src\\features\\admin",
+    "\\E-class\\e-commerce-frontend\\src\\layouts",
+    "\\E-class\\e-commerce-frontend\\src\\layouts\\components",
+    "\\E-class\\e-commerce-frontend\\src\\services"
+  ],
+  "SelectedNode": "\\E-class\\e-commerce-frontend\\src\\main.tsx",
+  "PreviewInSolutionExplorer": false
+}

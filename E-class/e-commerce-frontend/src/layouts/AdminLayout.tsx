@@ -165,11 +165,6 @@ const AdminLayout = () => {
               icon: <TagsOutlined />,
               children: [
                 {
-                  key: "/admin/discounts/promotions",
-                  path: "/admin/discounts/promotions",
-                  name: "Chương trình khuyến mãi",
-                },
-                {
                   key: "/admin/discounts/coupons",
                   path: "/admin/discounts/coupons",
                   name: "Mã giảm giá (Coupon)",
@@ -184,7 +179,7 @@ const AdminLayout = () => {
             return <Link to={menuItemProps.path}>{defaultDom}</Link>;
           }}
           actionsRender={() => [
-            <Space size="middle">
+            <Space size="middle" key="admin-actions">
               <Badge count={5} size="small">
                 <BellOutlined style={{ fontSize: 18 }} />
               </Badge>

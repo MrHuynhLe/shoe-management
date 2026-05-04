@@ -254,10 +254,14 @@ const PosManagement = () => {
       setLoadingDiscounts(true);
       const data = await posService.getAvailableDiscounts(orderId);
 
-      setAvailableDiscounts(data);
+      const couponOnly = (data || []).filter(
+        (item) => item.voucherType === "COUPON",
+      );
+
+      setAvailableDiscounts(couponOnly);
 
       if (selectedDiscount) {
-        const stillExists = data.find(
+        const stillExists = couponOnly.find(
           (item) =>
             item.voucherType === selectedDiscount.voucherType &&
             item.id === selectedDiscount.id,
@@ -481,7 +485,7 @@ const PosManagement = () => {
       ...prev,
       customerPaid: Math.max(
         (selectedOrder?.totalAmount ?? 0) -
-          (discount.estimatedDiscountAmount ?? 0),
+        (discount.estimatedDiscountAmount ?? 0),
         0,
       ),
     }));
@@ -527,14 +531,8 @@ const PosManagement = () => {
       const payload = {
         paymentMethodId: checkoutData.paymentMethodId,
         customerPaid: isCashPayment ? checkoutData.customerPaid : 0,
-        couponId:
-          selectedDiscount?.voucherType === "COUPON"
-            ? selectedDiscount.id
-            : null,
-        promotionId:
-          selectedDiscount?.voucherType === "PROMOTION"
-            ? selectedDiscount.id
-            : null,
+        couponId: selectedDiscount?.id ?? null,
+        promotionId: null,
         note: checkoutData.note,
       };
 

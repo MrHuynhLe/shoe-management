@@ -24,6 +24,16 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             String status,
             OffsetDateTime createdAt
     );
+    List<Order> findByOrderTypeAndStatusAndEmployeeId(
+            String orderType,
+            String status,
+            Long employId
+    );
+
+    List<Order> findByOrderTypeAndStatus(
+            String orderType,
+            String status
+    );
 
     Optional<Order> findByCode(String code);
 

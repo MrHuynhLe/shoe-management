@@ -35,4 +35,7 @@ public class Customer {
 
     @Column(name = "customer_type", length = 50, nullable = false)
     private String customerType = "RETAIL";
+
+    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true)
+    private java.util.Set<FavoriteProduct> favoriteProducts = new java.util.HashSet<>();
 }

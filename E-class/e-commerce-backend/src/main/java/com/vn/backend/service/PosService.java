@@ -9,7 +9,7 @@ import java.util.List;
 
 public interface PosService {
 
-    PosOrderResponse createOrder(PosCreateOrderRequest request);
+    PosOrderResponse createOrder(PosCreateOrderRequest request) throws Exception;
 
     List<PosOrderResponse> getDraftOrders();
 
