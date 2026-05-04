@@ -100,6 +100,18 @@ const ProductDetailPage = () => {
       .finally(() => setLoading(false));
   }, [id, navigate]);
 
+  const sellableVariants = useMemo(() => {
+    if (!product?.variants) return [];
+
+    return product.variants.filter(
+      (v: any) =>
+        (v.isActive ?? true) &&
+        (v.productIsActive ?? true) &&
+        v.deletedAt == null &&
+        (v.stockQuantity ?? 0) >= 0,
+    );
+  }, [product]);
+
   const { allSizes, allColors, variantsBySize, variantsByColor } =
     useMemo(() => {
       if (!product) {
@@ -112,15 +124,20 @@ const ProductDetailPage = () => {
       }
 
       const allSizes = [
-        ...new Set(product.variants.map((v) => v.attributes.SIZE)),
+        ...new Set(
+          sellableVariants.map((v) => v.attributes.SIZE).filter(Boolean),
+        ),
       ];
+
       const allColors = [
-        ...new Set(product.variants.map((v) => v.attributes.COLOR)),
+        ...new Set(
+          sellableVariants.map((v) => v.attributes.COLOR).filter(Boolean),
+        ),
       ];
 
       const variantsByColor = allColors.reduce(
         (acc, color) => {
-          acc[color] = product.variants.filter(
+          acc[color] = sellableVariants.filter(
             (v) => v.attributes.COLOR === color,
           );
           return acc;
@@ -130,7 +147,7 @@ const ProductDetailPage = () => {
 
       const variantsBySize = allSizes.reduce(
         (acc, size) => {
-          acc[size] = product.variants.filter(
+          acc[size] = sellableVariants.filter(
             (v) => v.attributes.SIZE === size,
           );
           return acc;
@@ -139,18 +156,21 @@ const ProductDetailPage = () => {
       );
 
       return { allSizes, allColors, variantsBySize, variantsByColor };
-    }, [product]);
+    }, [product, sellableVariants]);
+    
+  
 
   const selectedVariant = useMemo(() => {
-    if (!product || !selectedSize || !selectedColor) return null;
+    if (!selectedSize || !selectedColor) return null;
+
     return (
-      product.variants.find(
+      sellableVariants.find(
         (v) =>
           v.attributes.SIZE === selectedSize &&
           v.attributes.COLOR === selectedColor,
       ) || null
     );
-  }, [product, selectedSize, selectedColor]);
+  }, [sellableVariants, selectedSize, selectedColor]);
 
   useEffect(() => {
     if (!product) return;
@@ -199,30 +219,32 @@ const ProductDetailPage = () => {
 
     return [...new Set(newImageList)];
   }, [product, selectedColor, selectedVariant]);
-
+  //
   const availableSizesForSelectedColor = selectedColor
     ? variantsByColor[selectedColor]
-        ?.filter((v) => v.stockQuantity > 0)
-        .map((v) => v.attributes.SIZE)
+        ?.filter((v) => (v.stockQuantity ?? 0) > 0)
+        .map((v) => v.attributes.SIZE) || []
     : allSizes;
 
   const availableColorsForSelectedSize = selectedSize
     ? variantsBySize[selectedSize]
-        ?.filter((v) => v.stockQuantity > 0)
-        .map((v) => v.attributes.COLOR)
+        ?.filter((v) => (v.stockQuantity ?? 0) > 0)
+        .map((v) => v.attributes.COLOR) || []
     : allColors;
 
   const isSizeDisabled = (size: string) => {
     if (selectedColor && !availableSizesForSelectedColor.includes(size)) {
       return true;
     }
+
     const variantsForThisSize = variantsBySize[size];
     if (
       !variantsForThisSize ||
-      variantsForThisSize.every((v) => v.stockQuantity === 0)
+      variantsForThisSize.every((v) => (v.stockQuantity ?? 0) <= 0)
     ) {
       return true;
     }
+
     return false;
   };
 
@@ -230,15 +252,18 @@ const ProductDetailPage = () => {
     if (selectedSize && !availableColorsForSelectedSize.includes(color)) {
       return true;
     }
+
     const variantsForThisColor = variantsByColor[color];
     if (
       !variantsForThisColor ||
-      variantsForThisColor.every((v) => v.stockQuantity === 0)
+      variantsForThisColor.every((v) => (v.stockQuantity ?? 0) <= 0)
     ) {
       return true;
     }
+
     return false;
   };
+  //
 
   const handleSelectAttribute = (type: "size" | "color", value: string) => {
     if (type === "size") {
@@ -292,6 +317,10 @@ const ProductDetailPage = () => {
       },
     });
   };
+  const selectedStock = selectedVariant?.stockQuantity ?? 0;
+  const isOutOfStock = !selectedVariant || selectedStock <= 0;
+  const isLowStock =
+    selectedVariant != null && selectedStock > 0 && selectedStock <= 5;
 
   if (!product) {
     return (
@@ -408,21 +437,26 @@ const ProductDetailPage = () => {
             {selectedVariant && (
               <>
                 <div style={{ marginTop: 8 }}>
-                  <Text>Tồn kho: {selectedVariant.stockQuantity}</Text>
+                  <Text>Tồn kho: {selectedStock}</Text>
                 </div>
 
-                {selectedVariant.stockQuantity <= 0 && (
+                {isOutOfStock && (
                   <div style={{ color: "red", marginTop: 8 }}>
                     Sản phẩm hiện đã hết hàng.
                   </div>
                 )}
 
-                {selectedVariant.stockQuantity > 0 &&
-                  selectedVariant.stockQuantity <= 3 && (
-                    <div style={{ color: "#fa8c16", marginTop: 8 }}>
-                      Sản phẩm sắp hết hàng, vui lòng đặt sớm.
-                    </div>
-                  )}
+                {!isOutOfStock && isLowStock && (
+                  <div style={{ color: "#fa8c16", marginTop: 8 }}>
+                    Sản phẩm sắp hết hàng, vui lòng đặt sớm.
+                  </div>
+                )}
+
+                {!isOutOfStock && !isLowStock && (
+                  <div style={{ color: "#52c41a", marginTop: 8 }}>
+                    Sản phẩm còn hàng.
+                  </div>
+                )}
               </>
             )}
 
@@ -487,22 +521,30 @@ const ProductDetailPage = () => {
 
             <Divider />
 
-            <Space align="center" size="large" style={{ marginBottom: "24px" }}>
-              <InputNumber
-                min={1}
-                max={selectedVariant?.stockQuantity || 1}
-                value={quantity}
-                onChange={(val) => setQuantity(val || 1)}
-              />
-              <Button
-                type="primary"
-                icon={<ShoppingCartOutlined />}
-                size="large"
-                onClick={handleAddToCart}
-                disabled={!selectedVariant}
-              >
-                Thêm vào giỏ hàng
-              </Button>
+            <Space
+              direction="vertical"
+              size="middle"
+              style={{ marginBottom: "24px" }}
+            >
+              <Space align="center" size="large">
+                <InputNumber
+                  min={1}
+                  max={Math.max(selectedStock, 1)}
+                  value={quantity}
+                  onChange={(val) => setQuantity(val || 1)}
+                  disabled={isOutOfStock}
+                />
+
+                <Button
+                  type="primary"
+                  icon={<ShoppingCartOutlined />}
+                  size="large"
+                  onClick={handleAddToCart}
+                  disabled={isOutOfStock}
+                >
+                  {isOutOfStock ? "Hết hàng" : "Thêm vào giỏ hàng"}
+                </Button>
+              </Space>
             </Space>
 
             <Divider />

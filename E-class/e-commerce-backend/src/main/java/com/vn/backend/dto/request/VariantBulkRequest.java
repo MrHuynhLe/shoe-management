@@ -21,7 +21,6 @@ public class VariantBulkRequest {
 
     @Data
     public static class VariantItemRequest {
-        @NotBlank(message = "SKU không được để trống")
         private String code;
 
         private String barcode;

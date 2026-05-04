@@ -32,7 +32,6 @@ import { useAuth } from "@/services/AuthContext";
 import { discountService } from "@/services/discount.service";
 import { userService } from "@/services/userService";
 import { shippingService } from "@/services/shipping.service";
-import { promotionService } from "@/services/promotion.service";
 import { couponService } from "@/services/coupon.service";
 
 interface Address {
@@ -66,13 +65,17 @@ const CheckoutPage = () => {
   const { items, subtotal } = location.state || { items: [], subtotal: 0 };
 
   const total = subtotal + shippingFee - discount;
+
   const formatMoney = (value?: number | string) =>
     `${new Intl.NumberFormat("vi-VN").format(Number(value || 0))} ₫`;
 
   const buildVoucherLabel = (v: any) => {
     const discountText =
       v.discountType === "PERCENTAGE"
-        ? `Giảm ${v.discountValue}%${v.maxDiscountAmount ? `, tối đa ${formatMoney(v.maxDiscountAmount)}` : ""}`
+        ? `Giảm ${v.discountValue}%${v.maxDiscountAmount
+          ? `, tối đa ${formatMoney(v.maxDiscountAmount)}`
+          : ""
+        }`
         : `Giảm ${formatMoney(v.discountValue)}`;
 
     const minOrderText =
@@ -93,26 +96,18 @@ const CheckoutPage = () => {
   useEffect(() => {
     const fetchVouchers = async () => {
       try {
-        const promotionsRes = await promotionService.getPublicPromotions({
-          page: 0,
-          size: 50,
-        });
-        const promotions =
-          promotionsRes.data.content?.map((p: any) => ({
-            ...p,
-            type: "PROMOTION",
-          })) || [];
-
         let coupons: any[] = [];
+
         if (isAuthenticated) {
           const couponsRes = await couponService.getMyCoupons();
           coupons =
-            couponsRes.data?.map((c: any) => ({ ...c, type: "COUPON" })) || [];
+            couponsRes.data?.map((c: any) => ({
+              ...c,
+              type: "COUPON",
+            })) || [];
         }
 
-        const merged = [...promotions, ...coupons];
-
-        setAvailableVouchers(merged);
+        setAvailableVouchers(coupons);
       } catch (error) {
         console.error("Không thể tải danh sách voucher:", error);
         setAvailableVouchers([]);
@@ -163,6 +158,7 @@ const CheckoutPage = () => {
       "district",
       "ward",
     ]);
+
     if (!province || !district || !ward || items.length === 0) {
       setShippingFee(0);
       return;
@@ -172,15 +168,16 @@ const CheckoutPage = () => {
     try {
       const shippingEstimateRequest = {
         shippingInfo: {
-          province: province,
-          district: district,
-          address: address,
+          province,
+          district,
+          address,
         },
         items: items.map((item: any) => ({
           variantId: item.variantId,
           quantity: item.quantity,
         })),
       };
+
       const response = await shippingService.estimateShippingFee(
         shippingEstimateRequest,
       );
@@ -332,9 +329,11 @@ const CheckoutPage = () => {
       >
         Quay lại giỏ hàng
       </Button>
+
       <Title level={2} style={{ marginBottom: "24px" }}>
         Thanh toán
       </Title>
+
       <Form form={form} layout="vertical" onFinish={handlePlaceOrder}>
         <Row gutter={[32, 32]}>
           <Col xs={24} lg={14}>
@@ -351,6 +350,7 @@ const CheckoutPage = () => {
               >
                 <Input placeholder="Nguyễn Văn A" />
               </Form.Item>
+
               <Form.Item
                 name="phone"
                 label="Số điện thoại"
@@ -360,6 +360,7 @@ const CheckoutPage = () => {
               >
                 <Input placeholder="Ví dụ: 0123456789" />
               </Form.Item>
+
               <Row gutter={16}>
                 <Col span={12}>
                   <Form.Item
@@ -378,6 +379,7 @@ const CheckoutPage = () => {
                     />
                   </Form.Item>
                 </Col>
+
                 <Col span={12}>
                   <Form.Item
                     name="district"
@@ -393,6 +395,7 @@ const CheckoutPage = () => {
                   </Form.Item>
                 </Col>
               </Row>
+
               <Row gutter={16}>
                 <Col span={12}>
                   <Form.Item
@@ -408,6 +411,7 @@ const CheckoutPage = () => {
                     />
                   </Form.Item>
                 </Col>
+
                 <Col span={12}>
                   <Form.Item
                     name="address"
@@ -426,6 +430,7 @@ const CheckoutPage = () => {
                   </Form.Item>
                 </Col>
               </Row>
+
               <Button
                 type="link"
                 icon={<EditOutlined />}
@@ -437,16 +442,19 @@ const CheckoutPage = () => {
               >
                 Chọn địa chỉ đã lưu
               </Button>
+
               <Form.Item name="note" label="Ghi chú cho đơn hàng (tùy chọn)">
                 <Input.TextArea
                   rows={2}
                   placeholder="Ghi chú thêm cho người bán hoặc shipper"
                 />
               </Form.Item>
+
               <Form.Item name="saveAddress" valuePropName="checked">
                 <Checkbox>Lưu thông tin này cho lần mua sắm tiếp theo</Checkbox>
               </Form.Item>
             </Card>
+
             <Card
               title="Địa chỉ giao hàng"
               bordered={false}
@@ -464,6 +472,7 @@ const CheckoutPage = () => {
                   "ward",
                   "address",
                 ]);
+
                 const hasCompleteAddress =
                   values.customerName &&
                   values.phone &&
@@ -491,6 +500,7 @@ const CheckoutPage = () => {
                       </Text>
                       <Text>{values.customerName}</Text>
                     </div>
+
                     <div style={{ marginBottom: "8px" }}>
                       <Text
                         strong
@@ -500,6 +510,7 @@ const CheckoutPage = () => {
                       </Text>
                       <Text>{values.phone}</Text>
                     </div>
+
                     <div>
                       <Text
                         strong
@@ -525,6 +536,7 @@ const CheckoutPage = () => {
                 );
               })()}
             </Card>
+
             <Card
               title="2. Mã giảm giá"
               bordered={false}
@@ -555,7 +567,7 @@ const CheckoutPage = () => {
                     }
                   }}
                   filterOption={(input, option) =>
-                    (option?.label ?? "")
+                    String(option?.label ?? "")
                       .toLowerCase()
                       .includes(input.toLowerCase())
                   }
@@ -569,6 +581,7 @@ const CheckoutPage = () => {
                       : "Đăng nhập để xem mã giảm giá của bạn"
                   }
                 />
+
                 <Button
                   type="primary"
                   onClick={handleApplyVoucher}
@@ -577,11 +590,13 @@ const CheckoutPage = () => {
                   Áp dụng
                 </Button>
               </Space.Compact>
+
               {appliedVoucher && (
                 <div style={{ marginTop: "12px" }}>
                   <Text type="success">
                     Đã áp dụng mã: <strong>{appliedVoucher}</strong>
                   </Text>
+
                   {appliedVoucherInfo && (
                     <div style={{ marginTop: 8 }}>
                       <Text type="secondary">
@@ -592,6 +607,7 @@ const CheckoutPage = () => {
                 </div>
               )}
             </Card>
+
             <Card
               title="3. Phương thức thanh toán"
               bordered={false}
@@ -683,15 +699,19 @@ const CheckoutPage = () => {
                     </List.Item>
                   )}
                 />
+
                 <Divider />
+
                 <Row justify="space-between" style={{ marginBottom: 12 }}>
                   <Text>Tạm tính</Text>
                   <Text strong>{subtotal.toLocaleString("vi-VN")} ₫</Text>
                 </Row>
+
                 <Row justify="space-between" style={{ marginBottom: 12 }}>
                   <Text>Phí vận chuyển</Text>
                   <Text strong>{shippingFee.toLocaleString("vi-VN")} ₫</Text>
                 </Row>
+
                 {discount > 0 && (
                   <Row justify="space-between" style={{ marginBottom: 12 }}>
                     <Text type="success">Giảm giá</Text>
@@ -700,6 +720,7 @@ const CheckoutPage = () => {
                     </Text>
                   </Row>
                 )}
+
                 {appliedVoucher && (
                   <Row justify="space-between" style={{ marginBottom: 12 }}>
                     <Text>Mã đã dùng</Text>
@@ -708,7 +729,9 @@ const CheckoutPage = () => {
                     </Text>
                   </Row>
                 )}
+
                 <Divider />
+
                 <Row justify="space-between">
                   <Title level={4} style={{ margin: 0 }}>
                     Tổng cộng
@@ -717,6 +740,7 @@ const CheckoutPage = () => {
                     {total.toLocaleString("vi-VN")} ₫
                   </Title>
                 </Row>
+
                 <Popconfirm
                   title="Xác nhận đặt hàng?"
                   description="Vui lòng kiểm tra lại thông tin giao hàng và sản phẩm trước khi xác nhận."
@@ -757,6 +781,7 @@ const CheckoutPage = () => {
             Nhập địa chỉ mới
           </Button>
         </div>
+
         {addresses.length === 0 ? (
           <div style={{ textAlign: "center", padding: "20px" }}>
             <Text type="secondary">Không có địa chỉ đã lưu</Text>
@@ -781,7 +806,9 @@ const CheckoutPage = () => {
               >
                 <List.Item.Meta
                   title={`${address.fullName} - ${address.phone}`}
-                  description={`${address.address}${address.ward ? `, ${address.ward}` : ""}${address.district ? `, ${address.district}` : ""}${address.province ? `, ${address.province}` : ""}`}
+                  description={`${address.address}${address.ward ? `, ${address.ward}` : ""
+                    }${address.district ? `, ${address.district}` : ""}${address.province ? `, ${address.province}` : ""
+                    }`}
                 />
               </List.Item>
             )}

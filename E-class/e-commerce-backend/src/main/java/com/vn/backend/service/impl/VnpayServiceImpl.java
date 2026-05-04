@@ -547,17 +547,10 @@ public class VnpayServiceImpl implements com.vn.backend.service.VnpayService {
 
         Order order = payment.getOrder();
         if (order != null) {
-            String previousStatus = order.getStatus();
-
             order.setCustomerPaid(defaultZero(payment.getAmount()));
 
-            if (!ORDER_STATUS_CONFIRMED.equalsIgnoreCase(order.getStatus())) {
-                order.setStatus(ORDER_STATUS_CONFIRMED);
-                orderRepository.save(order);
-                saveOrderStatusHistory(order, previousStatus, ORDER_STATUS_CONFIRMED);
-            } else {
-                orderRepository.save(order);
-            }
+            // Giữ nguyên PENDING để admin xác nhận thủ công
+            orderRepository.save(order);
 
             saveVoucherUsageIfNeeded(order);
         }

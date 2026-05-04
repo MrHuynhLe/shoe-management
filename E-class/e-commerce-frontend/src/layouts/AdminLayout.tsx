@@ -24,9 +24,9 @@ import logo from "@/assets/logo-shoe-shop.png";
 const AdminLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
-    const { logout } = useAuth();
+  const { logout } = useAuth();
 
-    const handleLogout = () => {
+  const handleLogout = () => {
     logout();
     navigate("/login");
   };
@@ -41,27 +41,27 @@ const AdminLayout = () => {
   ];
 
   return (
-        <ConfigProvider
+    <ConfigProvider
       locale={{ ...antdViVN, ...proViVN }}
       theme={{
         token: {
-          colorPrimary: '#1b6eea',
-          colorBgLayout: '#f7f9fb',
-          colorBgContainer: '#ffffff',
-          colorText: '#1f2937',
-          colorTextSecondary: '#6b7280',
-          colorBorder: '#e5e7eb',
+          colorPrimary: "#1b6eea",
+          colorBgLayout: "#f7f9fb",
+          colorBgContainer: "#ffffff",
+          colorText: "#1f2937",
+          colorTextSecondary: "#6b7280",
+          colorBorder: "#e5e7eb",
           borderRadius: 10,
           borderRadiusSM: 8,
           controlHeight: 44,
           controlHeightLG: 48,
-          boxShadow: '0 4px 10px rgba(15, 23, 42, 0.08)',
+          boxShadow: "0 4px 10px rgba(15, 23, 42, 0.08)",
         },
       }}
     >
       <>
         <ProLayout
-          style={{ minHeight: '100vh', backgroundColor: '#f7f9fb' }}
+          style={{ minHeight: "100vh", backgroundColor: "#f7f9fb" }}
           title="S-Shop Admin"
           logo={logo}
           layout="mix"
@@ -69,10 +69,10 @@ const AdminLayout = () => {
           splitMenus={false}
           token={{
             sider: {
-              colorBgMenuItemHover: 'rgba(27, 110, 234, 0.08)',
-              colorTextMenuActive: '#1b6eea',
-              colorTextMenu: '#374151',
-              colorBgMenuItemActive: '#ffffff',
+              colorBgMenuItemHover: "rgba(27, 110, 234, 0.08)",
+              colorTextMenuActive: "#1b6eea",
+              colorTextMenu: "#374151",
+              colorBgMenuItemActive: "#ffffff",
             },
             pageContainer: {
               paddingInlinePageContainerContent: 24,
@@ -84,7 +84,7 @@ const AdminLayout = () => {
             {
               key: "/admin",
               path: "/admin",
-              name: "Dashboard",
+              name: "Dashboard & Thống kê",
               icon: <DashboardOutlined />,
             },
             {
@@ -165,22 +165,11 @@ const AdminLayout = () => {
               icon: <TagsOutlined />,
               children: [
                 {
-                  key: "/admin/discounts/promotions",
-                  path: "/admin/discounts/promotions",
-                  name: "Chương trình khuyến mãi",
-                },
-                {
                   key: "/admin/discounts/coupons",
                   path: "/admin/discounts/coupons",
                   name: "Mã giảm giá (Coupon)",
                 },
               ],
-            },
-            {
-              key: "/admin/revenue",
-              path: "/admin/revenue",
-              name: "Thống kê doanh thu",
-              icon: <LineChartOutlined />,
             },
           ]}
           menuItemRender={(menuItemProps, defaultDom) => {
@@ -190,7 +179,7 @@ const AdminLayout = () => {
             return <Link to={menuItemProps.path}>{defaultDom}</Link>;
           }}
           actionsRender={() => [
-            <Space size="middle">
+            <Space size="middle" key="admin-actions">
               <Badge count={5} size="small">
                 <BellOutlined style={{ fontSize: 18 }} />
               </Badge>

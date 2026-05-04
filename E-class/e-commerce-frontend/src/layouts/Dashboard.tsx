@@ -6,6 +6,7 @@ import {
   DatePicker,
   Empty,
   Row,
+  Select,
   Space,
   Spin,
   Statistic,
@@ -49,10 +50,14 @@ const DashboardPage = () => {
   const [query, setQuery] = useState<StatisticsQuery>({
     from: dayjs().startOf("month").format("YYYY-MM-DD"),
     to: dayjs().endOf("day").format("YYYY-MM-DD"),
+    orderType: "ALL",
+    page: 0,
+    size: 10,
   });
 
   const [overview, setOverview] = useState<OverviewStatistics>({
     totalRevenue: 0,
+    totalProfit: 0,
     totalOrders: 0,
     totalProductsSold: 0,
     totalCustomers: 0,
@@ -95,6 +100,7 @@ const DashboardPage = () => {
       setOverview(
         overviewRes ?? {
           totalRevenue: 0,
+          totalProfit: 0,
           totalOrders: 0,
           totalProductsSold: 0,
           totalCustomers: 0,
@@ -133,15 +139,30 @@ const DashboardPage = () => {
 
   const handleApplyFilter = (range: any) => {
     const nextQuery: StatisticsQuery = {
+      ...query,
       from: range?.[0] ? dayjs(range[0]).format("YYYY-MM-DD") : undefined,
       to: range?.[1] ? dayjs(range[1]).format("YYYY-MM-DD") : undefined,
+      page: 0,
     };
 
     setQuery(nextQuery);
     fetchDashboardData(nextQuery, groupBy);
   };
+  const applyPreset = (preset: "all" | "today" | "week" | "month") => {
+    if (preset === "all") {
+      const nextQuery: StatisticsQuery = {
+        ...query,
+        from: undefined,
+        to: undefined,
+        page: 0,
+      };
 
-  const applyPreset = (preset: "today" | "week" | "month") => {
+      setQuery(nextQuery);
+      setGroupBy("month");
+      fetchDashboardData(nextQuery, "month");
+      return;
+    }
+
     let from = dayjs();
     let to = dayjs();
 
@@ -164,8 +185,10 @@ const DashboardPage = () => {
     }
 
     const nextQuery: StatisticsQuery = {
+      ...query,
       from: from.format("YYYY-MM-DD"),
       to: to.format("YYYY-MM-DD"),
+      page: 0,
     };
 
     setQuery(nextQuery);
@@ -286,7 +309,74 @@ const DashboardPage = () => {
     if (!data.length) {
       return <Empty description={emptyText} />;
     }
+    const revenueColumns = [
+      {
+        title:
+          groupBy === "day" ? "Ngày" : groupBy === "week" ? "Tuần" : "Tháng",
+        dataIndex: "label",
+        key: "label",
+        render: (value: string) => {
+          if (!value) return "-";
 
+          if (groupBy === "day") {
+            return dayjs(value).isValid()
+              ? dayjs(value).format("DD/MM/YYYY")
+              : value;
+          }
+
+          if (groupBy === "month") {
+            return dayjs(`${value}-01`).isValid()
+              ? dayjs(`${value}-01`).format("MM/YYYY")
+              : value;
+          }
+
+          return dayjs(value).isValid()
+            ? `Tuần từ ${dayjs(value).format("DD/MM/YYYY")}`
+            : value;
+        },
+      },
+      {
+        title: "Số đơn",
+        dataIndex: "totalOrders",
+        key: "totalOrders",
+        align: "right" as const,
+        render: (value: number) => Number(value || 0),
+      },
+      {
+        title: "Sản phẩm bán",
+        dataIndex: "itemsSold",
+        key: "itemsSold",
+        align: "right" as const,
+        render: (value: number) => Number(value || 0),
+      },
+      {
+        title: "Doanh thu",
+        dataIndex: "revenue",
+        key: "revenue",
+        align: "right" as const,
+        render: (value: number) => formatCurrency(Number(value || 0)),
+      },
+      {
+        title: "Lợi nhuận",
+        dataIndex: "profit",
+        key: "profit",
+        align: "right" as const,
+        render: (value: number) => formatCurrency(Number(value || 0)),
+      },
+      {
+        title: "Tỷ suất LN",
+        key: "profitRate",
+        align: "right" as const,
+        render: (_: any, record: RevenueChartItem) => {
+          const revenue = Number(record.revenue || 0);
+          const profit = Number(record.profit || 0);
+
+          if (revenue <= 0) return "0%";
+
+          return `${((profit / revenue) * 100).toFixed(1)}%`;
+        },
+      },
+    ];
     return (
       <div style={{ width: "100%", height: 320 }}>
         <ResponsiveContainer width="100%" height="100%">
@@ -375,6 +465,74 @@ const DashboardPage = () => {
     },
   ];
 
+  const revenueColumns = [
+    {
+      title: groupBy === "day" ? "Ngày" : groupBy === "week" ? "Tuần" : "Tháng",
+      dataIndex: "label",
+      key: "label",
+      render: (value: string) => {
+        if (!value) return "-";
+
+        if (groupBy === "day") {
+          return dayjs(value).isValid()
+            ? dayjs(value).format("DD/MM/YYYY")
+            : value;
+        }
+
+        if (groupBy === "month") {
+          return dayjs(`${value}-01`).isValid()
+            ? dayjs(`${value}-01`).format("MM/YYYY")
+            : value;
+        }
+
+        return dayjs(value).isValid()
+          ? `Tuần từ ${dayjs(value).format("DD/MM/YYYY")}`
+          : value;
+      },
+    },
+    {
+      title: "Số đơn",
+      dataIndex: "totalOrders",
+      key: "totalOrders",
+      align: "right" as const,
+      render: (value: number) => Number(value || 0),
+    },
+    {
+      title: "Sản phẩm bán",
+      dataIndex: "itemsSold",
+      key: "itemsSold",
+      align: "right" as const,
+      render: (value: number) => Number(value || 0),
+    },
+    {
+      title: "Doanh thu",
+      dataIndex: "revenue",
+      key: "revenue",
+      align: "right" as const,
+      render: (value: number) => formatCurrency(Number(value || 0)),
+    },
+    {
+      title: "Lợi nhuận",
+      dataIndex: "profit",
+      key: "profit",
+      align: "right" as const,
+      render: (value: number) => formatCurrency(Number(value || 0)),
+    },
+    {
+      title: "Tỷ suất LN",
+      key: "profitRate",
+      align: "right" as const,
+      render: (_: any, record: RevenueChartItem) => {
+        const revenue = Number(record.revenue || 0);
+        const profit = Number(record.profit || 0);
+
+        if (revenue <= 0) return "0%";
+
+        return `${((profit / revenue) * 100).toFixed(1)}%`;
+      },
+    },
+  ];
+
   return (
     <Space direction="vertical" size="large" style={{ width: "100%" }}>
       <div>
@@ -398,9 +556,31 @@ const DashboardPage = () => {
               format="DD/MM/YYYY"
               onChange={(value) => handleApplyFilter(value)}
             />
+
+            <Select
+              style={{ width: 180 }}
+              value={query.orderType || "ALL"}
+              options={[
+                { label: "Tất cả đơn hàng", value: "ALL" },
+                { label: "Bán tại quầy POS", value: "POS" },
+                { label: "Đơn online", value: "ONLINE" },
+              ]}
+              onChange={(value) => {
+                const nextQuery: StatisticsQuery = {
+                  ...query,
+                  orderType: value,
+                  page: 0,
+                };
+
+                setQuery(nextQuery);
+                fetchDashboardData(nextQuery, groupBy);
+              }}
+            />
+
             <Button onClick={() => applyPreset("today")}>Hôm nay</Button>
             <Button onClick={() => applyPreset("week")}>Tuần này</Button>
             <Button onClick={() => applyPreset("month")}>Tháng này</Button>
+            <Button onClick={() => applyPreset("all")}>Tất cả</Button>
           </Space>
 
           <Space wrap>
@@ -438,6 +618,18 @@ const DashboardPage = () => {
               />
             </Card>
           </Col>
+
+          <Col xs={24} sm={12} xl={6}>
+            <Card>
+              <Statistic
+                title="Tổng lợi nhuận"
+                value={Number(overview.totalProfit || 0)}
+                formatter={(value) => formatCurrency(Number(value || 0))}
+                prefix={<DollarCircleOutlined />}
+              />
+            </Card>
+          </Col>
+
           <Col xs={24} sm={12} xl={6}>
             <Card>
               <Statistic
@@ -448,6 +640,7 @@ const DashboardPage = () => {
               />
             </Card>
           </Col>
+
           <Col xs={24} sm={12} xl={6}>
             <Card>
               <Statistic
@@ -458,6 +651,7 @@ const DashboardPage = () => {
               />
             </Card>
           </Col>
+
           <Col xs={24} sm={12} xl={6}>
             <Card>
               <Statistic
@@ -467,6 +661,7 @@ const DashboardPage = () => {
               />
             </Card>
           </Col>
+
           <Col xs={24} sm={12} xl={6}>
             <Card>
               <Statistic
@@ -476,6 +671,7 @@ const DashboardPage = () => {
               />
             </Card>
           </Col>
+
           <Col xs={24} sm={12} xl={6}>
             <Card>
               <Statistic

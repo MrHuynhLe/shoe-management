@@ -1,12 +1,16 @@
+export type StatisticsOrderType = "ALL" | "POS" | "ONLINE";
+
 export interface StatisticsQuery {
   from?: string;
   to?: string;
   page?: number;
   size?: number;
+  orderType?: StatisticsOrderType;
 }
 
 export interface OverviewStatistics {
   totalRevenue: number;
+  totalProfit: number;
   totalOrders: number;
   totalProductsSold: number;
   totalCustomers: number;
@@ -36,7 +40,6 @@ export interface OrderStatusItem {
   totalOrders: number;
   totalAmount: number;
 }
-
 
 export interface PaymentMethodRevenueItem {
   paymentMethodCode: string;

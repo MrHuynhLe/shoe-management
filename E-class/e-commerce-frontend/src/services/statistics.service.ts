@@ -15,9 +15,15 @@ const buildCommonParams = (query?: StatisticsQuery) => {
   if (query?.from) params.from = query.from;
   if (query?.to) params.to = query.to;
 
+  // ALL = lấy cả POS + ONLINE
+  // POS = chỉ bán tại quầy
+  // ONLINE = chỉ đơn online
+  if (query?.orderType) {
+    params.orderType = query.orderType;
+  }
+
   return params;
 };
-
 const buildTopProductParams = (query?: StatisticsQuery) => {
   const params = buildCommonParams(query);
   params.page = Number.isFinite(Number(query?.page)) ? Number(query?.page) : 0;
