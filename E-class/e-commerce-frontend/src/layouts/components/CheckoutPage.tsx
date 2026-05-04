@@ -194,23 +194,49 @@ const CheckoutPage = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      userService
-        .getProfile()
-        .then((response) => {
-          const profile = response.data;
-          if (profile) {
+      const initData = async () => {
+        try {
+          // Tải danh sách địa chỉ
+          const addrResponse = await orderService.getUserShippingAddresses();
+          const fetchedAddresses = addrResponse.data;
+          setAddresses(fetchedAddresses || []);
+
+          if (fetchedAddresses && fetchedAddresses.length > 0) {
+            // Chọn địa chỉ đầu tiên (mới nhất) làm mặc định
+            const latestAddress = fetchedAddresses[0];
             form.setFieldsValue({
-              customerName: profile.fullName,
-              phone: profile.phone,
-              province: profile.province,
-              district: profile.district,
+              customerName: latestAddress.fullName,
+              phone: latestAddress.phone,
+              province: latestAddress.province,
+              district: latestAddress.district,
+              ward: latestAddress.ward,
+              address: latestAddress.address,
+              note: latestAddress.note,
             });
+            setSelectedAddress(latestAddress);
+            // Cập nhật phí vận chuyển sau khi điền form
+            setTimeout(() => estimateShippingCost(), 100);
+          } else {
+            // Nếu không có địa chỉ nào, tải thông tin cơ bản từ profile
+            const profileResponse = await userService.getProfile();
+            const profile = profileResponse.data;
+            if (profile) {
+              form.setFieldsValue({
+                customerName: profile.fullName,
+                phone: profile.phone,
+                province: profile.province,
+                district: profile.district,
+              });
+            }
           }
-        })
-        .catch((err) =>
-          console.error("Không thể tải thông tin người dùng:", err),
-        );
+        } catch (err) {
+          console.error("Không thể tải dữ liệu khởi tạo:", err);
+        }
+      };
+
+      initData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, form]);
 
   const handleApplyVoucher = async () => {

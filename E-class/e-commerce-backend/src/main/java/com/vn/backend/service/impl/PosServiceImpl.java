@@ -122,9 +122,9 @@ public class PosServiceImpl implements PosService {
             customer = customerRepository.findById(request.getCustomerId().longValue())
                     .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy khách hàng"));
         }
-        if(orderRepository.findByOrderTypeAndStatusAndEmployeeId(ORDER_TYPE_POS, ORDER_STATUS_DRAFT, employee.getId()).size() > 10) {
-            throw new Exception("Số lượng hóa đơn nháp giới hạn là 10, không thể tạo thêm.");
-        }
+//        if(orderRepository.findByOrderTypeAndStatusAndEmployeeId(ORDER_TYPE_POS, ORDER_STATUS_DRAFT, employee.getId()).size() > 10) {
+//            throw new Exception("Số lượng hóa đơn nháp giới hạn là 10, không thể tạo thêm.");
+//        }
 
         Order order = Order.builder()
                 .code(generateOrderCode())
