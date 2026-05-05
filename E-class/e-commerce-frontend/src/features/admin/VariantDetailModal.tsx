@@ -1,5 +1,6 @@
 ﻿import {
   Modal,
+  Card,
   Table,
   Space,
   Button,
@@ -15,8 +16,9 @@
   Input,
   InputNumber,
   notification,
+  Segmented,
 } from "antd";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { EditOutlined, DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { productService } from "@/services/product.service";
 
@@ -94,6 +96,13 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
 
   const [bulkCostPrice, setBulkCostPrice] = useState<number | null>(null);
   const [bulkSellingPrice, setBulkSellingPrice] = useState<number | null>(null);
+  const [variantKeyword, setVariantKeyword] = useState("");
+  const [variantStockStatus, setVariantStockStatus] = useState<
+    "all" | "inStock" | "outOfStock"
+  >("all");
+  const [variantActiveStatus, setVariantActiveStatus] = useState<
+    "all" | "active" | "inactive"
+  >("all");
 
   const fetchProductDetails = async () => {
     if (!productId) {
@@ -236,6 +245,40 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
     setBulkCostPrice(null);
     setBulkSellingPrice(null);
   };
+
+  const resetVariantFilters = () => {
+    setVariantKeyword("");
+    setVariantStockStatus("all");
+    setVariantActiveStatus("all");
+  };
+
+  const filteredVariants = useMemo(() => {
+    const keyword = variantKeyword.trim().toLowerCase();
+
+    return (product?.variants || []).filter((variant) => {
+      const attributeText = Object.entries(variant.attributes || {})
+        .map(([key, value]) => `${key} ${value}`)
+        .join(" ")
+        .toLowerCase();
+
+      const matchesKeyword =
+        !keyword ||
+        variant.code.toLowerCase().includes(keyword) ||
+        attributeText.includes(keyword);
+
+      const matchesStock =
+        variantStockStatus === "all" ||
+        (variantStockStatus === "inStock" && variant.stockQuantity > 0) ||
+        (variantStockStatus === "outOfStock" && variant.stockQuantity <= 0);
+
+      const matchesActive =
+        variantActiveStatus === "all" ||
+        (variantActiveStatus === "active" && variant.isActive) ||
+        (variantActiveStatus === "inactive" && !variant.isActive);
+
+      return matchesKeyword && matchesStock && matchesActive;
+    });
+  }, [product?.variants, variantKeyword, variantStockStatus, variantActiveStatus]);
 
   const handleAddVariantFinish = async (values: any) => {
     if (!productId) {
@@ -418,14 +461,72 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
               Các biến thể sản phẩm
             </Typography.Title>
 
+            <Card size="small" style={{ borderRadius: 8 }}>
+              <Row gutter={[12, 12]} align="middle">
+                <Col xs={24} md={9}>
+                  <Input.Search
+                    allowClear
+                    placeholder="Loc SKU, mau, size, chat lieu..."
+                    value={variantKeyword}
+                    onChange={(e) => setVariantKeyword(e.target.value)}
+                    onSearch={(value) => setVariantKeyword(value)}
+                  />
+                </Col>
+
+                <Col xs={24} md={6}>
+                  <Segmented
+                    block
+                    value={variantStockStatus}
+                    onChange={(value) =>
+                      setVariantStockStatus(
+                        value as "all" | "inStock" | "outOfStock",
+                      )
+                    }
+                    options={[
+                      { label: "Tat ca", value: "all" },
+                      { label: "Con hang", value: "inStock" },
+                      { label: "Het hang", value: "outOfStock" },
+                    ]}
+                  />
+                </Col>
+
+                <Col xs={24} md={6}>
+                  <Segmented
+                    block
+                    value={variantActiveStatus}
+                    onChange={(value) =>
+                      setVariantActiveStatus(
+                        value as "all" | "active" | "inactive",
+                      )
+                    }
+                    options={[
+                      { label: "Tat ca", value: "all" },
+                      { label: "Dang ban", value: "active" },
+                      { label: "Ngung", value: "inactive" },
+                    ]}
+                  />
+                </Col>
+
+                <Col xs={24} md={3}>
+                  <Button block onClick={resetVariantFilters}>
+                    Reset
+                  </Button>
+                </Col>
+              </Row>
+            </Card>
+
             <Table
               columns={columns}
-              dataSource={product.variants}
+              dataSource={filteredVariants}
               rowKey="id"
               bordered
               size="small"
               scroll={{ x: 1080 }}
-              pagination={{ pageSize: 8, showSizeChanger: false }}
+              pagination={{
+                pageSize: 8,
+                showSizeChanger: false,
+                showTotal: (total) => `Tong ${total} bien the`,
+              }}
             />
 
             <Divider>Thêm biến thể mới</Divider>

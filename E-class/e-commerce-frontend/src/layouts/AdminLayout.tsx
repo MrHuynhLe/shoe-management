@@ -134,11 +134,6 @@ const AdminLayout = () => {
                   path: "/admin/attributes/materials",
                   name: "Chất liệu",
                 },
-                {
-                  key: "/admin/product-images",
-                  path: "/admin/product-images",
-                  name: "Hình ảnh",
-                },
               ],
             },
             {

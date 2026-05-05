@@ -42,7 +42,11 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                         p.code,
                         p.name,
                         b.name,
-                        min(pi.imageUrl),
+                        (
+                            select min(pi.imageUrl)
+                            from ProductImage pi
+                            where pi.product = p
+                        ),
                         coalesce(sum(v.stockQuantity), 0),
                         min(v.sellingPrice),
                         max(v.sellingPrice),
@@ -52,7 +56,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                     from Product p
                     left join p.brand b
                     left join p.category c
-                    left join p.images pi
                     left join p.variants v
                         on v.deletedAt is null
                         and (:includeInactive = true or v.isActive = true)

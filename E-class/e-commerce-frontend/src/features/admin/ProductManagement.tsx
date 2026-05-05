@@ -1,10 +1,16 @@
 import {
+  Badge,
   Button,
   Card,
+  Col,
   Image,
   Input,
+  InputNumber,
   Modal,
   Popconfirm,
+  Row,
+  Select,
+  Segmented,
   Space,
   Table,
   Tag,
@@ -18,7 +24,7 @@ import {
   EyeOutlined,
   PlusOutlined,
 } from "@ant-design/icons";
-import { Key, useEffect, useState } from "react";
+import { Key, useEffect, useMemo, useState } from "react";
 import AddProductForm from "@/layouts/components/AddProductForm";
 import { API_BASE_URL } from "@/services/axiosClient";
 import {
@@ -54,12 +60,43 @@ type ProductForTable = ProductListWithVariants & {
   brand: string;
 };
 
-const { Title } = Typography;
+interface FilterOption {
+  id: number;
+  name: string;
+}
+
+interface ProductFilters {
+  keyword: string;
+  categoryId: number | null;
+  brandName: string | null;
+  stockStatus: "all" | "inStock" | "outOfStock";
+  minPrice: number | null;
+  maxPrice: number | null;
+  minStock: number | null;
+  maxStock: number | null;
+}
+
+const initialFilters: ProductFilters = {
+  keyword: "",
+  categoryId: null,
+  brandName: null,
+  stockStatus: "all",
+  minPrice: null,
+  maxPrice: null,
+  minStock: null,
+  maxStock: null,
+};
+
+const { Title, Text } = Typography;
 const { Search } = Input;
 
 const ProductManagementPage = () => {
   const [products, setProducts] = useState<ProductListWithVariants[]>([]);
   const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState<FilterOption[]>([]);
+  const [brands, setBrands] = useState<FilterOption[]>([]);
+  const [filters, setFilters] = useState<ProductFilters>(initialFilters);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -75,13 +112,14 @@ const ProductManagementPage = () => {
 
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
 
-  const fetchProducts = () => {
+  const fetchProducts = (categoryId = filters.categoryId) => {
     setLoading(true);
 
     productService
       .getProducts({
         page: 0,
-        size: 10,
+        size: 500,
+        categoryId,
         includeInactive: true,
       })
       .then((res) => {
@@ -112,6 +150,90 @@ const ProductManagementPage = () => {
   useEffect(() => {
     fetchProducts();
   }, []);
+
+  useEffect(() => {
+    const fetchFilterOptions = async () => {
+      try {
+        const [categoryRes, brandRes] = await Promise.all([
+          productService.getCategories(),
+          productService.getBrands(),
+        ]);
+
+        setCategories(categoryRes.data || []);
+        setBrands(brandRes.data || []);
+      } catch {
+        notification.error({
+          message: "Lỗi tải bộ lọc",
+          description: "Không thể tải danh mục và thương hiệu.",
+        });
+      }
+    };
+
+    fetchFilterOptions();
+  }, []);
+
+  useEffect(() => {
+    fetchProducts(filters.categoryId);
+  }, [filters.categoryId]);
+
+  const updateFilters = (patch: Partial<ProductFilters>) => {
+    setFilters((prev) => ({ ...prev, ...patch }));
+  };
+
+  const resetFilters = () => {
+    setFilters(initialFilters);
+    fetchProducts(null);
+  };
+
+  const filteredProducts = useMemo(() => {
+    const keyword = filters.keyword.trim().toLowerCase();
+
+    return products.filter((product) => {
+      const matchesKeyword =
+        !keyword ||
+        product.name.toLowerCase().includes(keyword) ||
+        product.code.toLowerCase().includes(keyword) ||
+        product.brandName?.toLowerCase().includes(keyword);
+
+      const matchesBrand =
+        !filters.brandName || product.brandName === filters.brandName;
+
+      const matchesStockStatus =
+        filters.stockStatus === "all" ||
+        (filters.stockStatus === "inStock" && product.totalStock > 0) ||
+        (filters.stockStatus === "outOfStock" && product.totalStock <= 0);
+
+      const minProductPrice = product.minPrice ?? 0;
+      const matchesPrice =
+        (filters.minPrice == null || minProductPrice >= filters.minPrice) &&
+        (filters.maxPrice == null || minProductPrice <= filters.maxPrice);
+
+      const matchesStockRange =
+        (filters.minStock == null || product.totalStock >= filters.minStock) &&
+        (filters.maxStock == null || product.totalStock <= filters.maxStock);
+
+      return (
+        matchesKeyword &&
+        matchesBrand &&
+        matchesStockStatus &&
+        matchesPrice &&
+        matchesStockRange
+      );
+    });
+  }, [products, filters]);
+
+  const activeFilterCount = useMemo(() => {
+    return [
+      filters.keyword,
+      filters.categoryId,
+      filters.brandName,
+      filters.stockStatus !== "all" ? filters.stockStatus : null,
+      filters.minPrice,
+      filters.maxPrice,
+      filters.minStock,
+      filters.maxStock,
+    ].filter((value) => value !== null && value !== "").length;
+  }, [filters]);
 
   const confirmAction = (title: string, content: string) => {
     return new Promise<boolean>((resolve) => {
@@ -159,7 +281,7 @@ const ProductManagementPage = () => {
       ) {
         notification.warning({
           message: "Thiếu thông tin",
-          description: "Vui lòng điền đầy đủ các trường bắt buộc.",
+          description: "Vui lòng điền đầy đủ trường sản phẩm.",
         });
         return;
       }
@@ -250,7 +372,7 @@ const ProductManagementPage = () => {
   ) => {
     const confirmed = await confirmAction(
       "Xác nhận cập nhật sản phẩm",
-      `Bạn có chắc muốn lưu thay đổi cho sản phẩm "${values.name}"?`,
+      `Bạn có chắc muốn lưu thay đổi sản phẩm "${values.name}"?`,
     );
 
     if (!confirmed) {
@@ -411,6 +533,7 @@ const ProductManagementPage = () => {
               alignItems: "center",
               justifyContent: "center",
               color: "#999",
+              fontSize: 12,
             }}
           >
             No image
@@ -422,15 +545,16 @@ const ProductManagementPage = () => {
       dataIndex: "code",
       key: "code",
       width: 130,
+      render: (value: string) => <Text copyable>{value}</Text>,
     },
     {
-      title: "Tên sản phẩm",
+      title: "Sản phẩm",
       dataIndex: "name",
       key: "name",
       render: (text: string, record: ProductForTable) => (
         <Space direction="vertical" size={0}>
-          <Typography.Text strong>{text}</Typography.Text>
-          <Typography.Text type="secondary">{record.brandName}</Typography.Text>
+          <Text strong>{text}</Text>
+          <Text type="secondary">{record.brandName || "-"}</Text>
         </Space>
       ),
     },
@@ -438,43 +562,46 @@ const ProductManagementPage = () => {
       title: "Giá nhập",
       key: "costPrice",
       width: 160,
-      render: (_: any, record: ProductForTable) => {
+      align: "right" as const,
+      render: (_: unknown, record: ProductForTable) => {
         if (record.minCostPrice == null && record.maxCostPrice == null) {
           return "-";
         }
 
         if (record.minCostPrice === record.maxCostPrice) {
-          return `${Number(record.minCostPrice).toLocaleString("vi-VN")} ₫`;
+          return `${Number(record.minCostPrice).toLocaleString("vi-VN")} VND`;
         }
 
         return `${Number(record.minCostPrice).toLocaleString("vi-VN")} - ${Number(
           record.maxCostPrice,
-        ).toLocaleString("vi-VN")} ₫`;
+        ).toLocaleString("vi-VN")} VND`;
       },
     },
     {
       title: "Giá bán",
       key: "sellingPrice",
       width: 160,
-      render: (_: any, record: ProductForTable) => {
+      align: "right" as const,
+      render: (_: unknown, record: ProductForTable) => {
         if (record.minPrice == null && record.maxPrice == null) {
           return "-";
         }
 
         if (record.minPrice === record.maxPrice) {
-          return `${Number(record.minPrice).toLocaleString("vi-VN")} ₫`;
+          return `${Number(record.minPrice).toLocaleString("vi-VN")} VND`;
         }
 
         return `${Number(record.minPrice).toLocaleString("vi-VN")} - ${Number(
           record.maxPrice,
-        ).toLocaleString("vi-VN")} ₫`;
+        ).toLocaleString("vi-VN")} VND`;
       },
     },
     {
       title: "Tồn kho",
       dataIndex: "totalStock",
       key: "totalStock",
-      width: 100,
+      width: 110,
+      align: "center" as const,
       render: (value: number) => (
         <Tag color={value > 0 ? "green" : "red"}>{value || 0}</Tag>
       ),
@@ -483,9 +610,9 @@ const ProductManagementPage = () => {
       title: "Trạng thái",
       key: "status",
       width: 130,
-      render: (_: any, record: ProductForTable) => (
+      render: (_: unknown, record: ProductForTable) => (
         <Tag color={record.totalStock > 0 ? "green" : "orange"}>
-          {record.totalStock > 0 ? "Có hàng" : "Hết hàng"}
+          {record.totalStock > 0 ? "Còn hàng" : "Hết hàng"}
         </Tag>
       ),
     },
@@ -493,9 +620,10 @@ const ProductManagementPage = () => {
       title: "Thao tác",
       key: "action",
       width: 180,
-      render: (_: any, record: ProductForTable) => (
+      fixed: "right" as const,
+      render: (_: unknown, record: ProductForTable) => (
         <Space>
-          <Tooltip title="Xem biến thể">
+          <Tooltip title="Xem biến thể và lọc SKU">
             <Button
               icon={<EyeOutlined />}
               onClick={() => handleViewVariants(record)}
@@ -524,12 +652,15 @@ const ProductManagementPage = () => {
   ];
 
   return (
-    <Card>
+    <Card style={{ borderRadius: 8 }}>
       <Space direction="vertical" style={{ width: "100%" }} size="large">
         <Space style={{ width: "100%", justifyContent: "space-between" }}>
-          <Title level={3} style={{ margin: 0 }}>
-            Quản lý sản phẩm
-          </Title>
+          <Space direction="vertical" size={0}>
+            <Title level={3} style={{ margin: 0 }}>
+              Quản lý sản phẩm
+            </Title>
+
+          </Space>
 
           <Button
             type="primary"
@@ -540,22 +671,146 @@ const ProductManagementPage = () => {
           </Button>
         </Space>
 
-        <Search
-          placeholder="Tìm kiếm sản phẩm..."
-          allowClear
-          enterButton="Tìm kiếm"
-          onSearch={() => fetchProducts()}
-          style={{ maxWidth: 420 }}
-        />
+        <Card size="small" style={{ borderRadius: 8 }}>
+          <Space direction="vertical" style={{ width: "100%" }} size="middle">
+            <Row gutter={[12, 12]} align="middle">
+              <Col xs={24} md={10}>
+                <Search
+                  placeholder="Tìm tên, mã sản phẩm, thương hiệu..."
+                  allowClear
+                  value={filters.keyword}
+                  onChange={(e) => updateFilters({ keyword: e.target.value })}
+                  onSearch={(value) => updateFilters({ keyword: value })}
+                />
+              </Col>
+
+              <Col xs={24} md={7}>
+                <Segmented
+                  block
+                  value={filters.stockStatus}
+                  onChange={(value) =>
+                    updateFilters({
+                      stockStatus: value as ProductFilters["stockStatus"],
+                    })
+                  }
+                  options={[
+                    { label: "Tất cả", value: "all" },
+                    { label: "Còn hàng", value: "inStock" },
+                    { label: "Hết hàng", value: "outOfStock" },
+                  ]}
+                />
+              </Col>
+
+              <Col xs={24} md={7}>
+                <Space style={{ width: "100%", justifyContent: "flex-end" }}>
+                  <Badge count={activeFilterCount} size="small">
+                    <Button onClick={() => setAdvancedOpen((prev) => !prev)}>
+                      Bộ lọc nâng cao
+                    </Button>
+                  </Badge>
+
+                  <Button onClick={resetFilters}>Reset</Button>
+                </Space>
+              </Col>
+            </Row>
+
+            {advancedOpen && (
+              <Row gutter={[12, 12]}>
+                <Col xs={24} md={6}>
+                  <Select
+                    allowClear
+                    style={{ width: "100%" }}
+                    placeholder="Danh mục"
+                    value={filters.categoryId}
+                    onChange={(value) =>
+                      updateFilters({ categoryId: value ?? null })
+                    }
+                    options={categories.map((item) => ({
+                      value: item.id,
+                      label: item.name,
+                    }))}
+                  />
+                </Col>
+
+                <Col xs={24} md={6}>
+                  <Select
+                    allowClear
+                    style={{ width: "100%" }}
+                    placeholder="Thương hiệu"
+                    value={filters.brandName}
+                    onChange={(value) =>
+                      updateFilters({ brandName: value ?? null })
+                    }
+                    options={brands.map((item) => ({
+                      value: item.name,
+                      label: item.name,
+                    }))}
+                  />
+                </Col>
+
+                <Col xs={12} md={3}>
+                  <InputNumber<number>
+                    min={0}
+                    style={{ width: "100%" }}
+                    placeholder="Giá từ"
+                    value={filters.minPrice}
+                    onChange={(value) =>
+                      updateFilters({ minPrice: value ?? null })
+                    }
+                  />
+                </Col>
+
+                <Col xs={12} md={3}>
+                  <InputNumber<number>
+                    min={0}
+                    style={{ width: "100%" }}
+                    placeholder="Giá đến"
+                    value={filters.maxPrice}
+                    onChange={(value) =>
+                      updateFilters({ maxPrice: value ?? null })
+                    }
+                  />
+                </Col>
+
+                <Col xs={12} md={3}>
+                  <InputNumber<number>
+                    min={0}
+                    style={{ width: "100%" }}
+                    placeholder="Tồn từ"
+                    value={filters.minStock}
+                    onChange={(value) =>
+                      updateFilters({ minStock: value ?? null })
+                    }
+                  />
+                </Col>
+
+                <Col xs={12} md={3}>
+                  <InputNumber<number>
+                    min={0}
+                    style={{ width: "100%" }}
+                    placeholder="Tồn đến"
+                    value={filters.maxStock}
+                    onChange={(value) =>
+                      updateFilters({ maxStock: value ?? null })
+                    }
+                  />
+                </Col>
+              </Row>
+            )}
+          </Space>
+        </Card>
 
         <Table
           columns={columns}
-          dataSource={products as any}
+          dataSource={filteredProducts as any}
           loading={loading}
           rowKey="id"
           bordered
+          scroll={{ x: 1060 }}
           pagination={{
             pageSize: 10,
+            showSizeChanger: true,
+            showTotal: (total) => `Tổng ${total} sản phẩm`,
           }}
         />
       </Space>
