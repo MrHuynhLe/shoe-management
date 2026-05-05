@@ -1,6 +1,7 @@
 package com.vn.backend.controller;
 
 import com.vn.backend.dto.request.ProductVariantCreateRequest;
+import com.vn.backend.dto.request.ProductVariantUpdateRequest;
 import com.vn.backend.dto.request.VariantBulkRequest;
 import com.vn.backend.dto.response.ProductVariantResponse;
 import com.vn.backend.service.ProductVariantService;
@@ -36,6 +37,14 @@ public class ProductVariantController {
     @GetMapping("/product/{productId}")
     public ResponseEntity<List<ProductVariantResponse>> getByProductId(@PathVariable Long productId) {
         return ResponseEntity.ok(productVariantService.getByProductId(productId));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ProductVariantResponse> updateVariant(
+            @PathVariable Long id,
+            @RequestBody @Valid ProductVariantUpdateRequest request
+    ) {
+        return ResponseEntity.ok(productVariantService.update(id, request));
     }
 
     @DeleteMapping("/{id}")

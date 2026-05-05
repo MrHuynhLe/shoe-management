@@ -1,6 +1,7 @@
 package com.vn.backend.service.impl;
 
 import com.vn.backend.dto.request.ProductVariantCreateRequest;
+import com.vn.backend.dto.request.ProductVariantUpdateRequest;
 import com.vn.backend.dto.request.VariantBulkRequest;
 import com.vn.backend.dto.response.ProductVariantResponse;
 import com.vn.backend.entity.AttributeValue;
@@ -17,15 +18,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-import java.text.Normalizer;
 
 import java.math.BigDecimal;
+import java.text.Normalizer;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -90,7 +91,95 @@ public class ProductVariantServiceImpl implements ProductVariantService {
     }
 
     @Override
-    @Transactional
+    public ProductVariantResponse update(Long variantId, ProductVariantUpdateRequest request) {
+        ProductVariant variant = productVariantRepository.findByIdWithAttributes(variantId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy biến thể với ID: " + variantId));
+
+        if (variant.getDeletedAt() != null) {
+            throw new RuntimeException("Biến thể đã bị xóa trước đó");
+        }
+
+        if (StringUtils.hasText(request.getCode())) {
+            String normalizedCode = normalizeCode(request.getCode());
+
+            if (!StringUtils.hasText(normalizedCode)) {
+                throw new RuntimeException("Mã biến thể không hợp lệ");
+            }
+
+            boolean duplicated = productVariantRepository.existsByCodeAndDeletedAtIsNullAndIdNot(
+                    normalizedCode,
+                    variantId
+            );
+
+            if (duplicated) {
+                throw new RuntimeException("Mã biến thể đã tồn tại");
+            }
+
+            variant.setCode(normalizedCode);
+        }
+
+        if (request.getBarcode() != null) {
+            String trimmedBarcode = request.getBarcode().trim();
+
+            if (trimmedBarcode.isBlank()) {
+                variant.setBarcode(null);
+            } else {
+                boolean duplicatedBarcode = productVariantRepository.existsByBarcodeAndDeletedAtIsNullAndIdNot(
+                        trimmedBarcode,
+                        variantId
+                );
+
+                if (duplicatedBarcode) {
+                    throw new RuntimeException("Barcode đã tồn tại");
+                }
+
+                variant.setBarcode(trimmedBarcode);
+            }
+        }
+
+        if (request.getCostPrice() != null) {
+            validateMoney(request.getCostPrice(), "Giá nhập");
+            variant.setCostPrice(request.getCostPrice());
+        }
+
+        if (request.getSellingPrice() != null) {
+            validateMoney(request.getSellingPrice(), "Giá bán");
+            variant.setSellingPrice(request.getSellingPrice());
+        }
+
+        if (request.getStockQuantity() != null) {
+            if (request.getStockQuantity() < 0) {
+                throw new RuntimeException("Tồn kho không được nhỏ hơn 0");
+            }
+
+            variant.setStockQuantity(request.getStockQuantity());
+        }
+
+        if (request.getBinLocation() != null) {
+            variant.setBinLocation(
+                    request.getBinLocation().trim().isBlank()
+                            ? null
+                            : request.getBinLocation().trim()
+            );
+        }
+
+        if (request.getIsActive() != null) {
+            variant.setIsActive(request.getIsActive());
+        }
+
+        if (request.getAttributeValueIds() != null) {
+            updateVariantAttributes(variant, request.getAttributeValueIds());
+        }
+
+        ProductVariant saved = productVariantRepository.saveAndFlush(variant);
+
+        ProductVariant reloaded = productVariantRepository.findByIdWithAttributes(saved.getId())
+                .orElse(saved);
+
+        return toResponseFromEntity(reloaded);
+    }
+
+    @Override
     public void delete(Long variantId) {
         ProductVariant variant = productVariantRepository.findById(variantId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy biến thể với ID: " + variantId));
@@ -118,38 +207,25 @@ public class ProductVariantServiceImpl implements ProductVariantService {
             throw new RuntimeException("Giá nhập và giá bán không được để trống");
         }
 
-        if (costPrice.compareTo(BigDecimal.ZERO) < 0 || sellingPrice.compareTo(BigDecimal.ZERO) < 0) {
-            throw new RuntimeException("Giá nhập và giá bán phải lớn hơn hoặc bằng 0");
-        }
+        validateMoney(costPrice, "Giá nhập");
+        validateMoney(sellingPrice, "Giá bán");
 
         Product product = productRepository.findByIdAndDeletedAtIsNull(productId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm"));
 
         String trimmedBarcode = null;
+
         if (barcode != null && !barcode.isBlank()) {
             trimmedBarcode = barcode.trim();
+
             if (productVariantRepository.existsByBarcodeAndDeletedAtIsNull(trimmedBarcode)) {
                 throw new RuntimeException("Barcode đã tồn tại");
             }
         }
 
-        if (attributeValueIds == null || attributeValueIds.isEmpty()) {
-            throw new RuntimeException("Biến thể phải có ít nhất 1 thuộc tính");
-        }
-
-        List<Long> distinctAttributeValueIds = new ArrayList<>(new LinkedHashSet<>(attributeValueIds));
-        if (distinctAttributeValueIds.size() != attributeValueIds.size()) {
-            throw new RuntimeException("Danh sách thuộc tính đang bị trùng");
-        }
-
-        List<AttributeValue> attributeValues = attributeValueRepository.findAllById(distinctAttributeValueIds);
-
-        if (attributeValues.size() != distinctAttributeValueIds.size()) {
-            throw new RuntimeException("Có thuộc tính không tồn tại");
-        }
-
+        List<AttributeValue> attributeValues = getValidAttributeValues(attributeValueIds);
         validateNoDuplicateAttributeType(attributeValues);
-        validateDuplicateCombination(productId, attributeValues);
+        validateDuplicateCombination(productId, attributeValues, null);
 
         String resolvedCode = resolveVariantCode(product, code, attributeValues);
 
@@ -181,6 +257,54 @@ public class ProductVariantServiceImpl implements ProductVariantService {
         return toResponseFromCreatedData(variant, attributeValues);
     }
 
+    private void updateVariantAttributes(ProductVariant variant, List<Long> attributeValueIds) {
+        List<AttributeValue> attributeValues = getValidAttributeValues(attributeValueIds);
+        validateNoDuplicateAttributeType(attributeValues);
+        validateDuplicateCombination(variant.getProduct().getId(), attributeValues, variant.getId());
+
+        variantAttributeValueRepository.deleteByVariantId(variant.getId());
+
+        if (variant.getVariantAttributeValues() != null) {
+            variant.getVariantAttributeValues().clear();
+        }
+
+        productVariantRepository.saveAndFlush(variant);
+
+        for (AttributeValue av : attributeValues) {
+            VariantAttributeValue link = new VariantAttributeValue();
+            link.setId(new VariantAttributeValueId(variant.getId(), av.getId()));
+            link.setVariant(variant);
+            link.setAttributeValue(av);
+            variantAttributeValueRepository.saveAndFlush(link);
+        }
+    }
+
+    private List<AttributeValue> getValidAttributeValues(List<Long> attributeValueIds) {
+        if (attributeValueIds == null || attributeValueIds.isEmpty()) {
+            throw new RuntimeException("Biến thể phải có ít nhất 1 thuộc tính");
+        }
+
+        List<Long> distinctAttributeValueIds = new ArrayList<>(new LinkedHashSet<>(attributeValueIds));
+
+        if (distinctAttributeValueIds.size() != attributeValueIds.size()) {
+            throw new RuntimeException("Danh sách thuộc tính đang bị trùng");
+        }
+
+        List<AttributeValue> attributeValues = attributeValueRepository.findAllById(distinctAttributeValueIds);
+
+        if (attributeValues.size() != distinctAttributeValueIds.size()) {
+            throw new RuntimeException("Có thuộc tính không tồn tại");
+        }
+
+        return attributeValues;
+    }
+
+    private void validateMoney(BigDecimal value, String fieldName) {
+        if (value.compareTo(BigDecimal.ZERO) < 0) {
+            throw new RuntimeException(fieldName + " phải lớn hơn hoặc bằng 0");
+        }
+    }
+
     private void validateNoDuplicateAttributeType(List<AttributeValue> attributeValues) {
         Map<String, Long> counts = attributeValues.stream()
                 .collect(Collectors.groupingBy(
@@ -189,12 +313,17 @@ public class ProductVariantServiceImpl implements ProductVariantService {
                 ));
 
         boolean hasDuplicateType = counts.values().stream().anyMatch(count -> count > 1);
+
         if (hasDuplicateType) {
             throw new RuntimeException("Một biến thể không được chứa 2 giá trị cùng loại thuộc tính");
         }
     }
 
-    private void validateDuplicateCombination(Long productId, List<AttributeValue> newValues) {
+    private void validateDuplicateCombination(
+            Long productId,
+            List<AttributeValue> newValues,
+            Long excludedVariantId
+    ) {
         Set<Long> newSet = newValues.stream()
                 .map(AttributeValue::getId)
                 .collect(Collectors.toCollection(TreeSet::new));
@@ -203,6 +332,10 @@ public class ProductVariantServiceImpl implements ProductVariantService {
 
         for (ProductVariant existing : existingVariants) {
             if (existing.getDeletedAt() != null) {
+                continue;
+            }
+
+            if (excludedVariantId != null && excludedVariantId.equals(existing.getId())) {
                 continue;
             }
 
@@ -216,7 +349,10 @@ public class ProductVariantServiceImpl implements ProductVariantService {
         }
     }
 
-    private ProductVariantResponse toResponseFromCreatedData(ProductVariant variant, List<AttributeValue> attributeValues) {
+    private ProductVariantResponse toResponseFromCreatedData(
+            ProductVariant variant,
+            List<AttributeValue> attributeValues
+    ) {
         Map<String, String> attributes = attributeValues == null
                 ? Collections.emptyMap()
                 : attributeValues.stream()
@@ -230,9 +366,11 @@ public class ProductVariantServiceImpl implements ProductVariantService {
         return new ProductVariantResponse(
                 variant.getId(),
                 variant.getCode(),
+                variant.getBarcode(),
                 variant.getCostPrice(),
                 variant.getSellingPrice(),
                 variant.getStockQuantity(),
+                variant.getBinLocation(),
                 variant.getIsActive(),
                 attributes
         );
@@ -252,9 +390,11 @@ public class ProductVariantServiceImpl implements ProductVariantService {
         return new ProductVariantResponse(
                 variant.getId(),
                 variant.getCode(),
+                variant.getBarcode(),
                 variant.getCostPrice(),
                 variant.getSellingPrice(),
                 variant.getStockQuantity(),
+                variant.getBinLocation(),
                 variant.getIsActive(),
                 attributes
         );
@@ -282,6 +422,7 @@ public class ProductVariantServiceImpl implements ProductVariantService {
                 .orElse("SIZE");
 
         String baseCode = normalizeCode(product.getCode() + "-" + color + "-" + size);
+
         return ensureUniqueVariantCode(baseCode);
     }
 

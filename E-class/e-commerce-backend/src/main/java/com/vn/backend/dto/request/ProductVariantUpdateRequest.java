@@ -1,18 +1,13 @@
-package com.vn.backend.dto.response;
+package com.vn.backend.dto.request;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.util.Map;
+import java.util.List;
 
 @Data
-@AllArgsConstructor
-@NoArgsConstructor
-public class ProductVariantResponse {
+public class ProductVariantUpdateRequest {
 
-    private Long id;
     private String code;
     private String barcode;
     private BigDecimal costPrice;
@@ -20,5 +15,6 @@ public class ProductVariantResponse {
     private Integer stockQuantity;
     private String binLocation;
     private Boolean isActive;
-    private Map<String, String> attributes;
+
+    private List<Long> attributeValueIds;
 }

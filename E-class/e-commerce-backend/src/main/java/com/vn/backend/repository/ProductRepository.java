@@ -1,7 +1,6 @@
 package com.vn.backend.repository;
 
 import com.vn.backend.dto.response.ProductListResponse;
-
 import com.vn.backend.entity.Product;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -9,67 +8,72 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.util.List;
 import java.util.Optional;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
-    @Query(
-            value = """
-SELECT new com.vn.backend.dto.response.ProductListResponse(
-    p.id,
-    p.code,
-    p.name,
-    b.name,
-    c.name,
-    o.name,
-    MIN(v.sellingPrice),
-    MAX(v.sellingPrice),
-    COALESCE(SUM(v.stockQuantity), 0),
-    MAX(img.imageUrl),
-    p.isActive,
-    p.deletedAt
-)
-FROM Product p
-LEFT JOIN p.origin o
-LEFT JOIN p.brand b
-LEFT JOIN p.category c
-LEFT JOIN p.variants v ON (v.isActive = true AND v.deletedAt IS NULL)
-LEFT JOIN ProductImage img ON (img.product.id = p.id AND img.isPrimary = true)
-WHERE p.isActive = true
-  AND p.deletedAt IS NULL
-  AND (:categoryId IS NULL OR c.id = :categoryId)
-GROUP BY
-    p.id, p.code, p.name, b.name, c.name, o.name, p.isActive, p.deletedAt
-ORDER BY p.id DESC
-""",
-            countQuery = """
-SELECT COUNT(p.id)
-FROM Product p
-LEFT JOIN p.category c
-WHERE p.isActive = true
-  AND p.deletedAt IS NULL
-  AND (:categoryId IS NULL OR c.id = :categoryId)
-"""
-    )
-    Page<ProductListResponse> findProductList(Pageable pageable, @Param("categoryId") Long categoryId);
-
-    @Query("""
-    SELECT DISTINCT p
-    FROM Product p
-    JOIN FETCH p.brand
-    JOIN FETCH p.category
-    JOIN FETCH p.origin
-    LEFT JOIN FETCH p.images img
-    WHERE p.id = :id
-      AND p.isActive = true
-      AND p.deletedAt IS NULL
-""")
-    Optional<Product> findActiveDetailById(@Param("id") Long id);
-
     boolean existsByCodeAndDeletedAtIsNull(String code);
+
+    boolean existsByCodeAndDeletedAtIsNullAndIdNot(String code, Long id);
 
     Optional<Product> findByIdAndDeletedAtIsNull(Long id);
 
+    @Query("""
+            select p
+            from Product p
+            left join fetch p.brand
+            left join fetch p.category
+            left join fetch p.origin
+            left join fetch p.supplier
+            left join fetch p.images
+            where p.id = :id
+              and p.deletedAt is null
+              and (:includeInactive = true or p.isActive = true)
+            """)
+    Optional<Product> findDetailById(
+            @Param("id") Long id,
+            @Param("includeInactive") boolean includeInactive
+    );
 
+    @Query(
+            value = """
+                    select new com.vn.backend.dto.response.ProductListResponse(
+                        p.id,
+                        p.code,
+                        p.name,
+                        b.name,
+                        min(pi.imageUrl),
+                        coalesce(sum(v.stockQuantity), 0),
+                        min(v.sellingPrice),
+                        max(v.sellingPrice),
+                        min(v.costPrice),
+                        max(v.costPrice)
+                    )
+                    from Product p
+                    left join p.brand b
+                    left join p.category c
+                    left join p.images pi
+                    left join p.variants v
+                        on v.deletedAt is null
+                        and (:includeInactive = true or v.isActive = true)
+                    where p.deletedAt is null
+                      and (:includeInactive = true or p.isActive = true)
+                      and (:categoryId is null or c.id = :categoryId)
+                    group by p.id, p.code, p.name, b.name
+                    order by p.id desc
+                    """,
+            countQuery = """
+                    select count(p.id)
+                    from Product p
+                    left join p.category c
+                    where p.deletedAt is null
+                      and (:includeInactive = true or p.isActive = true)
+                      and (:categoryId is null or c.id = :categoryId)
+                    """
+    )
+    Page<ProductListResponse> findProductList(
+            Pageable pageable,
+            @Param("categoryId") Long categoryId,
+            @Param("includeInactive") boolean includeInactive
+    );
 }

@@ -11,15 +11,27 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 public class ProductDetailResponse {
+
     private Long id;
     private String code;
     private String name;
     private String description;
+
+    private Long brandId;
     private String brandName;
+
+    private Long categoryId;
     private String categoryName;
+
+    private Long originId;
     private String originName;
+
+    private Long supplierId;
+    private String supplierName;
+
     private Boolean isActive;
     private OffsetDateTime deletedAt;
+
     private List<ProductVariantResponse> variants;
     private List<String> images;
 }
