@@ -113,6 +113,19 @@ const ProductManagementPage = () => {
     fetchProducts();
   }, []);
 
+  const confirmAction = (title: string, content: string) => {
+    return new Promise<boolean>((resolve) => {
+      Modal.confirm({
+        title,
+        content,
+        okText: "Xác nhận",
+        cancelText: "Hủy",
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false),
+      });
+    });
+  };
+
   const handleAddProductSuccess = () => {
     setIsModalOpen(false);
     fetchProducts();
@@ -125,8 +138,6 @@ const ProductManagementPage = () => {
 
   const handleAddProductFinish = async (values: any) => {
     try {
-      setLoading(true);
-
       const formData = new FormData();
       const productDTO = {
         name: values.name,
@@ -152,6 +163,17 @@ const ProductManagementPage = () => {
         });
         return;
       }
+
+      const confirmed = await confirmAction(
+        "Xác nhận thêm sản phẩm",
+        `Bạn có chắc muốn thêm sản phẩm "${productDTO.name}"?`,
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      setLoading(true);
 
       formData.append(
         "data",
@@ -226,6 +248,15 @@ const ProductManagementPage = () => {
     productId: number,
     values: ProductUpdatePayload,
   ) => {
+    const confirmed = await confirmAction(
+      "Xác nhận cập nhật sản phẩm",
+      `Bạn có chắc muốn lưu thay đổi cho sản phẩm "${values.name}"?`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
     setEditProductLoading(true);
 
     try {
