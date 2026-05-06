@@ -1,5 +1,6 @@
-import {
+﻿import {
   Modal,
+  Card,
   Table,
   Space,
   Button,
@@ -14,13 +15,13 @@ import {
   Select,
   Input,
   InputNumber,
-  Upload,
   notification,
-} from 'antd';
-import { useState, useEffect } from 'react';
-import { EditOutlined, DeleteOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons';
-import { productService } from '@/services/product.service';
-import { App } from 'antd';
+  Segmented,
+} from "antd";
+import { useState, useEffect, useMemo } from "react";
+import { EditOutlined, DeleteOutlined, PlusOutlined } from "@ant-design/icons";
+import { productService } from "@/services/product.service";
+
 export interface ProductVariantAttributes {
   [key: string]: string;
 }
@@ -41,9 +42,19 @@ export interface ProductDetail {
   code: string;
   name: string;
   description: string;
+
+  brandId?: number;
   brandName: string;
+
+  categoryId?: number;
   categoryName: string;
+
+  originId?: number;
   originName: string;
+
+  supplierId?: number;
+  supplierName?: string;
+
   isActive: boolean;
   variants: Variant[];
   images: string[];
@@ -55,9 +66,10 @@ interface VariantDetailModalProps {
   onCancel: () => void;
   onEdit: (record: Variant) => void;
   onDelete: (id: number) => void;
-
   onAddVariant: (data: { productId: number; variants: any[] }) => Promise<void>;
+  refreshKey?: number;
 }
+
 interface AttributeOption {
   label: string;
   value: string;
@@ -65,294 +77,166 @@ interface AttributeOption {
 }
 
 const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
-  open, productId, onCancel, onEdit, onDelete, onAddVariant
+  open,
+  productId,
+  onCancel,
+  onEdit,
+  onDelete,
+  onAddVariant,
+  refreshKey = 0,
 }) => {
-  const { notification, message } = App.useApp();
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [addVariantForm] = Form.useForm();
+
   const [dynamicAttributes, setDynamicAttributes] = useState<any[]>([]);
-  const [selectedBulkAttributes, setSelectedBulkAttributes] = useState<Record<string, string[]>>({});
+  const [selectedBulkAttributes, setSelectedBulkAttributes] = useState<
+    Record<string, string[]>
+  >({});
+
   const [bulkCostPrice, setBulkCostPrice] = useState<number | null>(null);
   const [bulkSellingPrice, setBulkSellingPrice] = useState<number | null>(null);
+  const [variantKeyword, setVariantKeyword] = useState("");
+  const [variantStockStatus, setVariantStockStatus] = useState<
+    "all" | "inStock" | "outOfStock"
+  >("all");
+  const [variantActiveStatus, setVariantActiveStatus] = useState<
+    "all" | "active" | "inactive"
+  >("all");
 
   const fetchProductDetails = async () => {
-    if (!productId) return;
+    if (!productId) {
+      return;
+    }
+
     setLoading(true);
+
     try {
-      const response = await productService.getProductById(productId);
-      setProduct(response.data);
+      const res = await productService.getProductById(productId, true);
+      setProduct(res.data);
     } catch (error) {
-      console.error("Failed to fetch product details:", error);
       notification.error({
-        message: 'Lỗi',
-        description: 'Không thể tải chi tiết sản phẩm.',
+        message: "Lỗi",
+        description: "Không thể tải chi tiết sản phẩm.",
       });
-      setProduct(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAttributes = async () => {
+    try {
+      const res = await productService.getAttributes();
+      const raw = Array.isArray(res.data) ? res.data : res.data?.content || [];
+      setDynamicAttributes(raw);
+    } catch (error) {
+      console.error("Fetch attributes error:", error);
     }
   };
 
   useEffect(() => {
-    const fetchAttributes = async () => {
-      try {
-        const response = await productService.getAttributes();
-        setDynamicAttributes(response.data || []);
-      } catch (error) {
-        console.error("Failed to fetch attributes:", error);
-        notification.error({
-          message: 'Lỗi',
-          description: 'Không thể tải thuộc tính sản phẩm.',
-        });
-      }
-    };
-
-    if (open && productId) { 
-      fetchAttributes(); 
-      fetchProductDetails(); 
-    } else if (!open) { 
-      setProduct(null); 
-      addVariantForm.resetFields(); 
-      setSelectedBulkAttributes({}); 
+    if (open) {
+      fetchProductDetails();
+      fetchAttributes();
     }
-  }, [open, productId, addVariantForm]); 
+  }, [open, productId, refreshKey]);
 
+  const generateSku = (attributes: Record<string, string>) => {
+    const productCode = product?.code || "SP";
 
-  const handleDeleteVariantWithRefresh = async (variantId: number) => {
-    await onDelete(variantId); 
-    fetchProductDetails(); 
+    const suffix = Object.values(attributes || {})
+      .filter(Boolean)
+      .map((v) =>
+        String(v)
+          .normalize("NFD")
+          .replace(/[̀-ͯ]/g, "")
+          .replace(/đ/g, "d")
+          .replace(/Đ/g, "D")
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, ""),
+      )
+      .join("-");
+
+    return `${productCode}-${suffix}`;
   };
 
-  const getExistingAndFormCombinations = (excludeIndex?: number) => {
-    const combinations = new Set<string>();
-    const createCombinationKey = (attributes: Record<string, string>) => {
-      return Object.keys(attributes).sort().map(key => `${key}:${attributes[key]}`).join('|');
-    };
-    if (product?.variants) {
-      product.variants.forEach(v => {
-        combinations.add(createCombinationKey(v.attributes));
-      });
-    }
+  const buildAttributeValueIds = (attributes: Record<string, string>) => {
+    const ids: number[] = [];
 
-    const currentFormVariants = addVariantForm.getFieldsValue().variants || [];
-    currentFormVariants.forEach((v: any, index: number) => {
+    Object.entries(attributes || {}).forEach(([attrCode, selectedValue]) => {
+      const attr = dynamicAttributes.find((item: any) => item.code === attrCode);
 
-      if ((excludeIndex === undefined || index !== excludeIndex) && v && v.attributes) {
-        const hasAllAttributes = dynamicAttributes.every(attr => v.attributes[attr.code]);
-        if (hasAllAttributes) {
-          combinations.add(createCombinationKey(v.attributes));
-        }
-      }
-    });
-
-    return combinations;
-  };
-
-  const columns = [
-  { title: "SKU", dataIndex: "code", key: "code" },
-
-  ...dynamicAttributes.map((attr) => ({
-    title: attr.name,
-    dataIndex: ["attributes", attr.code],
-    key: attr.code,
-  })),
-
-  {
-    title: "Giá nhập",
-    dataIndex: "costPrice",
-    key: "costPrice",
-    render: (price: number) =>
-      price != null ? price.toLocaleString("vi-VN") + " ₫" : "-",
-  },
-
-  {
-    title: "Giá bán",
-    dataIndex: "sellingPrice",
-    key: "sellingPrice",
-    render: (price: number) =>
-      price != null ? price.toLocaleString("vi-VN") + " ₫" : "-",
-  },
-
-  { title: "Tồn kho", dataIndex: "stockQuantity", key: "stockQuantity" },
-
-  {
-    title: "Trạng thái",
-    dataIndex: "isActive",
-    key: "isActive",
-    render: (isActive: boolean) =>
-      isActive ? <Tag color="green">Hoạt động</Tag> : <Tag color="red">Ngừng</Tag>,
-  },
-
-  {
-    title: "Thao tác",
-    key: "action",
-    render: (_: any, record: Variant) => (
-      <Space size="middle">
-        <Button icon={<EditOutlined />} onClick={() => onEdit(record)} />
-        <Button
-          icon={<DeleteOutlined />}
-          danger
-          onClick={() => handleDeleteVariantWithRefresh(record.id)}
-        />
-      </Space>
-    ),
-  },
-];
-  const handleUpload = async (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    try {
-      const response = await productService.uploadImage(formData);
-      return response.data;
-    } catch (error) {
-      notification.error({ message: 'Lỗi upload ảnh' });
-      throw error;
-    }
-  };
-  const handleAddVariantFinish = async (values: any) => {
-    try {
-      setLoading(true);
-
-      if (!values.variants || values.variants.length === 0) {
-        notification.warning({
-          message: 'Chưa có biến thể',
-          description: 'Vui lòng thêm ít nhất một biến thể trước khi lưu.',
-        });
-        setLoading(false);
+      if (!attr) {
         return;
       }
 
-      const variantsToSubmit = values.variants.map((variant: any) => {
-        const attributeValueIds: number[] = [];
-        for (const attr of dynamicAttributes) {
-          const selectedValue = variant.attributes[attr.code];
-          const attrValue = attr.values.find((v: any) => v.value === selectedValue);
-          if (attrValue) {
-            attributeValueIds.push(attrValue.id);
-          }
-        }
+      const foundValue = attr.values?.find(
+        (v: any) => v.value === selectedValue || v.id === selectedValue,
+      );
 
-        return {
-          code: variant.sku || generateSku(variant.attributes),
-          costPrice: variant.costPrice,
-          sellingPrice: variant.sellingPrice,
-          stockQuantity: variant.stockQuantity || 0,
-          imageUrl: variant.imageUrl || null,
-          attributeValueIds: attributeValueIds,
-        };
-      });
+      if (foundValue?.id) {
+        ids.push(foundValue.id);
+      }
+    });
 
-      await productService.bulkCreateVariantsOnly({
-        productId: productId as number,
-        variants: variantsToSubmit
-      });
-
-      notification.success({ message: 'Thành công', description: 'Đã lưu các biến thể.' });
-      handleResetForm();
-      onCancel();
-    } catch (error: any) {
-      console.error("Lỗi khi tạo bulk:", error);
-      notification.error({
-        message: 'Lỗi',
-        description: error.response?.data?.message || 'Không thể lưu biến thể (Lỗi 415 hoặc định dạng dữ liệu).'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const generateSku = (attributes: Record<string, string> = {}) => {
-    const productCode = product?.code || 'PRODUCT';
-    const attributeParts = dynamicAttributes
-      .sort((a, b) => a.code.localeCompare(b.code))
-      .map(attr => {
-        const value = attributes[attr.code] || attr.code;
-        return value
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .replace(/đ/g, "d").replace(/Đ/g, "D")
-          .toUpperCase()
-          .replace(/\s/g, '');
-      })
-      .join('-');
-
-    return `${productCode}-${attributeParts}`;
+    return ids;
   };
 
   const handleGenerateVariants = () => {
-    const selectedValues = Object.values(selectedBulkAttributes).filter(v => v.length > 0);
-    if (selectedValues.length < dynamicAttributes.length) {
+    if (!dynamicAttributes.length) {
+      return;
+    }
+
+    const entries = Object.entries(selectedBulkAttributes).filter(
+      ([, values]) => values.length > 0,
+    );
+
+    if (entries.length === 0) {
       notification.warning({
-        message: 'Thiếu thông tin',
-        description: `Vui lòng chọn ít nhất một giá trị cho mỗi thuộc tính để tạo hàng loạt.`,
+        message: "Chưa chọn thuộc tính",
+        description: "Vui lòng chọn ít nhất một thuộc tính để tạo biến thể.",
       });
       return;
     }
 
-    const existingFormVariants = addVariantForm.getFieldValue('variants') || [];
-    const allExistingCombinations = getExistingAndFormCombinations();
-    const createCombinationKey = (attributes: Record<string, string>) => {
-      return Object.keys(attributes).sort().map(key => `${key}:${attributes[key]}`).join('|');
+    const cartesian = (arrays: string[][]): string[][] => {
+      return arrays.reduce<string[][]>(
+        (acc, curr) => acc.flatMap((a) => curr.map((b) => [...a, b])),
+        [[]],
+      );
     };
 
-    const newVariantsToAdd: any[] = [];
-    let duplicateCount = 0;
-    const generateCombinations = (attrIndex: number, currentCombination: any) => {
-      if (attrIndex === dynamicAttributes.length) {
-        const combinationKey = createCombinationKey(currentCombination);
-        if (!allExistingCombinations.has(combinationKey)) {
-          newVariantsToAdd.push({ attributes: currentCombination, sku: generateSku(currentCombination) });
-        }
-        else {
-          duplicateCount++;
-        }
-        return;
-      }
+    const combinations = cartesian(entries.map(([, values]) => values));
 
-      const currentAttr = dynamicAttributes[attrIndex];
-      const selectedValuesForAttr = selectedBulkAttributes[currentAttr.code] || [];
-      selectedValuesForAttr.forEach(value => {
-        generateCombinations(attrIndex + 1, { ...currentCombination, [currentAttr.code]: value });
+    const variants = combinations.map((combination) => {
+      const attributes: Record<string, string> = {};
+
+      entries.forEach(([attrCode], index) => {
+        attributes[attrCode] = combination[index];
       });
-    };
 
-    generateCombinations(0, {});
+      return {
+        sku: generateSku(attributes),
+        attributes,
+        costPrice: bulkCostPrice || 0,
+        sellingPrice: bulkSellingPrice || 0,
+        stockQuantity: 0,
+      };
+    });
 
-    if (duplicateCount > 0) {
-      notification.warning({
-        message: 'Bỏ qua biến thể trùng lặp',
-        description: `Đã bỏ qua ${duplicateCount} biến thể trùng lặp (Size/Màu đã tồn tại hoặc đã có trong form).`,
-      });
-    }
-
-    addVariantForm.setFieldsValue({ variants: [...existingFormVariants, ...newVariantsToAdd] });
+    addVariantForm.setFieldsValue({ variants });
   };
 
   const handleApplyBulkPrices = () => {
-    const currentVariants = addVariantForm.getFieldValue('variants') || [];
-    if (currentVariants.length === 0) {
-      notification.info({
-        message: 'Chưa có biến thể',
-        description: 'Vui lòng tạo biến thể trước khi áp dụng giá.',
-      });
-      return;
-    }
+    const variants = addVariantForm.getFieldValue("variants") || [];
 
-    const updatedVariants = currentVariants.map((variant: any) => {
-      if (!variant) return null;
-      return {
-        ...variant,
-        costPrice: bulkCostPrice !== null ? bulkCostPrice : variant.costPrice,
-        sellingPrice: bulkSellingPrice !== null ? bulkSellingPrice : variant.sellingPrice,
-      };
-    }).filter(Boolean);
+    const nextVariants = variants.map((item: any) => ({
+      ...item,
+      costPrice: bulkCostPrice ?? item.costPrice,
+      sellingPrice: bulkSellingPrice ?? item.sellingPrice,
+    }));
 
-    addVariantForm.setFieldsValue({ variants: updatedVariants });
-    notification.success({
-      message: 'Thành công',
-      description: 'Đã áp dụng giá hàng loạt.',
-    });
+    addVariantForm.setFieldsValue({ variants: nextVariants });
   };
 
   const handleResetForm = () => {
@@ -361,75 +245,354 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
     setBulkCostPrice(null);
     setBulkSellingPrice(null);
   };
+
+  const resetVariantFilters = () => {
+    setVariantKeyword("");
+    setVariantStockStatus("all");
+    setVariantActiveStatus("all");
+  };
+
+  const filteredVariants = useMemo(() => {
+    const keyword = variantKeyword.trim().toLowerCase();
+
+    return (product?.variants || []).filter((variant) => {
+      const attributeText = Object.entries(variant.attributes || {})
+        .map(([key, value]) => `${key} ${value}`)
+        .join(" ")
+        .toLowerCase();
+
+      const matchesKeyword =
+        !keyword ||
+        variant.code.toLowerCase().includes(keyword) ||
+        attributeText.includes(keyword);
+
+      const matchesStock =
+        variantStockStatus === "all" ||
+        (variantStockStatus === "inStock" && variant.stockQuantity > 0) ||
+        (variantStockStatus === "outOfStock" && variant.stockQuantity <= 0);
+
+      const matchesActive =
+        variantActiveStatus === "all" ||
+        (variantActiveStatus === "active" && variant.isActive) ||
+        (variantActiveStatus === "inactive" && !variant.isActive);
+
+      return matchesKeyword && matchesStock && matchesActive;
+    });
+  }, [product?.variants, variantKeyword, variantStockStatus, variantActiveStatus]);
+
+  const handleAddVariantFinish = async (values: any) => {
+    if (!productId) {
+      return;
+    }
+
+    const variants = (values.variants || []).map((item: any) => ({
+      code: item.sku,
+      costPrice: item.costPrice,
+      sellingPrice: item.sellingPrice,
+      stockQuantity: item.stockQuantity || 0,
+      attributeValueIds: buildAttributeValueIds(item.attributes),
+    }));
+
+    if (!variants.length) {
+      notification.warning({
+        message: "Chưa có biến thể",
+        description: "Vui lòng thêm ít nhất một biến thể.",
+      });
+      return;
+    }
+
+    await onAddVariant({
+      productId,
+      variants,
+    });
+
+    handleResetForm();
+    fetchProductDetails();
+  };
+
+  const columns = [
+    {
+      title: "SKU",
+      dataIndex: "code",
+      key: "code",
+      width: 180,
+      fixed: "left" as const,
+      render: (value: string) => (
+        <Typography.Text strong copyable>
+          {value}
+        </Typography.Text>
+      ),
+    },
+    {
+      title: "Thuộc tính",
+      dataIndex: "attributes",
+      key: "attributes",
+      width: 260,
+      render: (attrs: ProductVariantAttributes) => (
+        <Space wrap size={[4, 4]}>
+          {Object.entries(attrs || {}).map(([key, value]) => (
+            <Tag key={key}>
+              {key}: {value}
+            </Tag>
+          ))}
+        </Space>
+      ),
+    },
+    {
+      title: "Giá nhập",
+      dataIndex: "costPrice",
+      key: "costPrice",
+      width: 130,
+      align: "right" as const,
+      render: (value: number) =>
+        value != null ? `${Number(value).toLocaleString("vi-VN")} ₫` : "-",
+    },
+    {
+      title: "Giá bán",
+      dataIndex: "sellingPrice",
+      key: "sellingPrice",
+      width: 130,
+      align: "right" as const,
+      render: (value: number) =>
+        value != null ? `${Number(value).toLocaleString("vi-VN")} ₫` : "-",
+    },
+    {
+      title: "Tồn kho",
+      dataIndex: "stockQuantity",
+      key: "stockQuantity",
+      width: 100,
+      align: "center" as const,
+      render: (value: number) => (
+        <Tag color={value > 0 ? "green" : "red"}>{value || 0}</Tag>
+      ),
+    },
+    {
+      title: "Trạng thái",
+      dataIndex: "isActive",
+      key: "isActive",
+      width: 120,
+      align: "center" as const,
+      render: (value: boolean) => (
+        <Tag color={value ? "green" : "red"}>
+          {value ? "Hoạt động" : "Ngừng bán"}
+        </Tag>
+      ),
+    },
+    {
+      title: "Thao tác",
+      key: "action",
+      width: 160,
+      fixed: "right" as const,
+      render: (_: any, record: Variant) => (
+        <Space>
+          <Button icon={<EditOutlined />} onClick={() => onEdit(record)}>
+            Sửa
+          </Button>
+
+          <Button
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => onDelete(record.id)}
+          >
+            Xóa
+          </Button>
+        </Space>
+      ),
+    },
+  ];
+
   return (
     <Modal
-      title={`Chi tiết sản phẩm: ${product?.name || ''}`}
+      title={`Chi tiết biến thể${product ? ` - ${product.name}` : ""}`}
       open={open}
       onCancel={onCancel}
       width={1200}
       footer={null}
       destroyOnHidden
+      styles={{
+        body: {
+          maxHeight: "calc(100vh - 140px)",
+          overflowY: "auto",
+          paddingTop: 8,
+        },
+      }}
     >
       <Spin spinning={loading}>
         {product && (
-          <Space direction="vertical" style={{ width: '100%' }}>
-            <Descriptions bordered column={2} size="small">
-              <Descriptions.Item label="Mã sản phẩm">{product.code}</Descriptions.Item>
-              <Descriptions.Item label="Thương hiệu">{product.brandName}</Descriptions.Item>
-              <Descriptions.Item label="Danh mục">{product.categoryName}</Descriptions.Item>
-              <Descriptions.Item label="Xuất xứ">{product.originName}</Descriptions.Item>
-              <Descriptions.Item label="Mô tả" span={2}>{product.description}</Descriptions.Item>
+          <Space direction="vertical" style={{ width: "100%" }}>
+            <Descriptions
+              bordered
+              column={{ xs: 1, sm: 1, md: 2 }}
+              size="small"
+              labelStyle={{ width: 150, color: "#667085" }}
+            >
+              <Descriptions.Item label="Mã sản phẩm">
+                {product.code}
+              </Descriptions.Item>
+
+              <Descriptions.Item label="Thương hiệu">
+                {product.brandName}
+              </Descriptions.Item>
+
+              <Descriptions.Item label="Danh mục">
+                {product.categoryName}
+              </Descriptions.Item>
+
+              <Descriptions.Item label="Xuất xứ">
+                {product.originName}
+              </Descriptions.Item>
+
+              <Descriptions.Item label="Nhà cung cấp">
+                {product.supplierName || "-"}
+              </Descriptions.Item>
+
+              <Descriptions.Item label="Trạng thái">
+                <Tag color={product.isActive ? "green" : "red"}>
+                  {product.isActive ? "Đang bán" : "Ngừng bán"}
+                </Tag>
+              </Descriptions.Item>
+
+              <Descriptions.Item label="Mô tả" span={2}>
+                {product.description || "-"}
+              </Descriptions.Item>
             </Descriptions>
-            <Typography.Title level={5}>Các biến thể sản phẩm</Typography.Title>
+
+            <Typography.Title level={5} style={{ marginBottom: 0 }}>
+              Các biến thể sản phẩm
+            </Typography.Title>
+
+            <Card size="small" style={{ borderRadius: 8 }}>
+              <Row gutter={[12, 12]} align="middle">
+                <Col xs={24} md={9}>
+                  <Input.Search
+                    allowClear
+                    placeholder="Loc SKU, mau, size, chat lieu..."
+                    value={variantKeyword}
+                    onChange={(e) => setVariantKeyword(e.target.value)}
+                    onSearch={(value) => setVariantKeyword(value)}
+                  />
+                </Col>
+
+                <Col xs={24} md={6}>
+                  <Segmented
+                    block
+                    value={variantStockStatus}
+                    onChange={(value) =>
+                      setVariantStockStatus(
+                        value as "all" | "inStock" | "outOfStock",
+                      )
+                    }
+                    options={[
+                      { label: "Tat ca", value: "all" },
+                      { label: "Con hang", value: "inStock" },
+                      { label: "Het hang", value: "outOfStock" },
+                    ]}
+                  />
+                </Col>
+
+                <Col xs={24} md={6}>
+                  <Segmented
+                    block
+                    value={variantActiveStatus}
+                    onChange={(value) =>
+                      setVariantActiveStatus(
+                        value as "all" | "active" | "inactive",
+                      )
+                    }
+                    options={[
+                      { label: "Tat ca", value: "all" },
+                      { label: "Dang ban", value: "active" },
+                      { label: "Ngung", value: "inactive" },
+                    ]}
+                  />
+                </Col>
+
+                <Col xs={24} md={3}>
+                  <Button block onClick={resetVariantFilters}>
+                    Reset
+                  </Button>
+                </Col>
+              </Row>
+            </Card>
+
             <Table
               columns={columns}
-              dataSource={product.variants}
+              dataSource={filteredVariants}
               rowKey="id"
               bordered
-              pagination={false}
+              size="small"
+              scroll={{ x: 1080 }}
+              pagination={{
+                pageSize: 8,
+                showSizeChanger: false,
+                showTotal: (total) => `Tong ${total} bien the`,
+              }}
             />
 
             <Divider>Thêm biến thể mới</Divider>
-            <Space direction="vertical" style={{ width: '100%', marginBottom: 16 }}>
+
+            <Space direction="vertical" style={{ width: "100%", marginBottom: 16 }}>
               <Typography.Text>Tạo hàng loạt theo thuộc tính</Typography.Text>
+
               <Row gutter={[16, 16]} wrap>
-                {dynamicAttributes.map(attr => (
+                {dynamicAttributes.map((attr) => (
                   <Col flex="1 1 200px" key={attr.code}>
                     <Select
-                      mode="multiple" allowClear style={{ width: '100%' }}
+                      mode="multiple"
+                      allowClear
+                      style={{ width: "100%" }}
                       placeholder={`Chọn ${attr.name}`}
-                      onChange={(values) => setSelectedBulkAttributes(prev => ({ ...prev, [attr.code]: values }))}
-                      options={attr.values.map((v: any) => ({ label: v.value, value: v.value }))} />
+                      onChange={(values) =>
+                        setSelectedBulkAttributes((prev) => ({
+                          ...prev,
+                          [attr.code]: values,
+                        }))
+                      }
+                      options={(attr.values || []).map((v: AttributeOption) => ({
+                        label: v.label || v.value,
+                        value: v.value,
+                      }))}
+                    />
                   </Col>
                 ))}
-                <Col span={24 / (dynamicAttributes.length + 1)}>
-                  <Button onClick={handleGenerateVariants} block>Tạo hàng loạt</Button>
+
+                <Col flex="1 1 160px">
+                  <Button onClick={handleGenerateVariants} block>
+                    Tạo hàng loạt
+                  </Button>
                 </Col>
               </Row>
             </Space>
 
             <Divider>Áp dụng hàng loạt cho các dòng bên dưới</Divider>
+
             <Row gutter={16} style={{ marginBottom: 16 }}>
               <Col span={8}>
                 <InputNumber
-                  placeholder="Giá vốn hàng loạt"
-                  style={{ width: '100%' }}
-                  onChange={(value) => setBulkCostPrice(value === null ? null : Number(value))}
-                  // formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  // parser={(value) => value!.replace(/\$\s?|(,*)/g, '')}
+                  placeholder="Giá nhập hàng loạt"
+                  style={{ width: "100%" }}
+                  min={0}
+                  onChange={(value) =>
+                    setBulkCostPrice(value === null ? null : Number(value))
+                  }
                 />
               </Col>
+
               <Col span={8}>
                 <InputNumber
                   placeholder="Giá bán hàng loạt"
-                  style={{ width: '100%' }}
-                  onChange={(value) => setBulkSellingPrice(value === null ? null : Number(value))}
-                  // formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  // parser={(value) => value!.replace(/\$\s?|(,*)/g, '')}
+                  style={{ width: "100%" }}
+                  min={0}
+                  onChange={(value) =>
+                    setBulkSellingPrice(value === null ? null : Number(value))
+                  }
                 />
               </Col>
+
               <Col span={8}>
-                <Button onClick={handleApplyBulkPrices} block>Áp dụng giá</Button>
+                <Button onClick={handleApplyBulkPrices} block>
+                  Áp dụng giá
+                </Button>
               </Col>
             </Row>
 
@@ -437,120 +600,162 @@ const VariantDetailModal: React.FC<VariantDetailModalProps> = ({
               form={addVariantForm}
               onFinish={handleAddVariantFinish}
               autoComplete="off"
-              onValuesChange={(changedValues, allValues) => {
-                if (changedValues.variants) {
-                  const changedIndex = changedValues.variants.findIndex((v: any) => v && (v.size || v.color));
-                  if (changedIndex !== -1 && allValues.variants[changedIndex]?.attributes) {
-                    const target = allValues.variants[changedIndex];
-                    const newSku = generateSku(target.attributes);
-                    const currentVariants = [...allValues.variants];
-                    currentVariants[changedIndex] = { ...target, sku: newSku };
-                    addVariantForm.setFieldsValue({ variants: currentVariants });
+              onValuesChange={(_, allValues) => {
+                const variants = allValues.variants || [];
+
+                const nextVariants = variants.map((item: any) => {
+                  if (!item?.attributes) {
+                    return item;
                   }
-                }
+
+                  return {
+                    ...item,
+                    sku: generateSku(item.attributes),
+                  };
+                });
+
+                addVariantForm.setFieldsValue({ variants: nextVariants });
               }}
             >
+              <Row gutter={8} style={{ marginBottom: 8, padding: "0 8px" }}>
+                <Col span={4}>
+                  <Typography.Text strong>SKU</Typography.Text>
+                </Col>
 
-              <Row gutter={8} style={{ marginBottom: 8, padding: '0 8px' }}>
-                <Col span={4}><Typography.Text strong>SKU (Review)</Typography.Text></Col>
-                {dynamicAttributes.map(attr => (
-                  <Col span={3} key={attr.code}><Typography.Text strong>{attr.name}</Typography.Text></Col>
+                {dynamicAttributes.map((attr) => (
+                  <Col span={3} key={attr.code}>
+                    <Typography.Text strong>{attr.name}</Typography.Text>
+                  </Col>
                 ))}
-                <Col span={3}><Typography.Text strong>Giá vốn</Typography.Text></Col>
-                <Col span={3}><Typography.Text strong>Giá bán</Typography.Text></Col>
-                <Col span={3}><Typography.Text strong>Tồn kho</Typography.Text></Col>
-                <Col span={4}><Typography.Text strong>Ảnh/Xóa</Typography.Text></Col>
+
+                <Col span={3}>
+                  <Typography.Text strong>Giá nhập</Typography.Text>
+                </Col>
+
+                <Col span={3}>
+                  <Typography.Text strong>Giá bán</Typography.Text>
+                </Col>
+
+                <Col span={3}>
+                  <Typography.Text strong>Tồn kho</Typography.Text>
+                </Col>
+
+                <Col span={2}>
+                  <Typography.Text strong>Xóa</Typography.Text>
+                </Col>
               </Row>
+
               <Form.List name="variants">
                 {(fields, { add, remove }) => (
                   <>
                     {fields.map(({ key, name, ...restField }) => (
-                      <Row key={key} gutter={8} align="middle" style={{ marginBottom: 8 }}>
+                      <Row
+                        key={key}
+                        gutter={8}
+                        align="middle"
+                        style={{ marginBottom: 8 }}
+                      >
                         <Col span={4}>
-                          <Form.Item {...restField} name={[name, 'sku']} noStyle >
+                          <Form.Item {...restField} name={[name, "sku"]} noStyle>
                             <Input placeholder="SKU" disabled />
                           </Form.Item>
                         </Col>
-                        {dynamicAttributes.map(attr => (
+
+                        {dynamicAttributes.map((attr) => (
                           <Col span={3} key={attr.code}>
-                            <Form.Item {...restField} name={[name, 'attributes', attr.code]} rules={[{ required: true, message: 'Chọn' }]} noStyle>
+                            <Form.Item
+                              {...restField}
+                              name={[name, "attributes", attr.code]}
+                              rules={[{ required: true, message: "Chọn" }]}
+                              noStyle
+                            >
                               <Select
                                 placeholder={attr.name}
-
-                                style={{ width: '100%' }}
-
-                                options={attr.values.map((v: any) => ({ label: v.value, value: v.value }))}
-
-
+                                style={{ width: "100%" }}
+                                options={(attr.values || []).map((v: any) => ({
+                                  label: v.value,
+                                  value: v.value,
+                                }))}
                               />
                             </Form.Item>
                           </Col>
                         ))}
+
                         <Col span={3}>
-                          <Form.Item {...restField} name={[name, 'costPrice']} rules={[{ required: true, message: 'Nhập' }]} noStyle>
-                            <InputNumber placeholder="Giá vốn" style={{ width: '100%' }}
-                              formatter={(value) => value ? `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' ₫' : ''}
-                              parser={(value) => value!.replace(/\$\s?|(,*)/g, '')}
+                          <Form.Item
+                            {...restField}
+                            name={[name, "costPrice"]}
+                            rules={[{ required: true, message: "Nhập" }]}
+                            noStyle
+                          >
+                            <InputNumber
+                              placeholder="Giá nhập"
+                              style={{ width: "100%" }}
+                              min={0}
                             />
                           </Form.Item>
                         </Col>
+
                         <Col span={3}>
-                          <Form.Item {...restField} name={[name, 'sellingPrice']} rules={[{ required: true, message: 'Nhập' }]} noStyle>
-                            <InputNumber placeholder="Giá bán" style={{ width: '100%' }}
-                              formatter={(value) => value ? `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' ₫' : ''}
-                              parser={(value) => value!.replace(/\$\s?|(,*)/g, '')}
+                          <Form.Item
+                            {...restField}
+                            name={[name, "sellingPrice"]}
+                            rules={[{ required: true, message: "Nhập" }]}
+                            noStyle
+                          >
+                            <InputNumber
+                              placeholder="Giá bán"
+                              style={{ width: "100%" }}
+                              min={0}
                             />
                           </Form.Item>
                         </Col>
+
                         <Col span={3}>
-                          <Form.Item {...restField} name={[name, 'stockQuantity']} rules={[{ required: true, message: 'Nhập' }]} noStyle>
-                            <InputNumber placeholder="Tồn kho" min={0} style={{ width: '100%' }} />
+                          <Form.Item
+                            {...restField}
+                            name={[name, "stockQuantity"]}
+                            rules={[{ required: true, message: "Nhập" }]}
+                            noStyle
+                          >
+                            <InputNumber
+                              placeholder="Tồn kho"
+                              min={0}
+                              style={{ width: "100%" }}
+                            />
                           </Form.Item>
                         </Col>
-                        <Col span={5}>
-                          <Space align="start">
-                            <Form.Item {...restField} name={[name, 'variantImages']} valuePropName="fileList"
-                              getValueFromEvent={(e) => {
-                                if (Array.isArray(e)) return e;
-                                return e?.fileList;
-                              }} noStyle>
-                              <Upload
-                                listType="picture-card"
-                                maxCount={1}
-                                customRequest={async ({ file, onSuccess, onError }: any) => {
-                                  try {
-                                    const url = await handleUpload(file);
-                                    const allVariants = addVariantForm.getFieldValue('variants');
-                                    allVariants[name].imageUrl = url;
-                                    addVariantForm.setFieldsValue({ variants: allVariants });
-                                    onSuccess("ok");
-                                  } catch (err) {
-                                    console.error("Upload error:", err);
-                                    onError(err);
-                                  }
-                                }}
-                              >
-                                <div><PlusOutlined /><div style={{ marginTop: 8 }}>Ảnh</div></div>
-                              </Upload>
-                            </Form.Item>
-                            <Button icon={<DeleteOutlined />} danger onClick={() => remove(name)} />
-                          </Space>
+
+                        <Col span={2}>
+                          <Button
+                            icon={<DeleteOutlined />}
+                            danger
+                            onClick={() => remove(name)}
+                          />
                         </Col>
                       </Row>
                     ))}
+
                     <Form.Item>
-                      <Button type="dashed" onClick={() => add({ stockQuantity: 0 })} block icon={<PlusOutlined />}>
+                      <Button
+                        type="dashed"
+                        onClick={() => add({ stockQuantity: 0 })}
+                        block
+                        icon={<PlusOutlined />}
+                      >
                         Thêm dòng biến thể thủ công
                       </Button>
                     </Form.Item>
                   </>
                 )}
               </Form.List>
+
               <Form.Item>
                 <Space>
                   <Button type="primary" htmlType="submit">
                     Lưu các biến thể
                   </Button>
+
                   <Button onClick={handleResetForm}>Làm mới</Button>
                 </Space>
               </Form.Item>

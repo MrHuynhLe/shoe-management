@@ -1,26 +1,40 @@
 package com.vn.backend.service.impl;
 
 import com.vn.backend.dto.request.ProductCreateRequest;
+import com.vn.backend.dto.request.ProductUpdateRequest;
 import com.vn.backend.dto.response.PageResponse;
 import com.vn.backend.dto.response.ProductDetailResponse;
 import com.vn.backend.dto.response.ProductListResponse;
 import com.vn.backend.dto.response.ProductVariantResponse;
-import com.vn.backend.entity.*;
+import com.vn.backend.entity.Brand;
+import com.vn.backend.entity.Category;
+import com.vn.backend.entity.Origin;
+import com.vn.backend.entity.Product;
+import com.vn.backend.entity.ProductImage;
+import com.vn.backend.entity.ProductVariant;
+import com.vn.backend.entity.Supplier;
 import com.vn.backend.mapper.PageMapper;
-import com.vn.backend.repository.*;
+import com.vn.backend.repository.BrandRepository;
+import com.vn.backend.repository.CategoryRepository;
+import com.vn.backend.repository.OriginRepository;
+import com.vn.backend.repository.ProductImageRepository;
+import com.vn.backend.repository.ProductRepository;
+import com.vn.backend.repository.ProductVariantRepository;
+import com.vn.backend.repository.SupplierRepository;
 import com.vn.backend.service.FileStorageService;
 import com.vn.backend.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import java.time.OffsetDateTime;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-import java.text.Normalizer;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.text.Normalizer;
+import java.time.OffsetDateTime;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -39,6 +53,7 @@ public class ProductServiceImpl implements ProductService {
     private final SupplierRepository supplierRepository;
 
     @Override
+    @Transactional
     public Product create(ProductCreateRequest request) {
         Brand brand = brandRepository.findById(request.getBrandId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy thương hiệu"));
@@ -69,15 +84,76 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    public PageResponse<ProductListResponse> getProductList(int page, int size, Long categoryId) {
+    @Transactional
+    public ProductDetailResponse update(Long productId, ProductUpdateRequest request) {
+        Product product = productRepository.findByIdAndDeletedAtIsNull(productId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm với ID: " + productId));
+
+        Brand brand = brandRepository.findById(request.getBrandId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thương hiệu"));
+
+        Category category = categoryRepository.findById(request.getCategoryId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy danh mục"));
+
+        Origin origin = originRepository.findById(request.getOriginId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy xuất xứ"));
+
+        Supplier supplier = supplierRepository.findById(request.getSupplierId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy nhà cung cấp"));
+
+        product.setName(request.getName().trim());
+        product.setDescription(request.getDescription());
+        product.setBrand(brand);
+        product.setCategory(category);
+        product.setOrigin(origin);
+        product.setSupplier(supplier);
+        product.setIsActive(request.getIsActive() != null ? request.getIsActive() : true);
+
+        if (StringUtils.hasText(request.getCode())) {
+            String normalizedCode = normalizeCode(request.getCode());
+
+            if (!StringUtils.hasText(normalizedCode)) {
+                throw new RuntimeException("Mã sản phẩm không hợp lệ");
+            }
+
+            boolean duplicated = productRepository.existsByCodeAndDeletedAtIsNullAndIdNot(
+                    normalizedCode,
+                    productId
+            );
+
+            if (duplicated) {
+                throw new RuntimeException("Mã sản phẩm đã tồn tại");
+            }
+
+            product.setCode(normalizedCode);
+        }
+
+        productRepository.saveAndFlush(product);
+
+        return getProductDetail(productId, true);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<ProductListResponse> getProductList(
+            int page,
+            int size,
+            Long categoryId,
+            boolean includeInactive
+    ) {
         Pageable pageable = PageRequest.of(page, size);
-        Page<ProductListResponse> pageData = productRepository.findProductList(pageable, categoryId);
+        Page<ProductListResponse> pageData = productRepository.findProductList(
+                pageable,
+                categoryId,
+                includeInactive
+        );
         return PageMapper.toPageResponse(pageData, dto -> dto);
     }
 
     @Override
-    public ProductDetailResponse getProductDetail(Long id) {
-        Product p = productRepository.findActiveDetailById(id)
+    @Transactional(readOnly = true)
+    public ProductDetailResponse getProductDetail(Long id, boolean includeInactive) {
+        Product p = productRepository.findDetailById(id, includeInactive)
                 .orElseThrow(() -> new RuntimeException("PRODUCT_NOT_FOUND"));
 
         List<ProductVariant> productVariants = productVariantRepository.findByProductIdWithAttributes(id);
@@ -85,18 +161,21 @@ public class ProductServiceImpl implements ProductService {
         List<ProductVariantResponse> variants = productVariants == null
                 ? List.of()
                 : productVariants.stream()
-                .filter(v -> Boolean.TRUE.equals(v.getIsActive()))
+                .filter(v -> v.getDeletedAt() == null)
+                .filter(v -> includeInactive || Boolean.TRUE.equals(v.getIsActive()))
                 .map(v -> new ProductVariantResponse(
                         v.getId(),
                         v.getCode(),
+                        v.getBarcode(),
                         v.getCostPrice(),
                         v.getSellingPrice(),
                         v.getStockQuantity(),
+                        v.getBinLocation(),
                         v.getIsActive(),
                         v.getVariantAttributeValues() == null
                                 ? java.util.Collections.emptyMap()
                                 : v.getVariantAttributeValues().stream()
-                                .collect(Collectors.toMap(
+                                .collect(java.util.stream.Collectors.toMap(
                                         av -> av.getAttributeValue().getAttribute().getCode(),
                                         av -> av.getAttributeValue().getValue(),
                                         (oldVal, newVal) -> oldVal
@@ -107,9 +186,9 @@ public class ProductServiceImpl implements ProductService {
         List<String> images = p.getImages() == null
                 ? List.of()
                 : p.getImages().stream()
-                .sorted(Comparator
+                .sorted(java.util.Comparator
                         .comparing((ProductImage img) -> Boolean.TRUE.equals(img.getIsPrimary()) ? 0 : 1)
-                        .thenComparing(ProductImage::getDisplayOrder, Comparator.nullsLast(Integer::compareTo)))
+                        .thenComparing(ProductImage::getDisplayOrder, java.util.Comparator.nullsLast(Integer::compareTo)))
                 .map(ProductImage::getImageUrl)
                 .toList();
 
@@ -118,9 +197,19 @@ public class ProductServiceImpl implements ProductService {
                 p.getCode(),
                 p.getName(),
                 p.getDescription(),
-                p.getBrand().getName(),
-                p.getCategory().getName(),
-                p.getOrigin().getName(),
+
+                p.getBrand() != null ? p.getBrand().getId() : null,
+                p.getBrand() != null ? p.getBrand().getName() : null,
+
+                p.getCategory() != null ? p.getCategory().getId() : null,
+                p.getCategory() != null ? p.getCategory().getName() : null,
+
+                p.getOrigin() != null ? p.getOrigin().getId() : null,
+                p.getOrigin() != null ? p.getOrigin().getName() : null,
+
+                p.getSupplier() != null ? p.getSupplier().getId() : null,
+                p.getSupplier() != null ? p.getSupplier().getName() : null,
+
                 p.getIsActive(),
                 p.getDeletedAt(),
                 variants,
@@ -129,11 +218,12 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Transactional
     public Product createWithImages(
             ProductCreateRequest request,
             MultipartFile primaryImage,
-            List<MultipartFile> galleryImages) {
-
+            List<MultipartFile> galleryImages
+    ) {
         Brand brand = brandRepository.findById(request.getBrandId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy thương hiệu"));
 
@@ -148,8 +238,7 @@ public class ProductServiceImpl implements ProductService {
 
         Product product = new Product();
         product.setName(request.getName().trim());
-        String resolvedCode = resolveProductCode(request);
-        product.setCode(resolvedCode);
+        product.setCode(resolveProductCode(request));
         product.setDescription(request.getDescription());
         product.setBrand(brand);
         product.setCategory(category);
@@ -225,6 +314,7 @@ public class ProductServiceImpl implements ProductService {
         }
 
         String base = normalizeCode(request.getName());
+
         if (!StringUtils.hasText(base)) {
             base = "SAN-PHAM";
         }

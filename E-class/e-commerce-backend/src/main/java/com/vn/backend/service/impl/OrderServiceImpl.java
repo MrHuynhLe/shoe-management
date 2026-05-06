@@ -1,42 +1,75 @@
 package com.vn.backend.service.impl;
 
+import com.vn.backend.dto.request.OrderItemRequest;
+import com.vn.backend.dto.request.OrderReturnRequest;
+import com.vn.backend.dto.request.OrderReturnReviewRequest;
 import com.vn.backend.dto.request.PlaceOrderRequest;
 import com.vn.backend.dto.request.ValidateDiscountRequest;
-import com.vn.backend.dto.request.OrderItemRequest;
-import com.vn.backend.dto.response.*;
-import com.vn.backend.entity.*;
+import com.vn.backend.dto.response.CustomerResponse;
+import com.vn.backend.dto.response.OrderDetailResponse;
+import com.vn.backend.dto.response.OrderItemResponse;
+import com.vn.backend.dto.response.OrderResponse;
+import com.vn.backend.dto.response.OrderShippingAddressResponse;
+import com.vn.backend.dto.response.OrderStatusHistoryResponse;
+import com.vn.backend.dto.response.UserProfileResponse;
+import com.vn.backend.dto.response.ValidateDiscountResponse;
+import com.vn.backend.entity.Coupon;
+import com.vn.backend.entity.CouponUsage;
+import com.vn.backend.entity.Customer;
+import com.vn.backend.entity.Employee;
+import com.vn.backend.entity.Order;
+import com.vn.backend.entity.OrderItem;
+import com.vn.backend.entity.OrderShippingDetails;
+import com.vn.backend.entity.OrderStatusHistory;
+import com.vn.backend.entity.Payment;
+import com.vn.backend.entity.PaymentMethod;
+import com.vn.backend.entity.ProductImage;
+import com.vn.backend.entity.ProductVariant;
+import com.vn.backend.entity.Promotion;
+import com.vn.backend.entity.User;
+import com.vn.backend.entity.UserProfile;
 import com.vn.backend.exception.InvalidRequestException;
 import com.vn.backend.exception.ResourceNotFoundException;
-import com.vn.backend.repository.*;
+import com.vn.backend.repository.CartItemRepository;
+import com.vn.backend.repository.CouponUsageRepository;
+import com.vn.backend.repository.CustomerRepository;
+import com.vn.backend.repository.EmployeeRepository;
+import com.vn.backend.repository.InventoryTransactionRepository;
+import com.vn.backend.repository.OrderItemRepository;
+import com.vn.backend.repository.OrderRepository;
+import com.vn.backend.repository.OrderStatusHistoryRepository;
+import com.vn.backend.repository.PaymentMethodRepository;
+import com.vn.backend.repository.PaymentRepository;
+import com.vn.backend.repository.ProductVariantRepository;
+import com.vn.backend.repository.PromotionRepository;
+import com.vn.backend.repository.UserRepository;
 import com.vn.backend.security.CustomUserDetails;
 import com.vn.backend.service.DiscountService;
-import com.vn.backend.service.OrderService;
 import com.vn.backend.service.GhtkService;
+import com.vn.backend.service.OrderService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-import com.vn.backend.dto.request.OrderReturnRequest;
-import com.vn.backend.dto.request.OrderReturnReviewRequest;
 
 import java.math.BigDecimal;
-import java.util.*;
-import java.util.stream.Collectors;
-
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -54,7 +87,7 @@ public class OrderServiceImpl implements OrderService {
     private final CouponUsageRepository couponUsageRepository;
     private final PromotionRepository promotionRepository;
     private final EmployeeRepository employeeRepository;
-    private final GhtkService ghtkService; // Inject GhtkService
+    private final GhtkService ghtkService;
     private final GHTKLogicHandler ghtkLogicHandler;
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final InventoryTransactionRepository inventoryTransactionRepository;
@@ -76,10 +109,13 @@ public class OrderServiceImpl implements OrderService {
 
     private static final int RETURN_WINDOW_DAYS = 7;
 
-
     @Override
     @Transactional
     public OrderResponse placeOrder(Long userId, PlaceOrderRequest request) {
+        if (request == null || request.getItems() == null || request.getItems().isEmpty()) {
+            throw new InvalidRequestException("Đơn hàng phải có ít nhất một sản phẩm");
+        }
+
         Customer customer = resolveCustomer(userId);
 
         BigDecimal subTotal = BigDecimal.ZERO;
@@ -91,6 +127,14 @@ public class OrderServiceImpl implements OrderService {
 
         Map<Long, Integer> requestedQuantityByVariantId = new HashMap<>();
         for (OrderItemRequest itemRequest : request.getItems()) {
+            if (itemRequest.getVariantId() == null) {
+                throw new InvalidRequestException("Thiếu biến thể sản phẩm");
+            }
+
+            if (itemRequest.getQuantity() == null || itemRequest.getQuantity() <= 0) {
+                throw new InvalidRequestException("Số lượng sản phẩm phải lớn hơn 0");
+            }
+
             requestedQuantityByVariantId.merge(
                     itemRequest.getVariantId(),
                     itemRequest.getQuantity(),
@@ -100,11 +144,31 @@ public class OrderServiceImpl implements OrderService {
 
         Map<Long, ProductVariant> variantsMap = lockVariantsForOnlineOrder(requestedQuantityByVariantId);
 
+        for (Map.Entry<Long, Integer> entry : requestedQuantityByVariantId.entrySet()) {
+            ProductVariant variant = variantsMap.get(entry.getKey());
+            Integer totalRequestedQuantity = entry.getValue();
+
+            validateVariantCanBeOrdered(variant);
+
+            int currentStock = variant.getStockQuantity() == null ? 0 : variant.getStockQuantity();
+            if (currentStock < totalRequestedQuantity) {
+                throw new InvalidRequestException(
+                        "Không đủ tồn kho cho sản phẩm: "
+                                + variant.getProduct().getName()
+                                + " - "
+                                + variant.getCode()
+                );
+            }
+        }
+
         for (OrderItemRequest itemRequest : request.getItems()) {
             ProductVariant variant = variantsMap.get(itemRequest.getVariantId());
 
-            BigDecimal itemSubTotal = variant.getSellingPrice()
+            validateVariantCanBeOrdered(variant);
+
+            BigDecimal itemSubTotal = defaultZero(variant.getSellingPrice())
                     .multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
+
             subTotal = subTotal.add(itemSubTotal);
 
             OrderItem orderItem = OrderItem.builder()
@@ -220,7 +284,10 @@ public class OrderServiceImpl implements OrderService {
 
         paymentRepository.save(payment);
 
-        cartItemRepository.deleteAllByCart_Customer_IdAndProductVariant_IdIn(customer.getId(), requestedVariantIds);
+        cartItemRepository.deleteAllByCart_Customer_IdAndProductVariant_IdIn(
+                customer.getId(),
+                requestedVariantIds
+        );
 
         return mapToOrderResponse(savedOrder);
     }
@@ -307,14 +374,28 @@ public class OrderServiceImpl implements OrderService {
 
     private OrderItemResponse convertToOrderItemResponse(OrderItem item) {
         ProductVariant variant = item.getProductVariant();
-        String imageUrl = variant.getImages().stream()
-                .filter(ProductImage::getIsPrimary)
-                .findFirst()
-                .or(() -> variant.getImages().stream().findFirst())
-                .map(ProductImage::getImageUrl).orElse(null);
 
-        return new OrderItemResponse(variant.getProduct().getId(), variant.getProduct().getName(), variant.getCode(), imageUrl, item.getQuantity(), item.getPriceAtPurchase(), item.getPriceAtPurchase().multiply(BigDecimal.valueOf(item.getQuantity())));
+        String imageUrl = null;
+        if (variant != null && variant.getImages() != null) {
+            imageUrl = variant.getImages().stream()
+                    .filter(ProductImage::getIsPrimary)
+                    .findFirst()
+                    .or(() -> variant.getImages().stream().findFirst())
+                    .map(ProductImage::getImageUrl)
+                    .orElse(null);
+        }
+
+        return new OrderItemResponse(
+                variant.getProduct().getId(),
+                variant.getProduct().getName(),
+                variant.getCode(),
+                imageUrl,
+                item.getQuantity(),
+                item.getPriceAtPurchase(),
+                item.getPriceAtPurchase().multiply(BigDecimal.valueOf(item.getQuantity()))
+        );
     }
+
     @Override
     @Transactional(readOnly = true)
     public Page<OrderResponse> getMyOrders(Long userId, Pageable pageable) {
@@ -354,12 +435,10 @@ public class OrderServiceImpl implements OrderService {
             throw new InvalidRequestException("Không thể cập nhật trạng thái từ đơn hàng đã kết thúc.");
         }
 
-        // 1. Chỉ trừ kho khi chuyển từ PENDING -> CONFIRMED
         if (ORDER_STATUS_PENDING.equals(previousStatus) && ORDER_STATUS_CONFIRMED.equals(normalizedStatus)) {
             decreaseStockForOrder(order);
         }
 
-        // 2. Nếu đã xác nhận rồi mà hủy thì hoàn kho lại
         if (ORDER_STATUS_CONFIRMED.equals(previousStatus) && ORDER_STATUS_CANCELLED.equals(normalizedStatus)) {
             restoreStockForOrder(order);
         }
@@ -482,6 +561,7 @@ public class OrderServiceImpl implements OrderService {
     public List<OrderShippingAddressResponse> getUserShippingAddresses(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
         Customer customer = customerRepository
                 .findByUserProfileId(user.getUserProfile().getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
@@ -511,7 +591,11 @@ public class OrderServiceImpl implements OrderService {
         for (OrderItem item : order.getItems()) {
             ProductVariant variant = item.getProductVariant();
 
-            if (variant.getStockQuantity() < item.getQuantity()) {
+            validateVariantCanBeOrdered(variant);
+
+            int currentStock = variant.getStockQuantity() == null ? 0 : variant.getStockQuantity();
+
+            if (currentStock < item.getQuantity()) {
                 throw new InvalidRequestException(
                         "Không đủ số lượng tồn kho cho sản phẩm: "
                                 + variant.getProduct().getName()
@@ -520,7 +604,7 @@ public class OrderServiceImpl implements OrderService {
                 );
             }
 
-            variant.setStockQuantity(variant.getStockQuantity() - item.getQuantity());
+            variant.setStockQuantity(currentStock - item.getQuantity());
             productVariantRepository.save(variant);
         }
     }
@@ -528,7 +612,10 @@ public class OrderServiceImpl implements OrderService {
     private void restoreStockForOrder(Order order) {
         for (OrderItem item : order.getItems()) {
             ProductVariant variant = item.getProductVariant();
-            variant.setStockQuantity(variant.getStockQuantity() + item.getQuantity());
+
+            int currentStock = variant.getStockQuantity() == null ? 0 : variant.getStockQuantity();
+            variant.setStockQuantity(currentStock + item.getQuantity());
+
             productVariantRepository.save(variant);
         }
     }
@@ -571,6 +658,7 @@ public class OrderServiceImpl implements OrderService {
         if (order.getCustomer() != null) {
             UserProfile userProfile = order.getCustomer().getUserProfile();
             UserProfileResponse userProfileResponse = null;
+
             if (userProfile != null) {
                 userProfileResponse = new UserProfileResponse(
                         userProfile.getId(),
@@ -579,6 +667,7 @@ public class OrderServiceImpl implements OrderService {
                         userProfile.getAddress()
                 );
             }
+
             customerResponse = new CustomerResponse(order.getCustomer().getId(), userProfileResponse);
         }
 
@@ -695,8 +784,6 @@ public class OrderServiceImpl implements OrderService {
         return value == null ? BigDecimal.ZERO : value;
     }
 
-
-
     private Customer resolveCustomer(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new InvalidRequestException("User not found"));
@@ -812,6 +899,9 @@ public class OrderServiceImpl implements OrderService {
             Integer requestedQuantity = entry.getValue();
 
             ProductVariant variant = variantsMap.get(variantId);
+
+            validateVariantCanBeOrdered(variant);
+
             int currentStock = variant.getStockQuantity() == null ? 0 : variant.getStockQuantity();
 
             if (currentStock < requestedQuantity) {
@@ -825,6 +915,26 @@ public class OrderServiceImpl implements OrderService {
 
             variant.setStockQuantity(currentStock - requestedQuantity);
             productVariantRepository.save(variant);
+        }
+    }
+
+    private void validateVariantCanBeOrdered(ProductVariant variant) {
+        if (variant == null) {
+            throw new InvalidRequestException("Sản phẩm không còn khả dụng");
+        }
+
+        if (!Boolean.TRUE.equals(variant.getIsActive()) || variant.getDeletedAt() != null) {
+            throw new InvalidRequestException("Biến thể sản phẩm đã ngừng bán: " + variant.getCode());
+        }
+
+        if (variant.getProduct() == null
+                || !Boolean.TRUE.equals(variant.getProduct().getIsActive())
+                || variant.getProduct().getDeletedAt() != null) {
+            throw new InvalidRequestException("Sản phẩm đã ngừng bán: " + variant.getCode());
+        }
+
+        if (variant.getStockQuantity() == null || variant.getStockQuantity() <= 0) {
+            throw new InvalidRequestException("Sản phẩm đã hết hàng: " + variant.getCode());
         }
     }
 }

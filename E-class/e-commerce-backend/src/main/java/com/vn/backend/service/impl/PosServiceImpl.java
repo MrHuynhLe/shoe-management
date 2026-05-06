@@ -4,12 +4,15 @@ import com.vn.backend.dto.request.pos.PosAddItemRequest;
 import com.vn.backend.dto.request.pos.PosAssignCustomerRequest;
 import com.vn.backend.dto.request.pos.PosCheckoutRequest;
 import com.vn.backend.dto.request.pos.PosCreateOrderRequest;
+import com.vn.backend.dto.request.pos.PosQuickCreateCustomerRequest;
 import com.vn.backend.dto.request.pos.PosUpdateItemRequest;
 import com.vn.backend.dto.response.pos.PosAvailableDiscountResponse;
 import com.vn.backend.dto.response.pos.PosOrderItemResponse;
 import com.vn.backend.dto.response.pos.PosOrderResponse;
 import com.vn.backend.dto.response.pos.PosProductSearchResponse;
 import com.vn.backend.entity.AttributeValue;
+import com.vn.backend.entity.Coupon;
+import com.vn.backend.entity.CouponUsage;
 import com.vn.backend.entity.Customer;
 import com.vn.backend.entity.Employee;
 import com.vn.backend.entity.InventoryTransaction;
@@ -21,8 +24,12 @@ import com.vn.backend.entity.PaymentMethod;
 import com.vn.backend.entity.Product;
 import com.vn.backend.entity.ProductImage;
 import com.vn.backend.entity.ProductVariant;
+import com.vn.backend.entity.Promotion;
 import com.vn.backend.entity.Store;
+import com.vn.backend.entity.UserProfile;
 import com.vn.backend.entity.VariantAttributeValue;
+import com.vn.backend.repository.CouponRepository;
+import com.vn.backend.repository.CouponUsageRepository;
 import com.vn.backend.repository.CustomerRepository;
 import com.vn.backend.repository.EmployeeRepository;
 import com.vn.backend.repository.InventoryTransactionRepository;
@@ -33,36 +40,24 @@ import com.vn.backend.repository.PaymentMethodRepository;
 import com.vn.backend.repository.PaymentRepository;
 import com.vn.backend.repository.ProductImageRepository;
 import com.vn.backend.repository.ProductVariantRepository;
+import com.vn.backend.repository.PromotionRepository;
 import com.vn.backend.repository.StoreRepository;
+import com.vn.backend.repository.UserProfileRepository;
 import com.vn.backend.service.PosService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.vn.backend.entity.Coupon;
-import com.vn.backend.entity.CouponUsage;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.Optional;
-
-import com.vn.backend.entity.Promotion;
-import com.vn.backend.repository.CouponRepository;
-import com.vn.backend.repository.CouponUsageRepository;
-import com.vn.backend.repository.PromotionRepository;
-
-import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
-
-import com.vn.backend.dto.request.pos.PosQuickCreateCustomerRequest;
-import com.vn.backend.entity.UserProfile;
-import com.vn.backend.repository.UserProfileRepository;
-
-
+import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -76,6 +71,10 @@ public class PosServiceImpl implements PosService {
     private static final String PAYMENT_STATUS_PAID = "PAID";
 
     private static final int MAX_DRAFT_POS_ORDERS = 5;
+    private static final int MAX_DRAFT_POS_ORDERS_PER_EMPLOYEE = 10;
+
+    private static final String INVENTORY_IN = "IN";
+    private static final String INVENTORY_OUT = "OUT";
 
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
@@ -88,14 +87,10 @@ public class PosServiceImpl implements PosService {
     private final PaymentRepository paymentRepository;
     private final InventoryTransactionRepository inventoryTransactionRepository;
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
-
     private final PromotionRepository promotionRepository;
     private final CouponRepository couponRepository;
     private final CouponUsageRepository couponUsageRepository;
     private final UserProfileRepository userProfileRepository;
-
-    private static final String INVENTORY_IN = "IN";
-    private static final String INVENTORY_OUT = "OUT";
 
     @Override
     public PosOrderResponse createOrder(PosCreateOrderRequest request) {
@@ -122,8 +117,21 @@ public class PosServiceImpl implements PosService {
             customer = customerRepository.findById(request.getCustomerId().longValue())
                     .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy khách hàng"));
         }
-        if(orderRepository.findByOrderTypeAndStatusAndEmployeeId(ORDER_TYPE_POS, ORDER_STATUS_DRAFT, employee.getId()).size() > 10) {
-            throw new Exception("Số lượng hóa đơn nháp giới hạn là 10, không thể tạo thêm.");
+
+        int draftCountByEmployee = orderRepository
+                .findByOrderTypeAndStatusAndEmployeeId(
+                        ORDER_TYPE_POS,
+                        ORDER_STATUS_DRAFT,
+                        employee.getId()
+                )
+                .size();
+
+        if (draftCountByEmployee >= MAX_DRAFT_POS_ORDERS_PER_EMPLOYEE) {
+            throw new IllegalArgumentException(
+                    "Số lượng hóa đơn nháp giới hạn là "
+                            + MAX_DRAFT_POS_ORDERS_PER_EMPLOYEE
+                            + ", không thể tạo thêm."
+            );
         }
 
         Order order = Order.builder()
@@ -150,7 +158,10 @@ public class PosServiceImpl implements PosService {
     @Override
     @Transactional(readOnly = true)
     public List<PosOrderResponse> getDraftOrders() {
-        return orderRepository.findByStatusAndOrderTypeOrderByCreatedAtDesc(ORDER_STATUS_DRAFT, ORDER_TYPE_POS)
+        return orderRepository.findByStatusAndOrderTypeOrderByCreatedAtDesc(
+                        ORDER_STATUS_DRAFT,
+                        ORDER_TYPE_POS
+                )
                 .stream()
                 .map(this::mapToOrderResponse)
                 .toList();
@@ -177,19 +188,6 @@ public class PosServiceImpl implements PosService {
                 .toList();
     }
 
-//    @Override
-//    @Transactional(readOnly = true)
-//    public PosProductSearchResponse getProductByBarcode(String barcode) {
-//        ProductVariant variant = (ProductVariant) productVariantRepository.findByBarcode(barcode)
-//                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy sản phẩm"));
-//
-//        if (!isSellableVariant(variant)) {
-//            throw new IllegalArgumentException("Sản phẩm không khả dụng để bán");
-//        }
-//
-//        return mapToProductSearchResponse(variant);
-//    }
-
     @Override
     @Transactional
     public PosOrderResponse addItem(Long orderId, PosAddItemRequest request) {
@@ -212,7 +210,10 @@ public class PosServiceImpl implements PosService {
         }
 
         Optional<OrderItem> existingItemOpt =
-                orderItemRepository.findByOrder_IdAndProductVariant_Id(orderId, request.getProductVariantId());
+                orderItemRepository.findByOrder_IdAndProductVariant_Id(
+                        orderId,
+                        request.getProductVariantId()
+                );
 
         decreaseVariantStock(variant, addQty);
 
@@ -373,19 +374,22 @@ public class PosServiceImpl implements PosService {
                 .map(existingProfile -> {
                     boolean changed = false;
 
-                    if (existingProfile.getFullName() == null || existingProfile.getFullName().isBlank()) {
+                    if (existingProfile.getFullName() == null
+                            || existingProfile.getFullName().isBlank()) {
                         existingProfile.setFullName(fullName);
                         changed = true;
                     }
 
                     if (address != null && !address.isBlank()) {
-                        if (existingProfile.getAddress() == null || !address.equals(existingProfile.getAddress())) {
+                        if (existingProfile.getAddress() == null
+                                || !address.equals(existingProfile.getAddress())) {
                             existingProfile.setAddress(address);
                             changed = true;
                         }
                     }
 
-                    if (existingProfile.getIsActive() == null || !existingProfile.getIsActive()) {
+                    if (existingProfile.getIsActive() == null
+                            || !existingProfile.getIsActive()) {
                         existingProfile.setIsActive(true);
                         changed = true;
                     }
@@ -517,6 +521,7 @@ public class PosServiceImpl implements PosService {
                 .paidAt(OffsetDateTime.now())
                 .note("Thanh toán tiền mặt tại quầy")
                 .build();
+
         paymentRepository.save(payment);
 
         saveVoucherUsage(order, request);
@@ -552,6 +557,63 @@ public class PosServiceImpl implements PosService {
         saveOrderStatusHistory(order, ORDER_STATUS_DRAFT, ORDER_STATUS_CANCELLED);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<PosAvailableDiscountResponse> getAvailableDiscounts(Long orderId) {
+        Order order = getDraftOrderOrThrow(orderId);
+
+        List<OrderItem> items = orderItemRepository.findByOrder_Id(orderId);
+        BigDecimal subtotal = items.stream()
+                .map(item -> defaultZero(item.getPriceAtPurchase())
+                        .multiply(BigDecimal.valueOf(item.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        if (subtotal.compareTo(BigDecimal.ZERO) <= 0) {
+            return List.of();
+        }
+
+        OffsetDateTime now = OffsetDateTime.now();
+        List<PosAvailableDiscountResponse> results = new ArrayList<>();
+
+        List<Promotion> promotions = promotionRepository.findAllAvailableForPos(now);
+        for (Promotion promotion : promotions) {
+            if (!isPromotionApplicable(promotion, order, subtotal)) {
+                continue;
+            }
+            results.add(mapPromotionToPosDiscountResponse(promotion, subtotal));
+        }
+
+        if (order.getCustomer() != null) {
+            Long customerId = order.getCustomer().getId();
+
+            List<Coupon> coupons = couponRepository.findAvailableCouponsForCustomer(customerId);
+            for (Coupon coupon : coupons) {
+                if (!isCouponApplicable(coupon, order, subtotal)) {
+                    continue;
+                }
+                results.add(mapCouponToPosDiscountResponse(coupon, subtotal));
+            }
+        }
+
+        results.sort(
+                Comparator.comparing(
+                                PosAvailableDiscountResponse::getEstimatedDiscountAmount,
+                                Comparator.nullsLast(BigDecimal::compareTo)
+                        )
+                        .reversed()
+                        .thenComparing(
+                                PosAvailableDiscountResponse::getEndDate,
+                                Comparator.nullsLast(OffsetDateTime::compareTo)
+                        )
+        );
+
+        for (int i = 0; i < results.size(); i++) {
+            results.get(i).setBestVoucher(i == 0);
+        }
+
+        return results;
+    }
+
     private Order getOrderOrThrow(Long orderId) {
         return orderRepository.findById(orderId)
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy hóa đơn"));
@@ -572,7 +634,8 @@ public class PosServiceImpl implements PosService {
     }
 
     private void validateItemBelongsToOrder(OrderItem item, Long orderId) {
-        if (item.getOrder() == null || item.getOrder().getId() == null
+        if (item.getOrder() == null
+                || item.getOrder().getId() == null
                 || item.getOrder().getId().longValue() != orderId.longValue()) {
             throw new IllegalArgumentException("Sản phẩm không thuộc hóa đơn này");
         }
@@ -591,9 +654,11 @@ public class PosServiceImpl implements PosService {
         if (order.getDiscountAmount() == null) {
             order.setDiscountAmount(BigDecimal.ZERO);
         }
+
         if (order.getShippingFee() == null) {
             order.setShippingFee(BigDecimal.ZERO);
         }
+
         if (order.getCustomerPaid() == null) {
             order.setCustomerPaid(BigDecimal.ZERO);
         }
@@ -686,7 +751,10 @@ public class PosServiceImpl implements PosService {
 
     private String getImageUrl(ProductVariant variant) {
         Optional<ProductImage> variantImage =
-                productImageRepository.findFirstByProductVariant_IdOrderByIsPrimaryDescDisplayOrderAsc(variant.getId().longValue());
+                productImageRepository
+                        .findFirstByProductVariant_IdOrderByIsPrimaryDescDisplayOrderAsc(
+                                variant.getId().longValue()
+                        );
 
         if (variantImage.isPresent()) {
             return variantImage.get().getImageUrl();
@@ -694,7 +762,9 @@ public class PosServiceImpl implements PosService {
 
         if (variant.getProduct() != null) {
             return productImageRepository
-                    .findFirstByProduct_IdOrderByIsPrimaryDescDisplayOrderAsc(variant.getProduct().getId().longValue())
+                    .findFirstByProduct_IdOrderByIsPrimaryDescDisplayOrderAsc(
+                            variant.getProduct().getId().longValue()
+                    )
                     .map(ProductImage::getImageUrl)
                     .orElse(null);
         }
@@ -742,10 +812,6 @@ public class PosServiceImpl implements PosService {
 
     private String generateOrderCode() {
         return "POS-" + System.currentTimeMillis();
-    }
-
-    private String generateInventoryTransactionCode(Long orderId, Long variantId) {
-        return "PX-POS-" + orderId + "-" + variantId + "-" + System.currentTimeMillis();
     }
 
     private String safeTrim(String value) {
@@ -801,7 +867,10 @@ public class PosServiceImpl implements PosService {
                 && promotion.getUsageLimitPerCustomer() > 0
                 && order.getCustomer() != null) {
             long customerUsedCount = couponUsageRepository
-                    .countByPromotion_IdAndCustomer_Id(promotion.getId(), order.getCustomer().getId());
+                    .countByPromotion_IdAndCustomer_Id(
+                            promotion.getId(),
+                            order.getCustomer().getId()
+                    );
 
             if (customerUsedCount >= promotion.getUsageLimitPerCustomer()) {
                 return false;
@@ -810,63 +879,6 @@ public class PosServiceImpl implements PosService {
 
         return true;
     }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<PosAvailableDiscountResponse> getAvailableDiscounts(Long orderId) {
-        Order order = getDraftOrderOrThrow(orderId);
-
-        List<OrderItem> items = orderItemRepository.findByOrder_Id(orderId);
-        BigDecimal subtotal = items.stream()
-                .map(item -> defaultZero(item.getPriceAtPurchase())
-                        .multiply(BigDecimal.valueOf(item.getQuantity())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        if (subtotal.compareTo(BigDecimal.ZERO) <= 0) {
-            return List.of();
-        }
-
-        OffsetDateTime now = OffsetDateTime.now();
-        List<PosAvailableDiscountResponse> results = new ArrayList<>();
-
-        List<Promotion> promotions = promotionRepository.findAllAvailableForPos(now);
-        for (Promotion promotion : promotions) {
-            if (!isPromotionApplicable(promotion, order, subtotal)) {
-                continue;
-            }
-            results.add(mapPromotionToPosDiscountResponse(promotion, order, subtotal));
-        }
-
-        if (order.getCustomer() != null) {
-            Long customerId = order.getCustomer().getId();
-
-            List<Coupon> coupons = couponRepository.findAvailableCouponsForCustomer(customerId);
-            for (Coupon coupon : coupons) {
-                if (!isCouponApplicable(coupon, order, subtotal)) {
-                    continue;
-                }
-                results.add(mapCouponToPosDiscountResponse(coupon, order, subtotal));
-            }
-        }
-
-        results.sort(
-                Comparator.comparing(
-                                PosAvailableDiscountResponse::getEstimatedDiscountAmount,
-                                Comparator.nullsLast(BigDecimal::compareTo)
-                        ).reversed()
-                        .thenComparing(
-                                PosAvailableDiscountResponse::getEndDate,
-                                Comparator.nullsLast(OffsetDateTime::compareTo)
-                        )
-        );
-
-        for (int i = 0; i < results.size(); i++) {
-            results.get(i).setBestVoucher(i == 0);
-        }
-
-        return results;
-    }
-
 
     private boolean isCouponApplicable(Coupon coupon, Order order, BigDecimal subtotal) {
         if (coupon == null || order.getCustomer() == null) {
@@ -885,14 +897,16 @@ public class PosServiceImpl implements PosService {
         }
 
         long usedCountByCustomer = couponUsageRepository
-                .countByCoupon_IdAndCustomer_Id(coupon.getId(), order.getCustomer().getId());
+                .countByCoupon_IdAndCustomer_Id(
+                        coupon.getId(),
+                        order.getCustomer().getId()
+                );
 
         return usedCountByCustomer == 0;
     }
 
     private PosAvailableDiscountResponse mapCouponToPosDiscountResponse(
             Coupon coupon,
-            Order order,
             BigDecimal subtotal
     ) {
         long totalUsedCount = couponUsageRepository.countByCoupon_Id(coupon.getId());
@@ -944,41 +958,8 @@ public class PosServiceImpl implements PosService {
                 .build();
     }
 
-    private BigDecimal calculateDiscountAmount(
-            BigDecimal subtotal,
-            String discountType,
-            BigDecimal discountValue,
-            BigDecimal maxDiscountAmount
-    ) {
-        if (subtotal == null || discountType == null || discountValue == null) {
-            return BigDecimal.ZERO;
-        }
-
-        String normalizedDiscountType = discountType.trim().toUpperCase();
-
-        BigDecimal discountAmount = BigDecimal.ZERO;
-
-        if ("PERCENTAGE".equals(normalizedDiscountType)) {
-            discountAmount = subtotal.multiply(discountValue)
-                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-
-            if (maxDiscountAmount != null && discountAmount.compareTo(maxDiscountAmount) > 0) {
-                discountAmount = maxDiscountAmount;
-            }
-        } else if ("FIXED_AMOUNT".equals(normalizedDiscountType)) {
-            discountAmount = discountValue;
-        }
-
-        if (discountAmount.compareTo(subtotal) > 0) {
-            return subtotal;
-        }
-
-        return discountAmount;
-    }
-
     private PosAvailableDiscountResponse mapPromotionToPosDiscountResponse(
             Promotion promotion,
-            Order order,
             BigDecimal subtotal
     ) {
         long usedCount = couponUsageRepository.countByPromotion_Id(promotion.getId());
@@ -1030,6 +1011,38 @@ public class PosServiceImpl implements PosService {
                 .build();
     }
 
+    private BigDecimal calculateDiscountAmount(
+            BigDecimal subtotal,
+            String discountType,
+            BigDecimal discountValue,
+            BigDecimal maxDiscountAmount
+    ) {
+        if (subtotal == null || discountType == null || discountValue == null) {
+            return BigDecimal.ZERO;
+        }
+
+        String normalizedDiscountType = discountType.trim().toUpperCase();
+
+        BigDecimal discountAmount = BigDecimal.ZERO;
+
+        if ("PERCENTAGE".equals(normalizedDiscountType)) {
+            discountAmount = subtotal.multiply(discountValue)
+                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+
+            if (maxDiscountAmount != null
+                    && discountAmount.compareTo(maxDiscountAmount) > 0) {
+                discountAmount = maxDiscountAmount;
+            }
+        } else if ("FIXED_AMOUNT".equals(normalizedDiscountType)) {
+            discountAmount = discountValue;
+        }
+
+        if (discountAmount.compareTo(subtotal) > 0) {
+            return subtotal;
+        }
+
+        return discountAmount;
+    }
 
     private void saveVoucherUsage(Order order, PosCheckoutRequest request) {
         if (request.getCouponId() == null && request.getPromotionId() == null) {
@@ -1055,7 +1068,6 @@ public class PosServiceImpl implements PosService {
 
         couponUsageRepository.save(builder.build());
     }
-
 
     private ProductVariant getLockedVariantOrThrow(Long variantId) {
         return productVariantRepository.findByIdForUpdate(variantId)
@@ -1107,11 +1119,16 @@ public class PosServiceImpl implements PosService {
     }
 
     @Scheduled(cron = "0 59 23 * * ?")
-//    @Scheduled(fixedRate = 30000) // 30000ms = 30 giây để test
-    public void runEndOfDayJobToRemoteDraft() {
+    public void runEndOfDayJobToRemoveDraft() {
         System.out.println("Chạy job cuối ngày: " + LocalDateTime.now());
 
-        List<Order> orders = orderRepository.findByOrderTypeAndStatus(ORDER_TYPE_POS, ORDER_STATUS_DRAFT);
-        if(!orders.isEmpty()) {orderRepository.deleteAll(orders);}
+        List<Order> orders = orderRepository.findByOrderTypeAndStatus(
+                ORDER_TYPE_POS,
+                ORDER_STATUS_DRAFT
+        );
+
+        if (!orders.isEmpty()) {
+            orderRepository.deleteAll(orders);
+        }
     }
 }
