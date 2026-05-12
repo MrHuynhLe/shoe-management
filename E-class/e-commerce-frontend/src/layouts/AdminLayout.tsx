@@ -160,6 +160,11 @@ const AdminLayout = () => {
               icon: <TagsOutlined />,
               children: [
                 {
+                  key: "/admin/discounts/promotions",
+                  path: "/admin/discounts/promotions",
+                  name: "Chương trình khuyến mãi",
+                },
+                {
                   key: "/admin/discounts/coupons",
                   path: "/admin/discounts/coupons",
                   name: "Mã giảm giá",

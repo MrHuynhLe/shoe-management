@@ -52,6 +52,9 @@ interface Order {
   totalAmount: number;
   subtotalAmount?: number;
   discountAmount?: number;
+  discountType?: 'PERCENTAGE' | 'FIXED_AMOUNT';
+  discountValue?: number;
+  voucherCode?: string;
   discountPercent?: number;
   status: string;
   createdAt: string;
@@ -107,6 +110,9 @@ const OrderManagementPage = () => {
       message.error(error?.response?.data?.message || "Cập nhật thất bại");
     }
   };
+
+  const formatCurrency = (value?: number) =>
+    `${Number(value || 0).toLocaleString("vi-VN")} ₫`;
 
   const handleReviewReturn = async (
     orderId: number,
@@ -286,12 +292,18 @@ const OrderManagementPage = () => {
   };
 
   const columns: ProColumns<Order>[] = [
-    { title: "ID", dataIndex: "id", width: 64, search: false },
+    // {
+    //   title: "STT",
+    //   width: 64,
+    //   search: false,
+    //   align: "center",
+    //   render: (text, record, index) => index + 1, 
+    // },
     {
       title: "Mã đơn hàng",
       dataIndex: "code",
       render: (text) => <Text strong>#{text}</Text>,
-      width: 160,
+      width: 150,
     },
     {
       title: "Tên khách hàng",
@@ -299,20 +311,20 @@ const OrderManagementPage = () => {
       key: "customerName",
       render: (_, record) =>
         record.customerName || record.customer?.userProfile?.fullName || "N/A",
-      width: 180,
+      width: 160,
     },
     {
       title: "SĐT",
       dataIndex: "phone",
       key: "phone",
       render: (value) => value || "N/A",
-      width: 130,
+      width: 110,
     },
     {
       title: "Địa chỉ nhận hàng",
       dataIndex: "fullAddress",
       key: "fullAddress",
-      width: 320,
+      width: 200,
       render: (_, record) => {
         const displayAddress = getDisplayAddress(record);
 
@@ -328,28 +340,24 @@ const OrderManagementPage = () => {
       },
     },
     {
-      title: "% giảm",
-      dataIndex: "discountPercent",
-      key: "discountPercent",
-      width: 110,
-      align: "center",
-      render: (_, record) => {
-        if (!record.discountAmount || record.discountAmount <= 0) {
-          return <Text type="secondary">0%</Text>;
+      title: "Mã giảm",
+      dataIndex: "voucherCode",
+      key: "voucherCode",
+      width: 120,
+      align: "center" as const, 
+      render: (dom: React.ReactNode) => { 
+        const code = dom as string | undefined; 
+        if (!code) {
+          return <Text type="secondary">Không có</Text>;
         }
-
-        return (
-          <Tag color="green">
-            {Number(record.discountPercent || 0).toFixed(2)}%
-          </Tag>
-        );
+        return <Tag color="green">{code}</Tag>;
       },
     },
     {
       title: "Tổng tiền",
       dataIndex: "totalAmount",
       search: false,
-      width: 150,
+      width: 140,
       render: (_, record: Order) => (
         <Text strong style={{ color: "#c81d1d" }}>
           {record.totalAmount?.toLocaleString("vi-VN")} ₫
@@ -361,21 +369,21 @@ const OrderManagementPage = () => {
       dataIndex: "createdAt",
       valueType: "dateTime",
       search: false,
-      width: 170,
+      width: 140,
       render: (date: any) =>
         date ? new Date(date).toLocaleString("vi-VN") : "N/A",
     },
     {
       title: "Trạng thái",
       dataIndex: "status",
-      width: 140,
+      width: 120,
       render: (_, record) => getStatusTag(record.status),
     },
     {
       title: "Loại đơn hàng",
       dataIndex: "orderType",
       key: "orderType",
-      width: 120,
+      width: 80,
       render: (_, record) => getOrderTypeTag(record),
     },
     {
@@ -383,7 +391,7 @@ const OrderManagementPage = () => {
       valueType: "option",
       align: "center",
       fixed: "right",
-      width: 320,
+      width: 110,
       render: (_, record) => [
         <Tooltip title="Xem chi tiết" key="view">
           <Button

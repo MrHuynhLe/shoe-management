@@ -61,7 +61,7 @@ const CustomHeader = () => {
     : [
         {
           key: "login",
-          label: <Link to="/account">Đăng nhập / Đăng ký</Link>,
+          label: <Link to="/login">Đăng nhập / Đăng ký</Link>,
         },
       ];
 
@@ -133,7 +133,7 @@ const CustomHeader = () => {
           style={{ display: "flex", justifyContent: "flex-end", alignItems: "center" }}
         >
           <Space size={12} align="center" wrap>
-            <Input.Search placeholder="Tìm kiếm sản phẩm..." style={{ width: 280 }} />
+            <Input.Search placeholder="Tìm kiếm sản phẩm..." style={{ width: 280,padding:25 }} />
 
             <Link to="/cart" style={{ color: "#1b6eea", display: "inline-flex" }}>
               <Badge count={orderCount} size="small">

@@ -97,6 +97,7 @@ const CheckoutPage = () => {
     const fetchVouchers = async () => {
       try {
         let coupons: any[] = [];
+        let promotions: any[] = [];
 
         if (isAuthenticated) {
           const couponsRes = await couponService.getMyCoupons();
@@ -107,7 +108,15 @@ const CheckoutPage = () => {
             })) || [];
         }
 
-        setAvailableVouchers(coupons);
+        const promotionRes = await discountService.getPublicPromotions();
+        const promotionList = promotionRes?.data?.content || promotionRes?.data || [];
+        promotions =
+          promotionList.map((p: any) => ({
+            ...p,
+            type: "PROMOTION",
+          })) || [];
+
+        setAvailableVouchers([...coupons, ...promotions]);
       } catch (error) {
         console.error("Không thể tải danh sách voucher:", error);
         setAvailableVouchers([]);
