@@ -6,13 +6,30 @@
 
 :root {
   color-scheme: light;
+  --app-bg: #f3f6fb;
+  --app-surface: #ffffff;
+  --app-surface-soft: #f8fafc;
+  --app-border: #e5eaf3;
+  --app-text: #172033;
+  --app-muted: #667085;
+  --app-primary: #1b6eea;
+  --app-primary-hover: #155fd1;
+  --app-success: #16a34a;
+  --app-danger: #dc2626;
+  --app-warning: #d97706;
+  --app-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+  --app-shadow-soft: 0 4px 16px rgba(15, 23, 42, 0.06);
+  --app-radius: 10px;
+  --app-radius-sm: 8px;
 }
 
 body {
   font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  background: #f4f5f7;
-  color: rgba(0, 0, 0, 0.85);
+  background: var(--app-bg);
+  color: var(--app-text);
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 #root {
@@ -20,59 +37,59 @@ body {
 }
 
 a {
-  color: #1b6eea;
+  color: var(--app-primary);
+  text-decoration: none;
 }
 
 a:hover {
-  color: #1662d6;
+  color: var(--app-primary-hover);
 }
 
 .ant-layout {
   background: transparent;
 }
 
-.ant-layout-header,
-.ant-layout-footer,
-.ant-layout-sider {
-  background: #ffffff !important;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
-}
-
-.ant-layout-footer,
-.ant-pro-layout .ant-layout-footer,
-footer {
-  color: rgba(255, 255, 255, 0.85) !important;
-  background: #001529 !important;
-}
-
-.ant-layout-footer p,
-footer p,
-.ant-layout-footer a,
-footer a {
-  color: rgba(255, 255, 255, 0.82) !important;
-}
-
-.ant-layout-footer a:hover,
-footer a:hover {
-  color: #69b1ff !important;
-}
-
 .ant-card {
-  border-radius: 12px;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  box-shadow: var(--app-shadow-soft);
 }
 
 .ant-btn-primary {
-  border-radius: 8px;
+  border-radius: var(--app-radius-sm);
   font-weight: 600;
 }
 
-footer p {
-  cursor: pointer;
+.ant-table-wrapper .ant-table {
+  border-radius: var(--app-radius);
+  overflow: hidden;
 }
 
-footer p:hover {
-  color: #00b96b;
+.ant-table-thead > tr > th {
+  background: #f8fafc !important;
+  color: #344054 !important;
+  font-weight: 650 !important;
+}
+
+.ant-table-tbody > tr > td {
+  border-color: #edf1f7 !important;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background: #f7fbff !important;
+}
+
+.ant-modal-content,
+.ant-drawer-content {
+  border-radius: var(--app-radius) !important;
+}
+
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-input-number,
+.ant-picker,
+.ant-select-selector {
+  border-radius: var(--app-radius-sm) !important;
 }
 
 .ant-pro-layout-header {
@@ -96,24 +113,6 @@ footer p:hover {
 }
 
 /* Admin Modern Minimal tweaks */
-.ant-pro-layout .ant-layout-content {
-  background: #f7f9fb !important;
-}
-
-.ant-pro-table .ant-table {
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.ant-pro-table .ant-table-thead>tr>th {
-  background: #fcfdff;
-  color: #1f2937;
-}
-
-.ant-pro-table .ant-table-tbody>tr>td {
-  background: #ffffff;
-}
-
 .ant-btn {
   font-weight: 500;
 }
@@ -132,24 +131,23 @@ footer p:hover {
 
 /* Modern Minimal admin theme */
 .ant-pro-layout {
-  background: #f7f9fb !important;
+  background: var(--app-bg) !important;
 }
 
 .ant-pro-layout .ant-layout-sider,
 .ant-pro-layout .ant-layout-header,
-.ant-pro-layout .ant-layout-content,
 .ant-pro-layout .ant-layout-footer {
   background: #ffffff !important;
   box-shadow: none !important;
 }
 
 .ant-pro-layout .ant-layout-sider {
-  border-right: 1px solid #e5e7eb;
+  border-right: 1px solid var(--app-border);
 }
 
 .ant-pro-layout-header,
 .ant-pro-top-nav-header {
-  border-bottom: 1px solid #e5e7eb !important;
+  border-bottom: 1px solid var(--app-border) !important;
   box-shadow: 0 1px 8px rgba(15, 23, 42, 0.05) !important;
 }
 
@@ -167,8 +165,125 @@ footer p:hover {
 .ant-pro-layout .ant-menu-item-selected,
 .ant-pro-layout .ant-menu-item-active,
 .ant-pro-layout .ant-menu-submenu-selected {
-  background: rgba(27, 110, 234, 0.12) !important;
-  color: #1b6eea !important;
+  background: rgba(27, 110, 234, 0.1) !important;
+  color: var(--app-primary) !important;
+}
+
+.app-shell {
+  min-height: 100vh;
+  background: var(--app-bg);
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  height: auto;
+  min-height: 72px;
+  padding: 0 clamp(16px, 4vw, 56px) !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  border-bottom: 1px solid var(--app-border);
+  box-shadow: 0 2px 14px rgba(15, 23, 42, 0.05);
+  backdrop-filter: blur(12px);
+}
+
+.app-content {
+  flex: 1 0 auto;
+  padding: 24px clamp(16px, 4vw, 56px);
+  background:
+    radial-gradient(circle at 10% 0%, rgba(27, 110, 234, 0.08), transparent 30%),
+    var(--app-bg);
+}
+
+.app-page {
+  width: min(100%, 1440px);
+  margin: 0 auto;
+}
+
+.app-section {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  box-shadow: var(--app-shadow-soft);
+}
+
+.app-footer {
+  padding: 40px clamp(16px, 4vw, 56px) !important;
+  color: rgba(255, 255, 255, 0.78) !important;
+  background: #111827 !important;
+}
+
+.app-footer h3,
+.app-footer h4 {
+  color: #ffffff !important;
+}
+
+.app-footer p,
+.app-footer a {
+  color: rgba(255, 255, 255, 0.72) !important;
+}
+
+.app-footer a:hover {
+  color: #93c5fd !important;
+}
+
+.product-grid {
+  width: 100%;
+}
+
+.product-card {
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.product-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(27, 110, 234, 0.35);
+  box-shadow: var(--app-shadow);
+}
+
+.product-card-cover {
+  display: block;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background: var(--app-surface-soft);
+}
+
+.product-card-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 180ms ease;
+}
+
+.product-card:hover .product-card-cover img {
+  transform: scale(1.035);
+}
+
+.product-card-title {
+  display: -webkit-box;
+  min-height: 44px;
+  overflow: hidden;
+  color: var(--app-text);
+  font-weight: 650;
+  line-height: 1.45;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.product-price {
+  color: var(--app-danger);
+  font-size: 16px;
+  font-weight: 750;
+}
+
+@media (max-width: 992px) {
+  .app-content {
+    padding: 16px;
+  }
 }
 
 .ant-typography,

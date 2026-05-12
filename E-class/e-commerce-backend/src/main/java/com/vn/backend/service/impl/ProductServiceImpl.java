@@ -139,12 +139,14 @@ public class ProductServiceImpl implements ProductService {
             int page,
             int size,
             Long categoryId,
+            Long brandId,
             boolean includeInactive
     ) {
         Pageable pageable = PageRequest.of(page, size);
         Page<ProductListResponse> pageData = productRepository.findProductList(
                 pageable,
                 categoryId,
+                brandId,
                 includeInactive
         );
         return PageMapper.toPageResponse(pageData, dto -> dto);

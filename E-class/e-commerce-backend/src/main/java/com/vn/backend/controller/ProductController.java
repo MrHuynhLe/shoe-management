@@ -29,10 +29,11 @@ public class ProductController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size,
             @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Long brandId,
             @RequestParam(defaultValue = "false") boolean includeInactive
     ) {
         return ResponseEntity.ok(
-                productService.getProductList(page, size, categoryId, includeInactive)
+                productService.getProductList(page, size, categoryId, brandId, includeInactive)
         );
     }
 
