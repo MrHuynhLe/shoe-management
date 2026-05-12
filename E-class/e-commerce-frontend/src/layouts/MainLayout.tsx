@@ -1,5 +1,5 @@
 import { Layout, ConfigProvider } from 'antd';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import CustomHeader from './components/CustomHeader';
 import FooterBar from './components/FooterBar';
 import ChatbotWidget from "@/features/chatbot/ChatbotWidget";
@@ -8,9 +8,9 @@ const { Content } = Layout;
 
 const MainLayout = () => {
   return (
-    <Layout style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', minWidth: '1200px' }}>
+    <Layout className="app-shell" style={{ display: 'flex', flexDirection: 'column' }}>
       <CustomHeader />
-      <Content style={{ flex: '1 0 auto', padding: '24px 48px', background: '#F0F8FF' }}>
+      <Content className="app-content">
         <ConfigProvider
           theme={{
             components: {
@@ -22,7 +22,7 @@ const MainLayout = () => {
             },
           }}
         >
-          <div style={{ background: '#fff', padding: 24, minHeight: '100%', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+          <div className="app-page">
             <Outlet />
           </div>
         </ConfigProvider>

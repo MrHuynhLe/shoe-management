@@ -21,6 +21,7 @@ public class ProductListResponse {
     private BigDecimal maxPrice;
     private BigDecimal minCostPrice;
     private BigDecimal maxCostPrice;
+    private Boolean isActive;
 
     public ProductListResponse(
             Long id,
@@ -32,7 +33,8 @@ public class ProductListResponse {
             BigDecimal minPrice,
             BigDecimal maxPrice,
             BigDecimal minCostPrice,
-            BigDecimal maxCostPrice
+            BigDecimal maxCostPrice,
+            Boolean isActive
     ) {
         this.id = id;
         this.code = code;
@@ -44,5 +46,6 @@ public class ProductListResponse {
         this.maxPrice = maxPrice;
         this.minCostPrice = minCostPrice;
         this.maxCostPrice = maxCostPrice;
+        this.isActive = isActive;
     }
 }

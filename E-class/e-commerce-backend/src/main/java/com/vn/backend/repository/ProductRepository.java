@@ -51,7 +51,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                         min(v.sellingPrice),
                         max(v.sellingPrice),
                         min(v.costPrice),
-                        max(v.costPrice)
+                        max(v.costPrice),
+                        p.isActive
                     )
                     from Product p
                     left join p.brand b
@@ -62,21 +63,25 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                     where p.deletedAt is null
                       and (:includeInactive = true or p.isActive = true)
                       and (:categoryId is null or c.id = :categoryId)
-                    group by p.id, p.code, p.name, b.name
+                      and (:brandId is null or b.id = :brandId)
+                    group by p.id, p.code, p.name, b.name, p.isActive
                     order by p.id desc
                     """,
             countQuery = """
                     select count(p.id)
                     from Product p
                     left join p.category c
+                    left join p.brand b
                     where p.deletedAt is null
                       and (:includeInactive = true or p.isActive = true)
                       and (:categoryId is null or c.id = :categoryId)
+                      and (:brandId is null or b.id = :brandId)
                     """
     )
     Page<ProductListResponse> findProductList(
             Pageable pageable,
             @Param("categoryId") Long categoryId,
+            @Param("brandId") Long brandId,
             @Param("includeInactive") boolean includeInactive
     );
 }

@@ -16,6 +16,7 @@ public interface ProductService {
             int page,
             int size,
             Long categoryId,
+            Long brandId,
             boolean includeInactive
     );
 
