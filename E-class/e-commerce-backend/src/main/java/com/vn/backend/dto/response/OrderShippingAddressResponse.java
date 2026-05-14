@@ -10,5 +10,11 @@ public class OrderShippingAddressResponse {
     private String province;
     private String district;
     private String ward;
+    private Integer provinceId;
+    private Integer districtId;
+    private String wardCode;
+    private String provinceName;
+    private String districtName;
+    private String wardName;
     private String note;
 }

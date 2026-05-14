@@ -42,6 +42,7 @@ export const router = createBrowserRouter([
       { path: "checkout/vnpay-return", element: <OnlineVnpayReturn /> },
     ],
   },
+  { path: "/admin/login", element: <Login mode="admin" /> },
   {
     path: "/admin",
     element: <AdminLayout />,

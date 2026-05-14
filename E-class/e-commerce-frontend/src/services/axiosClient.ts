@@ -27,9 +27,14 @@ axiosClient.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
+      const loginPath = window.location.pathname.startsWith("/admin")
+        ? "/admin/login"
+        : "/login";
+
       localStorage.removeItem("token");
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      localStorage.removeItem("user");
+      if (window.location.pathname !== loginPath) {
+        window.location.href = loginPath;
       }
     }
     return Promise.reject(error);

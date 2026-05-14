@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
-import { orderService } from './order.service';
+import { cartService } from './cart.service';
 
 interface User {
   userId: number;
@@ -42,11 +42,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const token = localStorage.getItem('token');
     if (token) {
       try {
-        const response = await orderService.getMyOrders({ page: 0, size: 100 }); 
-        const activeOrders = response.data.content.filter((order: any) => order.status !== 'CANCELLED');
-        setOrderCount(activeOrders.length);
+        const response = await cartService.getCart();
+        const cartItems = response.data?.items || [];
+        const totalQuantity = cartItems.reduce(
+          (sum: number, item: any) => sum + Number(item.quantity || 0),
+          0,
+        );
+        setOrderCount(totalQuantity);
       } catch (error) {
-        console.error("Không thể tải số lượng đơn hàng:", error);
+        console.error("Không thể tải số lượng sản phẩm trong giỏ hàng:", error);
         setOrderCount(0);
       }
     } else {

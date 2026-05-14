@@ -114,32 +114,6 @@ const OrderManagementPage = () => {
   const formatCurrency = (value?: number) =>
     `${Number(value || 0).toLocaleString("vi-VN")} ₫`;
 
-  const handleReviewReturn = async (
-    orderId: number,
-    action: "APPROVE" | "REJECT",
-  ) => {
-    try {
-      await adminOrderService.reviewReturn(orderId, {
-        action,
-        note:
-          action === "APPROVE"
-            ? "Admin duyệt trả hàng"
-            : "Admin từ chối yêu cầu trả hàng",
-      });
-
-      message.success(
-        action === "APPROVE"
-          ? "Duyệt trả hàng thành công"
-          : "Đã từ chối yêu cầu trả hàng",
-      );
-      fetchAllOrders();
-    } catch (error: any) {
-      message.error(
-        error?.response?.data?.message || "Xử lý yêu cầu trả hàng thất bại",
-      );
-    }
-  };
-
   const normalizeStatus = (status?: string) => {
     const raw = String(status ?? '').trim().toUpperCase();
 
@@ -213,12 +187,6 @@ const OrderManagementPage = () => {
         return <Tag color="green">Hoàn thành</Tag>;
       case "CANCELLED":
         return <Tag color="red">Đã hủy</Tag>;
-      case "RETURN_REQUESTED":
-        return <Tag color="orange">Chờ duyệt trả hàng</Tag>;
-      case "RETURNED":
-        return <Tag color="purple">Đã trả hàng</Tag>;
-      case "RETURN_REJECTED":
-        return <Tag color="volcano">Từ chối trả hàng</Tag>;
       default:
         return <Tag>{status}</Tag>;
     }
@@ -465,28 +433,6 @@ const OrderManagementPage = () => {
           </Popconfirm>
         ),
 
-        record.status === "RETURN_REQUESTED" && (
-          <Space key={`return-actions-${record.id}`}>
-            <Popconfirm
-              title="Duyệt trả hàng?"
-              description="Hệ thống sẽ hoàn kho và chuyển thanh toán sang chờ hoàn tiền nếu đơn đã thanh toán."
-              onConfirm={() => handleReviewReturn(record.id, "APPROVE")}
-              okText="Duyệt"
-              cancelText="Không"
-            >
-              <Button type="primary">Duyệt trả hàng</Button>
-            </Popconfirm>
-
-            <Popconfirm
-              title="Từ chối yêu cầu trả hàng?"
-              onConfirm={() => handleReviewReturn(record.id, "REJECT")}
-              okText="Từ chối"
-              cancelText="Không"
-            >
-              <Button danger>Từ chối</Button>
-            </Popconfirm>
-          </Space>
-        ),
       ],
     },
   ];
@@ -539,27 +485,6 @@ const OrderManagementPage = () => {
       label: `Hoàn thành (${baseFilteredOrders.filter((o) => o.status === "COMPLETED").length})`,
       children: renderOrderTable(
         baseFilteredOrders.filter((o) => o.status === "COMPLETED"),
-      ),
-    },
-    {
-      key: "RETURN_REQUESTED",
-      label: `Chờ duyệt trả hàng (${baseFilteredOrders.filter((o) => o.status === "RETURN_REQUESTED").length})`,
-      children: renderOrderTable(
-        baseFilteredOrders.filter((o) => o.status === "RETURN_REQUESTED"),
-      ),
-    },
-    {
-      key: "RETURNED",
-      label: `Đã trả hàng (${baseFilteredOrders.filter((o) => o.status === "RETURNED").length})`,
-      children: renderOrderTable(
-        baseFilteredOrders.filter((o) => o.status === "RETURNED"),
-      ),
-    },
-    {
-      key: "RETURN_REJECTED",
-      label: `Từ chối trả hàng (${baseFilteredOrders.filter((o) => o.status === "RETURN_REJECTED").length})`,
-      children: renderOrderTable(
-        baseFilteredOrders.filter((o) => o.status === "RETURN_REJECTED"),
       ),
     },
     {

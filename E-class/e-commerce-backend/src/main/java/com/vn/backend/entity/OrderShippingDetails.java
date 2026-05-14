@@ -38,4 +38,13 @@ public class OrderShippingDetails {
 
     @Column(name = "ward")
     private String ward;
+
+    @Column(name = "province_id")
+    private Integer provinceId;
+
+    @Column(name = "district_id")
+    private Integer districtId;
+
+    @Column(name = "ward_code", length = 50)
+    private String wardCode;
 }

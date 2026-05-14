@@ -17,6 +17,7 @@ import { ClearOutlined } from "@ant-design/icons";
 import ProductListDisplay from "./Products";
 import { productService } from "@/services/product.service";
 import { PageResponse, ProductList as ProductItem } from "./product.model";
+import { useSearchParams } from "react-router-dom";
 
 const { Content, Sider } = Layout;
 const { Text, Title } = Typography;
@@ -26,6 +27,8 @@ const ProductPage = () => {
   const [categories, setCategories] = useState<any[]>([]);
   const [brands, setBrands] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchParams] = useSearchParams();
+  const keyword = (searchParams.get("keyword") || "").trim();
   const [filters, setFilters] = useState<{
     categoryId?: number | null;
     brandId?: number | null;
@@ -40,13 +43,37 @@ const ProductPage = () => {
       setLoading(true);
       try {
         const params = {
-          page: pagination.current - 1,
-          size: pagination.pageSize,
+          page: keyword ? 0 : pagination.current - 1,
+          size: keyword ? 500 : pagination.pageSize,
           categoryId: filters.categoryId,
           brandId: filters.brandId,
         };
         const res = await productService.getProducts(params);
-        setProducts(res.data);
+        if (!keyword) {
+          setProducts(res.data);
+          return;
+        }
+
+        const normalizedKeyword = keyword.toLowerCase();
+        const filteredContent = (res.data.content || []).filter(
+          (product: ProductItem) =>
+            product.name?.toLowerCase().includes(normalizedKeyword) ||
+            product.code?.toLowerCase().includes(normalizedKeyword) ||
+            product.brandName?.toLowerCase().includes(normalizedKeyword) ||
+            product.categoryName?.toLowerCase().includes(normalizedKeyword),
+        );
+        const start = (pagination.current - 1) * pagination.pageSize;
+        const end = start + pagination.pageSize;
+
+        setProducts({
+          ...res.data,
+          content: filteredContent.slice(start, end),
+          totalElements: filteredContent.length,
+          totalPages: Math.ceil(filteredContent.length / pagination.pageSize),
+          page: pagination.current - 1,
+          size: pagination.pageSize,
+          last: end >= filteredContent.length,
+        });
       } catch (error) {
         message.error("Không thể tải danh sách sản phẩm.");
       } finally {
@@ -55,7 +82,11 @@ const ProductPage = () => {
     };
 
     fetchProducts();
-  }, [filters, pagination]);
+  }, [filters, pagination, keyword]);
+
+  useEffect(() => {
+    setPagination((prev) => ({ ...prev, current: 1 }));
+  }, [keyword]);
 
   useEffect(() => {
     const fetchOptions = async () => {
@@ -98,7 +129,9 @@ const ProductPage = () => {
           Sản phẩm
         </Title>
         <Text type="secondary">
-          Lọc theo danh mục hoặc thương hiệu để tìm mẫu giày phù hợp.
+          {keyword
+            ? `Kết quả tìm kiếm cho "${keyword}".`
+            : "Lọc theo danh mục hoặc thương hiệu để tìm mẫu giày phù hợp."}
         </Text>
       </div>
 

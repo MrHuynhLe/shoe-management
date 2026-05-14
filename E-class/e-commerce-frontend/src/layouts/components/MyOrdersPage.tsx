@@ -10,8 +10,6 @@ import {
   Popconfirm,
   message,
   Tooltip,
-  Modal,
-  Input,
 } from "antd";
 import { useNavigate } from "react-router-dom";
 import OrderDetailModal from "./OrderDetailModal";
@@ -47,10 +45,6 @@ const MyOrdersPage = ({
   onUpdate: () => void;
 }) => {
   const navigate = useNavigate();
-  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
-  const [returnReason, setReturnReason] = useState("");
-  const [returningOrderId, setReturningOrderId] = useState<number | null>(null);
-  const [submittingReturn, setSubmittingReturn] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [retryingOrderId, setRetryingOrderId] = useState<number | null>(null);
@@ -95,42 +89,6 @@ const MyOrdersPage = ({
     }
   };
 
-  const openReturnModal = (orderId: number) => {
-    setReturningOrderId(orderId);
-    setReturnReason("");
-    setIsReturnModalOpen(true);
-  };
-
-  const handleSubmitReturnRequest = async () => {
-    if (!returningOrderId) {
-      return;
-    }
-
-    if (!returnReason.trim() || returnReason.trim().length < 10) {
-      message.warning("Lý do trả hàng phải có ít nhất 10 ký tự.");
-      return;
-    }
-
-    try {
-      setSubmittingReturn(true);
-      await orderService.requestReturn(returningOrderId, {
-        reason: returnReason.trim(),
-      });
-
-      message.success("Gửi yêu cầu trả hàng thành công.");
-      setIsReturnModalOpen(false);
-      setReturningOrderId(null);
-      setReturnReason("");
-      onUpdate();
-    } catch (error: any) {
-      message.error(
-        error.response?.data?.message || "Không thể gửi yêu cầu trả hàng.",
-      );
-    } finally {
-      setSubmittingReturn(false);
-    }
-  };
-
   const getStatusTag = (status: string) => {
     switch (status) {
       case "PENDING":
@@ -143,12 +101,6 @@ const MyOrdersPage = ({
         return <Tag color="green">Hoàn thành</Tag>;
       case "CANCELLED":
         return <Tag color="red">Đã hủy</Tag>;
-      case "RETURN_REQUESTED":
-        return <Tag color="orange">Chờ duyệt trả hàng</Tag>;
-      case "RETURNED":
-        return <Tag color="purple">Đã trả hàng</Tag>;
-      case "RETURN_REJECTED":
-        return <Tag color="volcano">Từ chối trả hàng</Tag>;
       default:
         return <Tag>{status}</Tag>;
     }
@@ -163,10 +115,6 @@ const MyOrdersPage = ({
         return <Tag color="red">Thanh toán thất bại</Tag>;
       case "EXPIRED":
         return <Tag color="orange">Hết hạn thanh toán</Tag>;
-      case "REFUND_PENDING":
-        return <Tag color="purple">Chờ hoàn tiền</Tag>;
-      case "REFUNDED":
-        return <Tag color="cyan">Đã hoàn tiền</Tag>;
       default:
         return <Tag>Chưa có thông tin</Tag>;
     }
@@ -256,12 +204,6 @@ const MyOrdersPage = ({
               Thanh toán lại
             </Button>
           )}
-          {record.status === "COMPLETED" && record.orderType === "ONLINE" && (
-            <Button onClick={() => openReturnModal(record.id)}>
-              Yêu cầu trả hàng
-            </Button>
-          )}
-
           {record.status === "PENDING" && (
             <Popconfirm
               title="Bạn chắc chắn muốn hủy đơn hàng này?"
@@ -320,26 +262,6 @@ const MyOrdersPage = ({
         visible={isModalVisible}
         onClose={() => setIsModalVisible(false)}
       />
-      <Modal
-        title="Yêu cầu trả hàng"
-        open={isReturnModalOpen}
-        onCancel={() => {
-          setIsReturnModalOpen(false);
-          setReturningOrderId(null);
-          setReturnReason("");
-        }}
-        onOk={handleSubmitReturnRequest}
-        okText="Gửi yêu cầu"
-        cancelText="Đóng"
-        confirmLoading={submittingReturn}
-      >
-        <Input.TextArea
-          rows={4}
-          value={returnReason}
-          onChange={(e) => setReturnReason(e.target.value)}
-          placeholder="Nhập lý do trả hàng, ví dụ: sản phẩm lỗi, sai size, sai màu..."
-        />
-      </Modal>
     </>
   );
 };
