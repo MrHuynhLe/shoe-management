@@ -16,5 +16,13 @@ public class OrderItemResponse {
     private String imageUrl;
     private int quantity;
     private BigDecimal price;
+    private BigDecimal originalPrice;
+    private BigDecimal unitPrice;
+    private BigDecimal salePrice;
+    private BigDecimal productDiscountPercent;
+    private BigDecimal productDiscountAmount;
+    private Long promotionId;
+    private Boolean isSale;
     private BigDecimal subtotal;
+    private BigDecimal lineTotal;
 }

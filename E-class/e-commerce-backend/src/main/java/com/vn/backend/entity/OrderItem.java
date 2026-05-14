@@ -36,8 +36,23 @@ public class OrderItem {
     private BigDecimal costPriceAtPurchase;
 
     /**
-     * The price of the product variant at the time of purchase.
+     * The effective unit price at the time of purchase after product promotion.
      */
     @Column(name = "price_at_purchase", nullable = false, precision = 15, scale = 2)
     private BigDecimal priceAtPurchase;
+
+    @Column(name = "original_price_at_purchase", precision = 15, scale = 2)
+    private BigDecimal originalPriceAtPurchase;
+
+    @Column(name = "product_discount_percent", precision = 5, scale = 2)
+    private BigDecimal productDiscountPercent;
+
+    @Column(name = "product_discount_amount", precision = 15, scale = 2)
+    private BigDecimal productDiscountAmount;
+
+    @Column(name = "promotion_id")
+    private Long promotionId;
+
+    @Column(name = "line_total", precision = 15, scale = 2)
+    private BigDecimal lineTotal;
 }

@@ -2,6 +2,7 @@ import {
   AppstoreOutlined,
   HomeOutlined,
   ShoppingCartOutlined,
+  TagsOutlined,
   UserOutlined,
 } from "@ant-design/icons";
 import {
@@ -131,6 +132,11 @@ const CustomHeader = () => {
                   key: "/products",
                   label: "Sản phẩm",
                   icon: <AppstoreOutlined />,
+                },
+                {
+                  key: "/promotions",
+                  label: "Khuyến mãi",
+                  icon: <TagsOutlined />,
                 },
               ]}
             />

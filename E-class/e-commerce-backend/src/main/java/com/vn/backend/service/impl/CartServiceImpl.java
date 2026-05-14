@@ -3,6 +3,7 @@ package com.vn.backend.service.impl;
 import com.vn.backend.dto.request.AddCartRequest;
 import com.vn.backend.dto.response.CartItemResponse;
 import com.vn.backend.dto.response.CartResponse;
+import com.vn.backend.dto.response.ProductPriceResponse;
 import com.vn.backend.entity.AttributeValue;
 import com.vn.backend.entity.Cart;
 import com.vn.backend.entity.CartItem;
@@ -18,6 +19,7 @@ import com.vn.backend.repository.CustomerRepository;
 import com.vn.backend.repository.ProductVariantRepository;
 import com.vn.backend.repository.UserRepository;
 import com.vn.backend.service.CartService;
+import com.vn.backend.service.ProductPriceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +40,7 @@ public class CartServiceImpl implements CartService {
     private final ProductVariantRepository productVariantRepository;
     private final CustomerRepository customerRepository;
     private final UserRepository userRepository;
+    private final ProductPriceService productPriceService;
 
     @Override
     public CartResponse addToCart(Long userId, AddCartRequest request) {
@@ -63,6 +66,7 @@ public class CartServiceImpl implements CartService {
 
             item.setQuantity(newQuantity);
             item.setUpdatedAt(OffsetDateTime.now());
+            applyCurrentPriceSnapshot(item, variant);
         } else {
             if (request.getQuantity() > safeStock(variant)) {
                 throw new IllegalArgumentException("Số lượng vượt quá tồn kho");
@@ -73,6 +77,7 @@ public class CartServiceImpl implements CartService {
             item.setProductVariant(variant);
             item.setQuantity(request.getQuantity());
             item.setCreatedAt(OffsetDateTime.now());
+            applyCurrentPriceSnapshot(item, variant);
         }
 
         cartItemRepository.save(item);
@@ -103,6 +108,7 @@ public class CartServiceImpl implements CartService {
 
         item.setQuantity(quantity);
         item.setUpdatedAt(OffsetDateTime.now());
+        applyCurrentPriceSnapshot(item, variant);
 
         cartItemRepository.save(item);
         return mapToCartResponse(item.getCart());
@@ -227,6 +233,8 @@ public class CartServiceImpl implements CartService {
         resp.setStatus(cart.getStatus().name());
 
         List<CartItemResponse> itemResponses = new ArrayList<>();
+        BigDecimal originalSubtotal = BigDecimal.ZERO;
+        BigDecimal productDiscountTotal = BigDecimal.ZERO;
         BigDecimal totalAmount = BigDecimal.ZERO;
         int totalItems = 0;
 
@@ -248,11 +256,13 @@ public class CartServiceImpl implements CartService {
             String size = extractAttributeValue(variant, "SIZE");
             String color = extractAttributeValue(variant, "COLOR");
 
-            BigDecimal price = variant.getSellingPrice() == null
-                    ? BigDecimal.ZERO
-                    : variant.getSellingPrice();
+            ProductPriceResponse priceSnapshot = applyCurrentPriceSnapshot(item, variant);
 
-            BigDecimal subTotal = price.multiply(BigDecimal.valueOf(item.getQuantity()));
+            BigDecimal originalPrice = defaultZero(item.getOriginalPrice());
+            BigDecimal unitPrice = defaultZero(item.getUnitPrice());
+            BigDecimal discountPercent = defaultZero(item.getDiscountPercent());
+            BigDecimal subTotal = defaultZero(item.getLineTotal());
+            BigDecimal itemOriginalSubtotal = originalPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
 
             CartItemResponse itemResp = new CartItemResponse();
             itemResp.setCartItemId(item.getId());
@@ -262,12 +272,22 @@ public class CartServiceImpl implements CartService {
             itemResp.setVariantCode(variant.getCode());
             itemResp.setSize(size);
             itemResp.setColor(color);
-            itemResp.setPrice(price);
+            itemResp.setPrice(unitPrice);
+            itemResp.setOriginalPrice(originalPrice);
+            itemResp.setUnitPrice(unitPrice);
+            itemResp.setSalePrice(unitPrice);
+            itemResp.setDiscountPercent(discountPercent);
+            itemResp.setPromotionId(item.getPromotionId());
+            itemResp.setPromotionName(priceSnapshot.getPromotionName());
+            itemResp.setIsSale(item.getPromotionId() != null && discountPercent.compareTo(BigDecimal.ZERO) > 0);
             itemResp.setQuantity(item.getQuantity());
             itemResp.setStockRemaining(variant.getStockQuantity());
             itemResp.setSubTotal(subTotal);
+            itemResp.setLineTotal(subTotal);
             itemResp.setImageUrl(imageUrl);
 
+            originalSubtotal = originalSubtotal.add(itemOriginalSubtotal);
+            productDiscountTotal = productDiscountTotal.add(itemOriginalSubtotal.subtract(subTotal));
             totalAmount = totalAmount.add(subTotal);
             totalItems += item.getQuantity();
 
@@ -275,9 +295,30 @@ public class CartServiceImpl implements CartService {
         }
 
         resp.setItems(itemResponses);
+        resp.setOriginalSubtotal(originalSubtotal);
+        resp.setProductDiscountTotal(productDiscountTotal);
+        resp.setSubtotalBeforeVoucher(totalAmount);
         resp.setTotalAmount(totalAmount);
         resp.setTotalItems(totalItems);
 
         return resp;
+    }
+
+    private ProductPriceResponse applyCurrentPriceSnapshot(CartItem item, ProductVariant variant) {
+        ProductPriceResponse price = productPriceService.calculateCurrentPrice(variant);
+        BigDecimal originalPrice = defaultZero(price.getOriginalPrice());
+        BigDecimal unitPrice = defaultZero(price.getUnitPrice());
+        BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
+
+        item.setOriginalPrice(originalPrice);
+        item.setUnitPrice(unitPrice);
+        item.setDiscountPercent(defaultZero(price.getDiscountPercent()));
+        item.setPromotionId(price.getPromotionId());
+        item.setLineTotal(lineTotal);
+        return price;
+    }
+
+    private BigDecimal defaultZero(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 }

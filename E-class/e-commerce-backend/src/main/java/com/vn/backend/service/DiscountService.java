@@ -11,5 +11,6 @@ import java.util.List;
 
 public interface DiscountService {
     ValidateDiscountResponse validateDiscount(ValidateDiscountRequest request, CustomUserDetails userDetails);
+    ValidateDiscountResponse validateDiscountForSubtotal(String code, BigDecimal subtotal, CustomUserDetails userDetails);
     Coupon findCouponByCode(String code);
 }

@@ -1,24 +1,29 @@
 package com.vn.backend.service.impl;
 
+import com.vn.backend.dto.request.OrderItemRequest;
 import com.vn.backend.dto.request.ValidateDiscountRequest;
 import com.vn.backend.dto.response.ValidateDiscountResponse;
 import com.vn.backend.entity.Coupon;
 import com.vn.backend.entity.Customer;
+import com.vn.backend.entity.ProductVariant;
 import com.vn.backend.entity.Promotion;
 import com.vn.backend.entity.User;
 import com.vn.backend.exception.InvalidRequestException;
 import com.vn.backend.repository.CouponRepository;
 import com.vn.backend.repository.CouponUsageRepository;
 import com.vn.backend.repository.CustomerRepository;
+import com.vn.backend.repository.ProductVariantRepository;
 import com.vn.backend.repository.PromotionRepository;
 import com.vn.backend.repository.UserRepository;
 import com.vn.backend.security.CustomUserDetails;
 import com.vn.backend.service.DiscountService;
+import com.vn.backend.service.ProductPriceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -30,30 +35,48 @@ public class DiscountServiceImpl implements DiscountService {
     private final CouponUsageRepository couponUsageRepository;
     private final UserRepository userRepository;
     private final CustomerRepository customerRepository;
+    private final ProductVariantRepository productVariantRepository;
+    private final ProductPriceService productPriceService;
 
     @Override
     public ValidateDiscountResponse validateDiscount(ValidateDiscountRequest request, CustomUserDetails userDetails) {
-        if (userDetails == null) {
-            throw new InvalidRequestException("Bạn cần đăng nhập để sử dụng voucher.");
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            throw new InvalidRequestException("Danh sach san pham la bat buoc khi xem truoc voucher.");
         }
 
-        String code = request.getCode().trim().toUpperCase();
-        Customer customer = resolveCustomer(userDetails.getUserId());
-
-        Optional<Promotion> promotionOpt = promotionRepository.findByCode(code);
-        if (promotionOpt.isPresent()) {
-            return validatePromotion(promotionOpt.get(), customer, request.getSubtotal());
-        }
-
-        Optional<Coupon> couponOpt = couponRepository.findByCodeAndIsActiveTrue(code);
-        if (couponOpt.isPresent()) {
-            return validateCoupon(couponOpt.get(), customer, request.getSubtotal());
-        }
-
-        throw new InvalidRequestException("Mã giảm giá không hợp lệ hoặc đã hết hạn.");
+        BigDecimal subtotalBeforeVoucher = calculateSubtotalBeforeVoucher(request.getItems());
+        return validateDiscountForSubtotal(request.getCode(), subtotalBeforeVoucher, userDetails);
     }
 
+    @Override
+    public ValidateDiscountResponse validateDiscountForSubtotal(
+            String code,
+            BigDecimal subtotal,
+            CustomUserDetails userDetails
+    ) {
+        if (userDetails == null) {
+            throw new InvalidRequestException("Ban can dang nhap de su dung voucher.");
+        }
 
+        if (code == null || code.isBlank()) {
+            throw new InvalidRequestException("Ma giam gia khong duoc de trong.");
+        }
+
+        String normalizedCode = code.trim().toUpperCase();
+        Customer customer = resolveCustomer(userDetails.getUserId());
+
+        Optional<Promotion> promotionOpt = promotionRepository.findByCode(normalizedCode);
+        if (promotionOpt.isPresent()) {
+            return validatePromotion(promotionOpt.get(), customer, subtotal);
+        }
+
+        Optional<Coupon> couponOpt = couponRepository.findByCodeAndIsActiveTrue(normalizedCode);
+        if (couponOpt.isPresent()) {
+            return validateCoupon(couponOpt.get(), customer, subtotal);
+        }
+
+        throw new InvalidRequestException("Ma giam gia khong hop le hoac da het han.");
+    }
 
     @Override
     public Coupon findCouponByCode(String code) {
@@ -65,21 +88,21 @@ public class DiscountServiceImpl implements DiscountService {
         OffsetDateTime now = OffsetDateTime.now();
 
         if (Boolean.FALSE.equals(promotion.getIsActive())) {
-            throw new InvalidRequestException("Chương trình khuyến mãi hiện đang tạm dừng.");
+            throw new InvalidRequestException("Chuong trinh khuyen mai hien dang tam dung.");
         }
 
         if (promotion.getStartDate() != null && now.isBefore(promotion.getStartDate())) {
-            throw new InvalidRequestException("Chương trình khuyến mãi chưa bắt đầu.");
+            throw new InvalidRequestException("Chuong trinh khuyen mai chua bat dau.");
         }
 
         if (promotion.getEndDate() != null && now.isAfter(promotion.getEndDate())) {
-            throw new InvalidRequestException("Chương trình khuyến mãi đã kết thúc.");
+            throw new InvalidRequestException("Chuong trinh khuyen mai da ket thuc.");
         }
 
         if (promotion.getUsageLimit() != null && promotion.getUsageLimit() > 0) {
             long totalUsage = couponUsageRepository.countByPromotion_Id(promotion.getId());
             if (totalUsage >= promotion.getUsageLimit()) {
-                throw new InvalidRequestException("Chương trình khuyến mãi đã hết lượt sử dụng.");
+                throw new InvalidRequestException("Chuong trinh khuyen mai da het luot su dung.");
             }
         }
 
@@ -89,12 +112,12 @@ public class DiscountServiceImpl implements DiscountService {
                     customer.getId()
             );
             if (customerUsage >= promotion.getUsageLimitPerCustomer()) {
-                throw new InvalidRequestException("Bạn đã sử dụng hết lượt của chương trình khuyến mãi này.");
+                throw new InvalidRequestException("Ban da su dung het luot cua chuong trinh khuyen mai nay.");
             }
         }
 
         if (promotion.getMinOrderValue() != null && subtotal.compareTo(promotion.getMinOrderValue()) < 0) {
-            throw new InvalidRequestException("Đơn hàng chưa đạt giá trị tối thiểu để áp dụng khuyến mãi.");
+            throw new InvalidRequestException("Don hang chua dat gia tri toi thieu de ap dung khuyen mai.");
         }
 
         BigDecimal discountAmount = calculateDiscount(
@@ -107,19 +130,28 @@ public class DiscountServiceImpl implements DiscountService {
         ValidateDiscountResponse response = new ValidateDiscountResponse();
         response.setCode(promotion.getCode());
         response.setDiscountAmount(discountAmount);
-        response.setMessage("Áp dụng khuyến mãi thành công.");
+        response.setDiscountType(promotion.getDiscountType());
+        response.setDiscountValue(promotion.getDiscountValue());
+        response.setMinOrderValue(promotion.getMinOrderValue());
+        response.setMaxDiscountAmount(promotion.getMaxDiscountAmount());
+        response.setUsageLimit(promotion.getUsageLimit());
+        if (promotion.getUsageLimit() != null && promotion.getUsageLimit() > 0) {
+            long totalUsage = couponUsageRepository.countByPromotion_Id(promotion.getId());
+            response.setRemainingUsage(Math.max(promotion.getUsageLimit() - (int) totalUsage, 0));
+        }
+        response.setMessage("Ap dung khuyen mai thanh cong.");
         return response;
     }
 
     private ValidateDiscountResponse validateCoupon(Coupon coupon, Customer customer, BigDecimal subtotal) {
         long totalUsage = couponUsageRepository.countByCoupon_Id(coupon.getId());
         if (coupon.getUsageLimit() != null && coupon.getUsageLimit() > 0 && totalUsage >= coupon.getUsageLimit()) {
-            throw new InvalidRequestException("Mã giảm giá đã hết lượt sử dụng.");
+            throw new InvalidRequestException("Ma giam gia da het luot su dung.");
         }
 
         long customerUsage = couponUsageRepository.countByCoupon_IdAndCustomer_Id(coupon.getId(), customer.getId());
         if (customerUsage > 0) {
-            throw new InvalidRequestException("Bạn đã sử dụng mã giảm giá này rồi.");
+            throw new InvalidRequestException("Ban da su dung ma giam gia nay roi.");
         }
 
         BigDecimal discountAmount = calculateDiscount(
@@ -132,7 +164,13 @@ public class DiscountServiceImpl implements DiscountService {
         ValidateDiscountResponse response = new ValidateDiscountResponse();
         response.setCode(coupon.getCode());
         response.setDiscountAmount(discountAmount);
-        response.setMessage("Áp dụng mã giảm giá thành công.");
+        response.setDiscountType(coupon.getDiscountType());
+        response.setDiscountValue(coupon.getDiscountValue());
+        response.setUsageLimit(coupon.getUsageLimit());
+        if (coupon.getUsageLimit() != null && coupon.getUsageLimit() > 0) {
+            response.setRemainingUsage(Math.max(coupon.getUsageLimit() - (int) totalUsage, 0));
+        }
+        response.setMessage("Ap dung ma giam gia thanh cong.");
         return response;
     }
 
@@ -155,11 +193,32 @@ public class DiscountServiceImpl implements DiscountService {
         return discount.min(subtotal);
     }
 
+    private BigDecimal calculateSubtotalBeforeVoucher(List<OrderItemRequest> items) {
+        BigDecimal subtotal = BigDecimal.ZERO;
+
+        for (OrderItemRequest item : items) {
+            if (item.getVariantId() == null || item.getQuantity() == null || item.getQuantity() <= 0) {
+                throw new InvalidRequestException("San pham hoac so luong khong hop le.");
+            }
+
+            ProductVariant variant = productVariantRepository.findById(item.getVariantId())
+                    .orElseThrow(() -> new InvalidRequestException("Khong tim thay bien the san pham."));
+            BigDecimal unitPrice = productPriceService.calculateCurrentPrice(variant).getUnitPrice();
+            subtotal = subtotal.add(defaultZero(unitPrice).multiply(BigDecimal.valueOf(item.getQuantity())));
+        }
+
+        return subtotal;
+    }
+
     private Customer resolveCustomer(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new InvalidRequestException("User not found"));
 
         return customerRepository.findByUserProfileId(user.getUserProfile().getId())
                 .orElseThrow(() -> new InvalidRequestException("Customer not found"));
+    }
+
+    private BigDecimal defaultZero(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 }

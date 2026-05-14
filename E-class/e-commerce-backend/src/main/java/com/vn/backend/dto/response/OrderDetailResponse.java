@@ -25,7 +25,13 @@ public class OrderDetailResponse {
 
     private String paymentMethodName;
     private BigDecimal subtotalAmount;
+    private BigDecimal originalSubtotal;
+    private BigDecimal productDiscountTotal;
+    private BigDecimal subtotalBeforeVoucher;
+    private BigDecimal voucherDiscountAmount;
+    private BigDecimal productRevenue;
     private BigDecimal totalAmount;
+    private BigDecimal finalTotal;
     private String voucherCode;
     private BigDecimal discountAmount;
     private BigDecimal discountPercent;

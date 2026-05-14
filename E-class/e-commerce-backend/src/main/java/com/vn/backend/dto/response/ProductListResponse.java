@@ -15,6 +15,7 @@ public class ProductListResponse {
     private String code;
     private String name;
     private String brandName;
+    private String categoryName;
     private String imageUrl;
     private Integer totalStock;
     private BigDecimal minPrice;
@@ -22,6 +23,15 @@ public class ProductListResponse {
     private BigDecimal minCostPrice;
     private BigDecimal maxCostPrice;
     private Boolean isActive;
+    private BigDecimal minOriginalPrice;
+    private BigDecimal maxOriginalPrice;
+    private BigDecimal salePrice;
+    private BigDecimal minSalePrice;
+    private BigDecimal maxSalePrice;
+    private BigDecimal discountPercent;
+    private Boolean isSale = false;
+    private Integer saleVariantCount = 0;
+    private Integer activeVariantCount = 0;
 
     public ProductListResponse(
             Long id,
@@ -47,5 +57,11 @@ public class ProductListResponse {
         this.minCostPrice = minCostPrice;
         this.maxCostPrice = maxCostPrice;
         this.isActive = isActive;
+        this.minOriginalPrice = minPrice;
+        this.maxOriginalPrice = maxPrice;
+        this.minSalePrice = minPrice;
+        this.maxSalePrice = maxPrice;
+        this.salePrice = minPrice;
+        this.isSale = false;
     }
 }

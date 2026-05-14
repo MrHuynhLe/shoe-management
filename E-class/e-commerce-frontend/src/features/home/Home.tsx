@@ -40,7 +40,7 @@ const Home = () => {
     const fetchInitialProducts = async () => {
       setLoading(true);
       try {
-        const res = await productService.getProducts({ page: 0, size: 8 });
+        const res = await productService.filterProducts({ page: 0, size: 8 });
         setProducts(res.data);
       } catch (error) {
         message.error("Không thể tải danh sách sản phẩm cho trang chủ.");

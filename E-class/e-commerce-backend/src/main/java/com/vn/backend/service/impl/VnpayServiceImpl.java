@@ -279,6 +279,8 @@ public class VnpayServiceImpl implements com.vn.backend.service.VnpayService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         order.setTotalAmount(totalAmount);
+        order.setSubtotalBeforeVoucher(totalAmount);
+        order.setProductRevenue(totalAmount.subtract(defaultZero(order.getDiscountAmount())).max(BigDecimal.ZERO));
 
         if (order.getShippingFee() == null) {
             order.setShippingFee(BigDecimal.ZERO);
@@ -344,6 +346,7 @@ public class VnpayServiceImpl implements com.vn.backend.service.VnpayService {
 
         order.setDiscountAmount(discountAmount);
         order.setVoucherCode(appliedVoucherCode);
+        order.setProductRevenue(totalAmount.subtract(discountAmount).max(BigDecimal.ZERO));
 
         if (request.getNote() != null) {
             order.setNote(request.getNote());

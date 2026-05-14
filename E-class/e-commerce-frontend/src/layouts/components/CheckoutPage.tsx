@@ -30,17 +30,18 @@ import {
 import { orderService } from "@/services/order.service";
 import { useAuth } from "@/services/AuthContext";
 import { discountService } from "@/services/discount.service";
+import { checkoutService, CheckoutQuoteResponse } from "@/services/checkout.service";
 import { userService } from "@/services/userService";
 import { couponService } from "@/services/coupon.service";
 import {
   GhnDistrict,
   GhnProvince,
   GhnWard,
-  calculateShippingFee,
   getDistricts,
   getProvinces,
   getWards,
 } from "@/services/ghnShippingService";
+import { resolveImageUrl } from "@/utils/utils";
 
 const { Title, Text } = Typography;
 
@@ -66,7 +67,7 @@ const CheckoutPage = () => {
   const [form] = Form.useForm();
   const { isAuthenticated, user } = useAuth();
 
-  const { items = [], subtotal = 0 } = location.state || {};
+  const { items = [] } = location.state || {};
   const totalQuantity = useMemo(
     () =>
       items.reduce(
@@ -77,15 +78,14 @@ const CheckoutPage = () => {
   );
 
   const [loading, setLoading] = useState(false);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quote, setQuote] = useState<CheckoutQuoteResponse | null>(null);
   const [voucherCode, setVoucherCode] = useState("");
-  const [discount, setDiscount] = useState(0);
   const [appliedVoucher, setAppliedVoucher] = useState<string | null>(null);
   const [appliedVoucherInfo, setAppliedVoucherInfo] = useState<any>(null);
   const [availableVouchers, setAvailableVouchers] = useState<any[]>([]);
 
-  const [shippingFee, setShippingFee] = useState(0);
   const [shippingError, setShippingError] = useState("");
-  const [isShippingLoading, setIsShippingLoading] = useState(false);
 
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [isAddressModalVisible, setIsAddressModalVisible] = useState(false);
@@ -103,8 +103,17 @@ const CheckoutPage = () => {
   const selectedProvinceId = Form.useWatch("provinceId", form);
   const selectedDistrictId = Form.useWatch("districtId", form);
   const selectedWardCode = Form.useWatch("wardCode", form);
+  const selectedAddress = Form.useWatch("address", form);
+  const selectedProvinceName = Form.useWatch("provinceName", form);
+  const selectedDistrictName = Form.useWatch("districtName", form);
+  const selectedWardName = Form.useWatch("wardName", form);
 
-  const total = subtotal - discount + shippingFee;
+  const quoteItems = quote?.items || [];
+  const subtotalBeforeVoucher = Number(quote?.subtotalBeforeVoucher || 0);
+  const discount = Number(quote?.voucherDiscountAmount || 0);
+  const shippingFee = Number(quote?.shippingFee || 0);
+  const total = Number(quote?.finalTotal || 0);
+  const isShippingLoading = quoteLoading;
   const defaultAddressStorageKey = useMemo(
     () => `checkout_default_address_${user?.userId || "guest"}`,
     [user?.userId],
@@ -136,6 +145,82 @@ const CheckoutPage = () => {
           : "";
 
     return `${v.code || v.name} - ${discountText}${minOrderText}${remainingText}`;
+  };
+
+  const buildQuotePayload = (nextVoucherCode: string | null = appliedVoucher) => {
+    const values = form.getFieldsValue([
+      "customerName",
+      "phone",
+      "address",
+      "province",
+      "district",
+      "ward",
+      "provinceId",
+      "districtId",
+      "wardCode",
+      "provinceName",
+      "districtName",
+      "wardName",
+      "note",
+    ]);
+
+    const hasShippingInfo =
+      values.address && values.provinceName && values.districtName;
+
+    return {
+      items: items.map((item: any) => ({
+        variantId: item.variantId,
+        quantity: item.quantity,
+      })),
+      voucherCode: nextVoucherCode || undefined,
+      shippingInfo: hasShippingInfo
+        ? {
+            customerName: values.customerName || "Khach hang",
+            phone: values.phone || "0000000000",
+            address: values.address,
+            province: values.provinceName,
+            district: values.districtName,
+            ward: values.wardName,
+            provinceId: values.provinceId,
+            districtId: values.districtId,
+            wardCode: values.wardCode,
+            provinceName: values.provinceName,
+            districtName: values.districtName,
+            wardName: values.wardName,
+            note: values.note,
+          }
+        : undefined,
+    };
+  };
+
+  const fetchQuote = async (
+    nextVoucherCode: string | null = appliedVoucher,
+    options: { silent?: boolean } = {},
+  ) => {
+    if (!items.length) {
+      setQuote(null);
+      return null;
+    }
+
+    try {
+      setQuoteLoading(true);
+      setShippingError("");
+      const response = await checkoutService.quote(buildQuotePayload(nextVoucherCode));
+      setQuote(response.data);
+      return response.data;
+    } catch (error: any) {
+      setQuote(null);
+      const errorMessage =
+        error?.response?.data?.message ||
+        "Khong the tinh lai tong tien don hang.";
+      if (!options.silent) {
+        message.error(errorMessage);
+      }
+      setShippingError(errorMessage);
+      throw error;
+    } finally {
+      setQuoteLoading(false);
+    }
   };
 
   const normalizeLocationName = (value?: string) =>
@@ -366,35 +451,40 @@ const CheckoutPage = () => {
   }, [selectedDistrictId]);
 
   useEffect(() => {
-    const calculateFee = async () => {
-      if (!selectedDistrictId || !selectedWardCode || items.length === 0) {
-        setShippingFee(0);
+    const calculateFeeFromQuote = async () => {
+      if (items.length === 0) {
+        setQuote(null);
         setShippingError("");
         return;
       }
 
       try {
-        setIsShippingLoading(true);
+        setQuoteLoading(true);
         setShippingError("");
 
-        const fee = await calculateShippingFee({
-          toDistrictId: Number(selectedDistrictId),
-          toWardCode: String(selectedWardCode),
-          totalQuantity,
-          totalProductAmount: Number(subtotal || 0),
-        });
-
-        setShippingFee(fee);
+        const response = await checkoutService.quote(buildQuotePayload(appliedVoucher));
+        setQuote(response.data);
       } catch (error) {
-        setShippingFee(0);
+        setQuote(null);
         setShippingError("Không thể tính phí vận chuyển");
       } finally {
-        setIsShippingLoading(false);
+        setQuoteLoading(false);
       }
     };
 
-    calculateFee();
-  }, [selectedDistrictId, selectedWardCode, totalQuantity, subtotal, items.length]);
+    calculateFeeFromQuote();
+  }, [
+    items.length,
+    totalQuantity,
+    appliedVoucher,
+    selectedProvinceId,
+    selectedDistrictId,
+    selectedWardCode,
+    selectedAddress,
+    selectedProvinceName,
+    selectedDistrictName,
+    selectedWardName,
+  ]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -438,18 +528,18 @@ const CheckoutPage = () => {
         note: address.note,
       });
 
-      setShippingFee(0);
+      setQuote(null);
       setShippingError("");
 
       if (closeModal) {
         setIsAddressModalVisible(false);
       }
     } catch (error: any) {
-      console.error("Kh?ng th? ch?n ??a ch? ?? l?u:", error);
+      console.error("Không thể chọn địa chỉ đã lưu:", error);
       if (showError) {
         message.error(
           error?.message ||
-            "Kh?ng th? d?ng ??a ch? ?? l?u n?y. Vui l?ng ch?n l?i t?nh/huy?n/x?.",
+            "Không thể dùng địa chỉ đã lưu này. Vui lòng chọn lại tỉnh/huyện/xã.",
         );
       }
     } finally {
@@ -465,7 +555,7 @@ const CheckoutPage = () => {
       wardCode: undefined,
       wardName: undefined,
     });
-    setShippingFee(0);
+    setQuote(null);
     setShippingError("");
   };
 
@@ -475,7 +565,7 @@ const CheckoutPage = () => {
       wardCode: undefined,
       wardName: undefined,
     });
-    setShippingFee(0);
+    setQuote(null);
     setShippingError("");
   };
 
@@ -492,12 +582,13 @@ const CheckoutPage = () => {
     }
 
     try {
-      const response = await discountService.validateVoucher(voucherCode, subtotal);
-      const { discountAmount, message: successMessage } = response.data;
-
-      setDiscount(discountAmount);
+      const quoteData = await fetchQuote(voucherCode);
       setAppliedVoucher(voucherCode);
-      setAppliedVoucherInfo(response.data);
+      setAppliedVoucherInfo(
+        availableVouchers.find((voucher) => voucher.code === voucherCode) ||
+          quoteData,
+      );
+      const successMessage = null;
 
       message.success(
         successMessage || `Áp dụng mã "${voucherCode}" thành công!`,
@@ -511,6 +602,11 @@ const CheckoutPage = () => {
   };
 
   const handlePlaceOrder = async (values: any) => {
+    if (!quote) {
+      message.warning("Vui long doi he thong tinh lai tong tien don hang.");
+      return;
+    }
+
     if (!shippingFee || shippingError || isShippingLoading) {
       message.warning("Vui lòng chọn đủ địa chỉ để tính phí vận chuyển.");
       return;
@@ -530,12 +626,11 @@ const CheckoutPage = () => {
         provinceName: values.provinceName,
         districtName: values.districtName,
         wardName: values.wardName,
-        shippingFee,
         note: values.note,
       },
       shouldUpdateProfile: values.saveAddress,
       paymentMethodCode: values.paymentMethod,
-      items: items.map((item: any) => ({
+      items: quoteItems.map((item: any) => ({
         variantId: item.variantId,
         quantity: item.quantity,
       })),
@@ -555,10 +650,10 @@ const CheckoutPage = () => {
     try {
       await orderService.placeOrder(orderData);
 
-      setDiscount(0);
       setAppliedVoucher(null);
       setAppliedVoucherInfo(null);
       setVoucherCode("");
+      setQuote(null);
 
       message.success("Đặt hàng thành công!");
       navigate("/cart?tab=pending");
@@ -847,7 +942,6 @@ const CheckoutPage = () => {
                   onChange={(value) => {
                     setVoucherCode(value || "");
                     if (!value) {
-                      setDiscount(0);
                       setAppliedVoucher(null);
                       setAppliedVoucherInfo(null);
                     }
@@ -946,7 +1040,7 @@ const CheckoutPage = () => {
 
           <Col xs={24} lg={10}>
             <Card
-              title={`Đơn hàng (${items.length} sản phẩm)`}
+              title={`Đơn hàng (${quoteItems.length || items.length} sản phẩm)`}
               bordered={false}
               style={{
                 boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
@@ -954,26 +1048,42 @@ const CheckoutPage = () => {
                 top: 24,
               }}
             >
-              <Spin spinning={loading}>
+              <Spin spinning={loading || quoteLoading}>
                 <List
                   itemLayout="horizontal"
-                  dataSource={items}
+                  dataSource={quoteItems}
                   renderItem={(item: any) => (
                     <List.Item>
                       <List.Item.Meta
                         avatar={
-                          <Avatar shape="square" size={64} src={item.image} />
+                          <Avatar
+                            shape="square"
+                            size={64}
+                            src={resolveImageUrl(item.imageUrl)}
+                          />
                         }
-                        title={<Text>{item.name}</Text>}
+                        title={
+                          <Text>
+                            {item.productName}
+                            {item.variantCode ? ` - ${item.variantCode}` : ""}
+                          </Text>
+                        }
                         description={
                           <Row justify="space-between">
                             <Col>
                               <Text type="secondary">SL: {item.quantity}</Text>
                             </Col>
                             <Col>
-                              <Text strong>
-                                {formatMoney(item.price * item.quantity)}
-                              </Text>
+                              <Space direction="vertical" size={0} align="end">
+                                <Text strong style={{ color: item.promotionId ? "#c81d1d" : undefined }}>
+                                  {formatMoney(item.lineTotal)}
+                                </Text>
+                                {item.promotionId && item.originalPrice > item.unitPrice && (
+                                  <Text delete type="secondary" style={{ fontSize: 12 }}>
+                                    {formatMoney(item.originalPrice * item.quantity)}
+                                  </Text>
+                                )}
+                              </Space>
                             </Col>
                           </Row>
                         }
@@ -985,8 +1095,8 @@ const CheckoutPage = () => {
                 <Divider />
 
                 <Row justify="space-between" style={{ marginBottom: 12 }}>
-                  <Text>Tạm tính</Text>
-                  <Text strong>{formatMoney(subtotal)}</Text>
+                  <Text>Tạm tính sau khuyến mãi sản phẩm</Text>
+                  <Text strong>{formatMoney(subtotalBeforeVoucher)}</Text>
                 </Row>
 
                 <Row justify="space-between" style={{ marginBottom: 12 }}>
@@ -1000,7 +1110,7 @@ const CheckoutPage = () => {
 
                 {discount > 0 && (
                   <Row justify="space-between" style={{ marginBottom: 12 }}>
-                    <Text type="success">Giảm giá</Text>
+                    <Text type="success">Giảm giá voucher</Text>
                     <Text strong type="success">
                       - {formatMoney(discount)}
                     </Text>
@@ -1073,7 +1183,7 @@ const CheckoutPage = () => {
               });
               setDistricts([]);
               setWards([]);
-              setShippingFee(0);
+              setQuote(null);
               setShippingError("");
               setIsAddressModalVisible(false);
             }}

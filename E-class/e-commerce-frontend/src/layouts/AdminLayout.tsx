@@ -170,7 +170,7 @@ const AdminLayout = () => {
                 {
                   key: "/admin/discounts/promotions",
                   path: "/admin/discounts/promotions",
-                  name: "Chương trình khuyến mãi",
+                  name: "Khuyến mãi sản phẩm",
                 },
                 {
                   key: "/admin/discounts/coupons",
