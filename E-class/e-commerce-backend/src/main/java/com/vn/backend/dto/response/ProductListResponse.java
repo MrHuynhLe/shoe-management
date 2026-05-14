@@ -1,13 +1,13 @@
 package com.vn.backend.dto.response;
 
 import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 
-@Getter
+@Data
+@NoArgsConstructor
 @AllArgsConstructor
 public class ProductListResponse {
 
@@ -15,14 +15,37 @@ public class ProductListResponse {
     private String code;
     private String name;
     private String brandName;
-    private String categoryName;
-    private String originName;
+    private String imageUrl;
+    private Integer totalStock;
     private BigDecimal minPrice;
     private BigDecimal maxPrice;
-    private Long totalStock;
-    private String imageUrl;
+    private BigDecimal minCostPrice;
+    private BigDecimal maxCostPrice;
     private Boolean isActive;
-    private OffsetDateTime deletedAt;
 
+    public ProductListResponse(
+            Long id,
+            String code,
+            String name,
+            String brandName,
+            String imageUrl,
+            Long totalStock,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
+            BigDecimal minCostPrice,
+            BigDecimal maxCostPrice,
+            Boolean isActive
+    ) {
+        this.id = id;
+        this.code = code;
+        this.name = name;
+        this.brandName = brandName;
+        this.imageUrl = imageUrl;
+        this.totalStock = totalStock == null ? 0 : totalStock.intValue();
+        this.minPrice = minPrice;
+        this.maxPrice = maxPrice;
+        this.minCostPrice = minCostPrice;
+        this.maxCostPrice = maxCostPrice;
+        this.isActive = isActive;
+    }
 }
-

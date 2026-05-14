@@ -45,6 +45,7 @@ public class CartServiceImpl implements CartService {
 
         Cart cart = getOrCreateActiveCart(userId);
         ProductVariant variant = getVariantOrThrow(request.getProductVariantId());
+
         validateVariantAvailable(variant);
 
         Optional<CartItem> existing =
@@ -56,15 +57,15 @@ public class CartServiceImpl implements CartService {
             item = existing.get();
             int newQuantity = item.getQuantity() + request.getQuantity();
 
-            if (newQuantity > variant.getStockQuantity()) {
-                throw new IllegalArgumentException("Quantity exceeds stock");
+            if (newQuantity > safeStock(variant)) {
+                throw new IllegalArgumentException("Số lượng vượt quá tồn kho");
             }
 
             item.setQuantity(newQuantity);
             item.setUpdatedAt(OffsetDateTime.now());
         } else {
-            if (request.getQuantity() > variant.getStockQuantity()) {
-                throw new IllegalArgumentException("Quantity exceeds stock");
+            if (request.getQuantity() > safeStock(variant)) {
+                throw new IllegalArgumentException("Số lượng vượt quá tồn kho");
             }
 
             item = new CartItem();
@@ -94,8 +95,10 @@ public class CartServiceImpl implements CartService {
             return mapToCartResponse(item.getCart());
         }
 
-        if (quantity > variant.getStockQuantity()) {
-            throw new IllegalArgumentException("Quantity exceeds stock");
+        validateVariantAvailable(variant);
+
+        if (quantity > safeStock(variant)) {
+            throw new IllegalArgumentException("Số lượng vượt quá tồn kho");
         }
 
         item.setQuantity(quantity);
@@ -120,7 +123,7 @@ public class CartServiceImpl implements CartService {
 
         Cart cart = cartRepository
                 .findByCustomerIdAndStatus(customer.getId(), CartStatus.ACTIVE)
-                .orElseThrow(() -> new IllegalArgumentException("Active cart not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy giỏ hàng đang hoạt động"));
 
         cartItemRepository.deleteAllByCartId(cart.getId());
     }
@@ -144,44 +147,60 @@ public class CartServiceImpl implements CartService {
 
     private Customer resolveCustomer(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng"));
 
         return customerRepository
                 .findByUserProfileId(user.getUserProfile().getId())
-                .orElseThrow(() -> new IllegalArgumentException("Customer not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy khách hàng"));
     }
 
     private ProductVariant getVariantOrThrow(Long variantId) {
         return productVariantRepository.findById(variantId)
-                .orElseThrow(() -> new IllegalArgumentException("Product variant not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy biến thể sản phẩm"));
     }
 
     private CartItem getCartItemOwnedByUser(Long userId, Long cartItemId) {
         Customer customer = resolveCustomer(userId);
 
         CartItem item = cartItemRepository.findById(cartItemId)
-                .orElseThrow(() -> new IllegalArgumentException("Cart item not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy sản phẩm trong giỏ hàng"));
 
-        if (!item.getCart().getCustomer().getId().equals(customer.getId())) {
-            throw new RuntimeException("Access denied");
+        if (item.getCart() == null
+                || item.getCart().getCustomer() == null
+                || !item.getCart().getCustomer().getId().equals(customer.getId())) {
+            throw new RuntimeException("Bạn không có quyền thao tác giỏ hàng này");
         }
 
         return item;
     }
 
     private void validateVariantAvailable(ProductVariant variant) {
-        if (!Boolean.TRUE.equals(variant.getIsActive()) || variant.getDeletedAt() != null) {
-            throw new IllegalArgumentException("Product variant is not available");
+        if (variant == null) {
+            throw new IllegalArgumentException("Sản phẩm không còn khả dụng");
         }
 
-        if (variant.getStockQuantity() == null || variant.getStockQuantity() <= 0) {
-            throw new IllegalArgumentException("Product is out of stock");
+        if (!Boolean.TRUE.equals(variant.getIsActive()) || variant.getDeletedAt() != null) {
+            throw new IllegalArgumentException("Biến thể sản phẩm đã ngừng bán");
         }
+
+        if (variant.getProduct() == null
+                || !Boolean.TRUE.equals(variant.getProduct().getIsActive())
+                || variant.getProduct().getDeletedAt() != null) {
+            throw new IllegalArgumentException("Sản phẩm đã ngừng bán");
+        }
+
+        if (safeStock(variant) <= 0) {
+            throw new IllegalArgumentException("Sản phẩm đã hết hàng");
+        }
+    }
+
+    private int safeStock(ProductVariant variant) {
+        return variant.getStockQuantity() == null ? 0 : variant.getStockQuantity();
     }
 
     private void validateQuantity(int quantity) {
         if (quantity <= 0) {
-            throw new IllegalArgumentException("Quantity must be greater than 0");
+            throw new IllegalArgumentException("Số lượng phải lớn hơn 0");
         }
     }
 
@@ -216,18 +235,24 @@ public class CartServiceImpl implements CartService {
         for (CartItem item : items) {
             ProductVariant variant = item.getProductVariant();
 
-            String imageUrl = variant.getImages().stream()
-                    .filter(productImage -> Boolean.TRUE.equals(productImage.getIsPrimary()))
-                    .findFirst()
-                    .or(() -> variant.getImages().stream().findFirst())
-                    .map(ProductImage::getImageUrl)
-                    .orElse(null);
+            String imageUrl = null;
+            if (variant.getImages() != null) {
+                imageUrl = variant.getImages().stream()
+                        .filter(productImage -> Boolean.TRUE.equals(productImage.getIsPrimary()))
+                        .findFirst()
+                        .or(() -> variant.getImages().stream().findFirst())
+                        .map(ProductImage::getImageUrl)
+                        .orElse(null);
+            }
 
             String size = extractAttributeValue(variant, "SIZE");
             String color = extractAttributeValue(variant, "COLOR");
 
-            BigDecimal subTotal = variant.getSellingPrice()
-                    .multiply(BigDecimal.valueOf(item.getQuantity()));
+            BigDecimal price = variant.getSellingPrice() == null
+                    ? BigDecimal.ZERO
+                    : variant.getSellingPrice();
+
+            BigDecimal subTotal = price.multiply(BigDecimal.valueOf(item.getQuantity()));
 
             CartItemResponse itemResp = new CartItemResponse();
             itemResp.setCartItemId(item.getId());
@@ -237,7 +262,7 @@ public class CartServiceImpl implements CartService {
             itemResp.setVariantCode(variant.getCode());
             itemResp.setSize(size);
             itemResp.setColor(color);
-            itemResp.setPrice(variant.getSellingPrice());
+            itemResp.setPrice(price);
             itemResp.setQuantity(item.getQuantity());
             itemResp.setStockRemaining(variant.getStockQuantity());
             itemResp.setSubTotal(subTotal);

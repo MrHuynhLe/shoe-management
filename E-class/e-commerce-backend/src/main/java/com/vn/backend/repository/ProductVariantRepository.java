@@ -1,100 +1,102 @@
 package com.vn.backend.repository;
 
 import com.vn.backend.entity.ProductVariant;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-@Repository
 public interface ProductVariantRepository extends JpaRepository<ProductVariant, Long> {
-
-    @Query("""
-        SELECT DISTINCT pv
-        FROM ProductVariant pv
-        JOIN FETCH pv.product p
-        LEFT JOIN FETCH pv.variantAttributeValues vav
-        LEFT JOIN FETCH vav.attributeValue av
-        LEFT JOIN FETCH av.attribute a
-        WHERE pv.deletedAt IS NULL
-          AND (pv.isActive = true OR pv.isActive IS NULL)
-          AND p.deletedAt IS NULL
-          AND (p.isActive = true OR p.isActive IS NULL)
-        ORDER BY p.name ASC, pv.code ASC
-    """)
-    List<ProductVariant> findAllActiveWithAttributes();
-
-    @Query("""
-        SELECT DISTINCT pv
-        FROM ProductVariant pv
-        JOIN FETCH pv.product p
-        LEFT JOIN FETCH pv.variantAttributeValues vav
-        LEFT JOIN FETCH vav.attributeValue av
-        LEFT JOIN FETCH av.attribute a
-        WHERE pv.deletedAt IS NULL
-          AND (pv.isActive = true OR pv.isActive IS NULL)
-          AND p.deletedAt IS NULL
-          AND (p.isActive = true OR p.isActive IS NULL)
-          AND p.id = :productId
-        ORDER BY pv.code ASC
-    """)
-    List<ProductVariant> findByProductIdWithAttributes(@Param("productId") Long productId);
-
-    @Query("""
-        SELECT DISTINCT pv
-        FROM ProductVariant pv
-        JOIN FETCH pv.product p
-        LEFT JOIN FETCH pv.variantAttributeValues vav
-        LEFT JOIN FETCH vav.attributeValue av
-        LEFT JOIN FETCH av.attribute a
-        WHERE pv.deletedAt IS NULL
-          AND (pv.isActive = true OR pv.isActive IS NULL)
-          AND p.deletedAt IS NULL
-          AND (p.isActive = true OR p.isActive IS NULL)
-          AND pv.id = :id
-    """)
-    Optional<ProductVariant> findActiveById(@Param("id") Long id);
-
-    @Query("""
-        SELECT DISTINCT pv
-        FROM ProductVariant pv
-        JOIN FETCH pv.product p
-        LEFT JOIN FETCH pv.variantAttributeValues vav
-        LEFT JOIN FETCH vav.attributeValue av
-        LEFT JOIN FETCH av.attribute a
-        WHERE pv.deletedAt IS NULL
-          AND (pv.isActive = true OR pv.isActive IS NULL)
-          AND p.deletedAt IS NULL
-          AND (p.isActive = true OR p.isActive IS NULL)
-          AND (
-                LOWER(pv.code) LIKE LOWER(CONCAT('%', :keyword, '%'))
-             OR LOWER(COALESCE(pv.barcode, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
-             OR LOWER(p.code) LIKE LOWER(CONCAT('%', :keyword, '%'))
-             OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
-          )
-        ORDER BY p.name ASC, pv.code ASC
-    """)
-    List<ProductVariant> searchForPos(@Param("keyword") String keyword);
-
-    @Query(
-            value = "SELECT * FROM product_variants WHERE id = :id FOR UPDATE",
-            nativeQuery = true
-    )
-    Optional<ProductVariant> findByIdForUpdate(@Param("id") Long id);
-
-    @Query(
-            value = "SELECT * FROM product_variants WHERE id IN (:ids) ORDER BY id FOR UPDATE",
-            nativeQuery = true
-    )
-    List<ProductVariant> findAllByIdInForUpdate(@Param("ids") Collection<Long> ids);
 
     boolean existsByCodeAndDeletedAtIsNull(String code);
 
+    boolean existsByCodeAndDeletedAtIsNullAndIdNot(String code, Long id);
+
     boolean existsByBarcodeAndDeletedAtIsNull(String barcode);
 
+    boolean existsByBarcodeAndDeletedAtIsNullAndIdNot(String barcode, Long id);
+
     List<ProductVariant> findByProductId(Long productId);
+
+    @Query("""
+            select distinct v
+            from ProductVariant v
+            left join fetch v.product p
+            left join fetch v.variantAttributeValues vav
+            left join fetch vav.attributeValue av
+            left join fetch av.attribute a
+            where p.id = :productId
+              and v.deletedAt is null
+            order by v.id asc
+            """)
+    List<ProductVariant> findByProductIdWithAttributes(@Param("productId") Long productId);
+
+    @Query("""
+            select distinct v
+            from ProductVariant v
+            left join fetch v.product p
+            left join fetch v.variantAttributeValues vav
+            left join fetch vav.attributeValue av
+            left join fetch av.attribute a
+            where v.id = :id
+            """)
+    Optional<ProductVariant> findByIdWithAttributes(@Param("id") Long id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select v
+            from ProductVariant v
+            where v.id = :id
+            """)
+    Optional<ProductVariant> findByIdForUpdate(@Param("id") Long id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select v
+            from ProductVariant v
+            where v.id in :ids
+            """)
+    List<ProductVariant> findAllByIdInForUpdate(@Param("ids") List<Long> ids);
+
+    @Query("""
+            select distinct v
+            from ProductVariant v
+            left join fetch v.product p
+            left join fetch p.brand
+            left join fetch v.variantAttributeValues vav
+            left join fetch vav.attributeValue av
+            left join fetch av.attribute a
+            where v.deletedAt is null
+              and v.isActive = true
+              and p.deletedAt is null
+              and p.isActive = true
+            order by p.name asc, v.id asc
+            """)
+    List<ProductVariant> findAllActiveWithAttributes();
+
+    @Query("""
+            select distinct v
+            from ProductVariant v
+            left join fetch v.product p
+            left join fetch p.brand
+            left join fetch v.variantAttributeValues vav
+            left join fetch vav.attributeValue av
+            left join fetch av.attribute a
+            where v.deletedAt is null
+              and v.isActive = true
+              and p.deletedAt is null
+              and p.isActive = true
+              and (
+                    lower(p.name) like lower(concat('%', :keyword, '%'))
+                 or lower(p.code) like lower(concat('%', :keyword, '%'))
+                 or lower(v.code) like lower(concat('%', :keyword, '%'))
+                 or lower(coalesce(v.barcode, '')) like lower(concat('%', :keyword, '%'))
+              )
+            order by p.name asc, v.id asc
+            """)
+    List<ProductVariant> searchForPos(@Param("keyword") String keyword);
 }

@@ -1,5 +1,25 @@
 import { axiosClient } from "./axiosClient";
 
+export interface ProductUpdatePayload {
+  name: string;
+  code?: string | null;
+  description?: string | null;
+  brandId: number;
+  categoryId: number;
+  originId: number;
+  supplierId: number;
+  isActive?: boolean;
+}
+
+export interface ProductVariantUpdatePayload {
+  code?: string | null;
+  costPrice?: number;
+  sellingPrice?: number;
+  stockQuantity?: number;
+  isActive?: boolean;
+  attributeValueIds?: number[];
+}
+
 export const productService = {
   getProducts: (params?: any) => {
     return axiosClient.get("/v1/products", { params });
@@ -9,35 +29,69 @@ export const productService = {
     return axiosClient.get("/v1/favorites", { params });
   },
 
-  getProductById: (productId: number) =>
-    axiosClient.get(`/v1/products/${productId}`),
+  getProductById: (productId: number, includeInactive = false) => {
+    return axiosClient.get(`/v1/products/${productId}`, {
+      params: {
+        includeInactive,
+      },
+    });
+  },
 
-  getBrands: () => axiosClient.get("/v1/brands"),
-  getCategories: () => axiosClient.get("/v1/categories"),
-  getOrigins: () => axiosClient.get("/v1/origins"),
-  getSuppliers: () => axiosClient.get("/v1/suppliers"),
-  getAttributes: () => axiosClient.get("/v1/attributes"),
+  getBrands: () => {
+    return axiosClient.get("/v1/brands");
+  },
 
-  getColors: () => axiosClient.get("/v1/attributes/color/values"),
-  getSizes: () => axiosClient.get("/v1/attributes/size/values"),
-  getMaterials: () => axiosClient.get("/v1/attributes/material/values"),
+  getCategories: () => {
+    return axiosClient.get("/v1/categories");
+  },
 
-  createProductWithImages: (formData: FormData) =>
-    axiosClient.post("/v1/products/with-images", formData, {
+  getOrigins: () => {
+    return axiosClient.get("/v1/origins");
+  },
+
+  getSuppliers: () => {
+    return axiosClient.get("/v1/suppliers");
+  },
+
+  getAttributes: () => {
+    return axiosClient.get("/v1/attributes");
+  },
+
+  getColors: () => {
+    return axiosClient.get("/v1/attributes/color/values");
+  },
+
+  getSizes: () => {
+    return axiosClient.get("/v1/attributes/size/values");
+  },
+
+  getMaterials: () => {
+    return axiosClient.get("/v1/attributes/material/values");
+  },
+
+  createProductWithImages: (formData: FormData) => {
+    return axiosClient.post("/v1/products/with-images", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
-    }),
+    });
+  },
 
-  uploadImage: (formData: FormData) =>
-    axiosClient.post("/v1/products/upload-image", formData, {
+  updateProduct: (productId: number, payload: ProductUpdatePayload) => {
+    return axiosClient.put(`/v1/products/${productId}`, payload);
+  },
+
+  uploadImage: (formData: FormData) => {
+    return axiosClient.post("/v1/products/upload-image", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
-    }),
+    });
+  },
 
-  bulkCreateVariantsOnly: (payload: { productId: number; variants: any[] }) =>
-    axiosClient.post("/v1/product-variants/bulk", payload),
+  bulkCreateVariantsOnly: (payload: { productId: number; variants: any[] }) => {
+    return axiosClient.post("/v1/product-variants/bulk", payload);
+  },
 
   bulkCreateVariants: (productId: number, variants: any[]) => {
     const formData = new FormData();
@@ -69,6 +123,10 @@ export const productService = {
         "Content-Type": "multipart/form-data",
       },
     });
+  },
+
+  updateVariant: (variantId: number, payload: ProductVariantUpdatePayload) => {
+    return axiosClient.put(`/v1/product-variants/${variantId}`, payload);
   },
 
   deleteProduct: (productId: number) => {

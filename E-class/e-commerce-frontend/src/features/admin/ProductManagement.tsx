@@ -1,32 +1,40 @@
 import {
+  Badge,
   Button,
+  Card,
+  Col,
+  Image,
   Input,
+  InputNumber,
+  Modal,
+  Popconfirm,
+  Row,
+  Select,
+  Segmented,
   Space,
   Table,
   Tag,
-  Typography,
   Tooltip,
-  Modal,
+  Typography,
   notification,
-  Image,
-  Popconfirm,
-  Card,
 } from "antd";
 import {
-  PlusOutlined,
-  EyeOutlined,
   DeleteOutlined,
-  InboxOutlined,
   EditOutlined,
+  EyeOutlined,
+  PlusOutlined,
 } from "@ant-design/icons";
-import { useEffect, useState, Key } from "react";
-import { productService } from "@/services/product.service";
+import { Key, useEffect, useMemo, useState } from "react";
 import AddProductForm from "@/layouts/components/AddProductForm";
-import CreateOrderModal from "@/layouts/components/CreateOrderModal";
-import VariantDetailModal, { Variant } from "./VariantDetailModal";
 import { API_BASE_URL } from "@/services/axiosClient";
-
+import {
+  productService,
+  ProductUpdatePayload,
+  ProductVariantUpdatePayload,
+} from "@/services/product.service";
+import EditProductModal from "./EditProductModal";
 import EditVariantModal from "./EditVariantModal";
+import VariantDetailModal, { Variant } from "./VariantDetailModal";
 
 interface ProductList {
   id: number;
@@ -48,59 +56,211 @@ interface ProductListWithVariants extends ProductList {
   variants: Variant[];
 }
 
-type ProductForTable = Omit<ProductListWithVariants, "brand"> & {
+type ProductForTable = ProductListWithVariants & {
   brand: string;
 };
 
-const { Title } = Typography;
+interface FilterOption {
+  id: number;
+  name: string;
+}
+
+interface ProductFilters {
+  keyword: string;
+  categoryId: number | null;
+  brandName: string | null;
+  stockStatus: "all" | "inStock" | "outOfStock";
+  minPrice: number | null;
+  maxPrice: number | null;
+  minStock: number | null;
+  maxStock: number | null;
+}
+
+const initialFilters: ProductFilters = {
+  keyword: "",
+  categoryId: null,
+  brandName: null,
+  stockStatus: "all",
+  minPrice: null,
+  maxPrice: null,
+  minStock: null,
+  maxStock: null,
+};
+
+const { Title, Text } = Typography;
 const { Search } = Input;
 
 const ProductManagementPage = () => {
   const [products, setProducts] = useState<ProductListWithVariants[]>([]);
   const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState<FilterOption[]>([]);
+  const [brands, setBrands] = useState<FilterOption[]>([]);
+  const [filters, setFilters] = useState<ProductFilters>(initialFilters);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
-  const [isVariantDetailModalOpen, setIsVariantDetailModalOpen] =
-    useState(false);
+
+  const [isVariantDetailModalOpen, setIsVariantDetailModalOpen] = useState(false);
   const [isEditVariantModalOpen, setIsEditVariantModalOpen] = useState(false);
   const [editingVariant, setEditingVariant] = useState<Variant | null>(null);
-  const [selectedProduct, setSelectedProduct] =
-    useState<ProductForTable | null>(null);
-  const [selectedProductId, setSelectedProductId] = useState<number | null>(
-    null,
-  );
+  const [editVariantLoading, setEditVariantLoading] = useState(false);
+  const [variantDetailRefreshKey, setVariantDetailRefreshKey] = useState(0);
 
-  const fetchProducts = () => {
+  const [isEditProductModalOpen, setIsEditProductModalOpen] = useState(false);
+  const [editingProductId, setEditingProductId] = useState<number | null>(null);
+  const [editProductLoading, setEditProductLoading] = useState(false);
+
+  const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
+
+  const fetchProducts = (categoryId = filters.categoryId) => {
     setLoading(true);
+
     productService
-      .getProducts({ page: 0, size: 10 })
+      .getProducts({
+        page: 0,
+        size: 500,
+        categoryId,
+        includeInactive: true,
+      })
       .then((res) => {
         const formattedData: ProductForTable[] = res.data.content.map(
           (p: ProductList) => ({
             ...p,
             key: p.id,
             brand: p.brandName,
-            hasVariants: true,
+            hasVariants: p.totalStock > 0,
             hasPendingOrder: false,
             variants: [],
           }),
         );
+
         setProducts(formattedData);
       })
-      .catch((error) => console.error("Lỗi khi tải danh sách sản phẩm:", error))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        notification.error({
+          message: "Lỗi tải dữ liệu",
+          description: "Không thể tải danh sách sản phẩm.",
+        });
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
   useEffect(() => {
     fetchProducts();
   }, []);
 
-  const handleAddProduct = async (values: any) => {
+  useEffect(() => {
+    const fetchFilterOptions = async () => {
+      try {
+        const [categoryRes, brandRes] = await Promise.all([
+          productService.getCategories(),
+          productService.getBrands(),
+        ]);
+
+        setCategories(categoryRes.data || []);
+        setBrands(brandRes.data || []);
+      } catch {
+        notification.error({
+          message: "Lỗi tải bộ lọc",
+          description: "Không thể tải danh mục và thương hiệu.",
+        });
+      }
+    };
+
+    fetchFilterOptions();
+  }, []);
+
+  useEffect(() => {
+    fetchProducts(filters.categoryId);
+  }, [filters.categoryId]);
+
+  const updateFilters = (patch: Partial<ProductFilters>) => {
+    setFilters((prev) => ({ ...prev, ...patch }));
+  };
+
+  const resetFilters = () => {
+    setFilters(initialFilters);
+    fetchProducts(null);
+  };
+
+  const filteredProducts = useMemo(() => {
+    const keyword = filters.keyword.trim().toLowerCase();
+
+    return products.filter((product) => {
+      const matchesKeyword =
+        !keyword ||
+        product.name.toLowerCase().includes(keyword) ||
+        product.code.toLowerCase().includes(keyword) ||
+        product.brandName?.toLowerCase().includes(keyword);
+
+      const matchesBrand =
+        !filters.brandName || product.brandName === filters.brandName;
+
+      const matchesStockStatus =
+        filters.stockStatus === "all" ||
+        (filters.stockStatus === "inStock" && product.totalStock > 0) ||
+        (filters.stockStatus === "outOfStock" && product.totalStock <= 0);
+
+      const minProductPrice = product.minPrice ?? 0;
+      const matchesPrice =
+        (filters.minPrice == null || minProductPrice >= filters.minPrice) &&
+        (filters.maxPrice == null || minProductPrice <= filters.maxPrice);
+
+      const matchesStockRange =
+        (filters.minStock == null || product.totalStock >= filters.minStock) &&
+        (filters.maxStock == null || product.totalStock <= filters.maxStock);
+
+      return (
+        matchesKeyword &&
+        matchesBrand &&
+        matchesStockStatus &&
+        matchesPrice &&
+        matchesStockRange
+      );
+    });
+  }, [products, filters]);
+
+  const activeFilterCount = useMemo(() => {
+    return [
+      filters.keyword,
+      filters.categoryId,
+      filters.brandName,
+      filters.stockStatus !== "all" ? filters.stockStatus : null,
+      filters.minPrice,
+      filters.maxPrice,
+      filters.minStock,
+      filters.maxStock,
+    ].filter((value) => value !== null && value !== "").length;
+  }, [filters]);
+
+  const confirmAction = (title: string, content: string) => {
+    return new Promise<boolean>((resolve) => {
+      Modal.confirm({
+        title,
+        content,
+        okText: "Xác nhận",
+        cancelText: "Hủy",
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false),
+      });
+    });
+  };
+
+  const handleAddProductSuccess = () => {
+    setIsModalOpen(false);
+    fetchProducts();
+
+    notification.success({
+      message: "Thành công",
+      description: "Thêm sản phẩm thành công.",
+    });
+  };
+
+  const handleAddProductFinish = async (values: any) => {
     try {
-      setLoading(true);
-
       const formData = new FormData();
-
       const productDTO = {
         name: values.name,
         code: values.code || null,
@@ -113,18 +273,29 @@ const ProductManagementPage = () => {
       };
 
       if (
+        !productDTO.name ||
         !productDTO.brandId ||
         !productDTO.categoryId ||
         !productDTO.originId ||
-        !productDTO.supplierId ||
-        !productDTO.name
+        !productDTO.supplierId
       ) {
         notification.warning({
           message: "Thiếu thông tin",
-          description: "Vui lòng điền đầy đủ các trường bắt buộc (*)",
+          description: "Vui lòng điền đầy đủ trường sản phẩm.",
         });
         return;
       }
+
+      const confirmed = await confirmAction(
+        "Xác nhận thêm sản phẩm",
+        `Bạn có chắc muốn thêm sản phẩm "${productDTO.name}"?`,
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      setLoading(true);
 
       formData.append(
         "data",
@@ -134,320 +305,346 @@ const ProductManagementPage = () => {
       );
 
       const imageFileList = values.images || [];
+      const firstFile = imageFileList[0];
 
-      if (imageFileList.length > 0) {
-        // ảnh đầu tiên = ảnh chính
-        const firstFile = imageFileList[0];
-        if (firstFile?.originFileObj) {
-          formData.append("image", firstFile.originFileObj);
-        }
-
-        // các ảnh còn lại = ảnh phụ
-        imageFileList.slice(1).forEach((file: any) => {
-          if (file?.originFileObj) {
-            formData.append("images", file.originFileObj);
-          }
-        });
+      if (firstFile?.originFileObj) {
+        formData.append("image", firstFile.originFileObj);
       }
 
-      // QUAN TRỌNG: gọi đúng endpoint with-images
-      const productRes = await productService.createProductWithImages(formData);
+      imageFileList.slice(1).forEach((file: any) => {
+        if (file?.originFileObj) {
+          formData.append("images", file.originFileObj);
+        }
+      });
 
-      const createdProductId =
-        productRes?.data?.id || productRes?.data?.data?.id;
+      const productRes = await productService.createProductWithImages(formData);
+      const createdProductId = productRes?.data?.id || productRes?.data?.data?.id;
 
       if (!createdProductId) {
         throw new Error("Không lấy được productId sau khi tạo sản phẩm");
       }
 
-      if (values.variants && values.variants.length > 0) {
-        const variantsPayload = values.variants.map((item: any) => ({
-          costPrice: item.cost_price,
-          sellingPrice: item.selling_price,
-          stockQuantity: item.stock_quantity,
-          attributeValueIds: [
-            item.color_id,
-            item.size_id,
-            item.material_id,
-          ].filter(Boolean),
-        }));
-
+      if (values.variants?.length) {
         await productService.bulkCreateVariantsOnly({
           productId: createdProductId,
-          variants: variantsPayload,
+          variants: values.variants.map((item: any) => ({
+            costPrice: item.cost_price,
+            sellingPrice: item.selling_price,
+            stockQuantity: item.stock_quantity,
+            isActive: item.is_active,
+            attributeValueIds: [
+              item.color_id,
+              item.size_id,
+              item.material_id,
+            ].filter(Boolean),
+          })),
         });
       }
 
-      setIsModalOpen(false);
-      notification.success({
-        message: "Thành công",
-        description: "Sản phẩm đã được tạo thành công!",
-      });
-
-      fetchProducts();
+      handleAddProductSuccess();
     } catch (error: any) {
-      console.error("CREATE PRODUCT ERROR:", error);
-
-      const serverMessage =
-        error.response?.data?.message ||
-        error.response?.data ||
-        error.message ||
-        "Đã có lỗi xảy ra trong quá trình tạo sản phẩm.";
-
       notification.error({
-        message: "Tạo sản phẩm thất bại",
+        message: "Lỗi thêm sản phẩm",
         description:
-          typeof serverMessage === "string"
-            ? serverMessage
-            : "Dữ liệu không hợp lệ, vui lòng kiểm tra lại.",
+          error?.response?.data?.message ||
+          error?.response?.data ||
+          error?.message ||
+          "Không thể thêm sản phẩm.",
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const showAddModal = () => {
-    setIsModalOpen(true);
-  };
-
-  const showOrderModal = (product: ProductForTable) => {
-    setSelectedProduct(product);
-    setIsOrderModalOpen(true);
-  };
-
-  const showVariantDetailModal = (record: ProductForTable) => {
+  const handleViewVariants = (record: ProductForTable) => {
     setSelectedProductId(record.id);
     setIsVariantDetailModalOpen(true);
   };
 
-  const handleEditVariant = (variant: Variant) => {
+  const handleOpenEditProduct = (record: ProductForTable) => {
+    setEditingProductId(record.id);
+    setIsEditProductModalOpen(true);
+  };
+
+  const handleUpdateProduct = async (
+    productId: number,
+    values: ProductUpdatePayload,
+  ) => {
+    const confirmed = await confirmAction(
+      "Xác nhận cập nhật sản phẩm",
+      `Bạn có chắc muốn lưu thay đổi sản phẩm "${values.name}"?`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setEditProductLoading(true);
+
+    try {
+      await productService.updateProduct(productId, values);
+
+      notification.success({
+        message: "Thành công",
+        description: "Cập nhật sản phẩm thành công.",
+      });
+
+      setIsEditProductModalOpen(false);
+      setEditingProductId(null);
+      fetchProducts();
+    } catch (error: any) {
+      notification.error({
+        message: "Lỗi cập nhật sản phẩm",
+        description:
+          error?.response?.data?.message ||
+          error?.response?.data ||
+          "Không thể cập nhật sản phẩm.",
+      });
+    } finally {
+      setEditProductLoading(false);
+    }
+  };
+
+  const handleOpenEditVariant = (variant: Variant) => {
     setEditingVariant(variant);
     setIsEditVariantModalOpen(true);
   };
 
+  const handleUpdateVariant = async (
+    variantId: number,
+    values: ProductVariantUpdatePayload,
+  ) => {
+    setEditVariantLoading(true);
+
+    try {
+      await productService.updateVariant(variantId, values);
+
+      notification.success({
+        message: "Thành công",
+        description: "Cập nhật biến thể thành công.",
+      });
+
+      setIsEditVariantModalOpen(false);
+      setEditingVariant(null);
+      fetchProducts();
+      setVariantDetailRefreshKey((prev) => prev + 1);
+    } catch (error: any) {
+      notification.error({
+        message: "Lỗi cập nhật biến thể",
+        description:
+          error?.response?.data?.message ||
+          error?.response?.data ||
+          "Không thể cập nhật biến thể.",
+      });
+    } finally {
+      setEditVariantLoading(false);
+    }
+  };
+
+  const handleDeleteProduct = async (productId: number) => {
+    try {
+      await productService.deleteProduct(productId);
+
+      notification.success({
+        message: "Thành công",
+        description: "Xóa sản phẩm thành công.",
+      });
+
+      fetchProducts();
+    } catch (error: any) {
+      notification.error({
+        message: "Lỗi xóa sản phẩm",
+        description:
+          error?.response?.data?.message ||
+          error?.response?.data ||
+          "Không thể xóa sản phẩm.",
+      });
+    }
+  };
+
   const handleDeleteVariant = async (variantId: number) => {
     try {
-      setLoading(true);
       await productService.deleteVariant(variantId);
+
       notification.success({
         message: "Thành công",
-        description: "Biến thể đã được xóa thành công!",
+        description: "Xóa biến thể thành công.",
       });
 
       fetchProducts();
+      setVariantDetailRefreshKey((prev) => prev + 1);
     } catch (error: any) {
-      console.error("Lỗi khi xóa biến thể:", error);
       notification.error({
-        message: "Lỗi",
-        description: error.response?.data?.message || "Không thể xóa biến thể.",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCancelVariantDetailModal = () => {
-    setIsVariantDetailModalOpen(false);
-    setSelectedProductId(null);
-  };
-
-  const handleCreateOrder = (values: any) => {
-    console.log("Submitting new purchase order:", values);
-    setIsOrderModalOpen(false);
-  };
-
-  const handleSaveVariant = (values: Variant) => {
-    console.log("Saving variant changes:", values);
-    setIsEditVariantModalOpen(false);
-  };
-
-  const handleAddVariant = async (data: {
-    productId: number;
-    variants: any[];
-  }) => {
-    const { productId, variants } = data;
-
-    try {
-      setLoading(true);
-
-      await productService.bulkCreateVariants(productId, variants);
-      notification.success({
-        message: "Thành công",
-        description: "Các biến thể đã được thêm thành công!",
-      });
-      handleCancelVariantDetailModal();
-      fetchProducts();
-    } catch (error: any) {
-      console.error("Failed to add variants:", error);
-      const serverMessage =
-        error.response?.data?.message || "Đã có lỗi xảy ra khi thêm biến thể.";
-      notification.error({
-        message: "Thêm biến thể thất bại",
+        message: "Lỗi xóa biến thể",
         description:
-          typeof serverMessage === "string"
-            ? serverMessage
-            : "Dữ liệu không hợp lệ, vui lòng kiểm tra lại.",
+          error?.response?.data?.message ||
+          error?.response?.data ||
+          "Không thể xóa biến thể.",
       });
-    } finally {
-      setLoading(false);
     }
+  };
+
+  const handleAddVariant = async (data: { productId: number; variants: any[] }) => {
+    await productService.bulkCreateVariantsOnly(data);
+
+    notification.success({
+      message: "Thành công",
+      description: "Thêm biến thể thành công.",
+    });
+
+    fetchProducts();
+    setVariantDetailRefreshKey((prev) => prev + 1);
+  };
+
+  const getImageUrl = (imageUrl?: string) => {
+    if (!imageUrl) {
+      return "";
+    }
+
+    if (imageUrl.startsWith("http")) {
+      return imageUrl;
+    }
+
+    return `${API_BASE_URL}${imageUrl}`;
   };
 
   const columns = [
     {
-      title: "STT",
-      key: "stt",
-      width: 60,
-      align: "center" as const,
-      render: (_text: any, _record: any, index: number) => index + 1,
-    },
-    {
       title: "Ảnh",
       dataIndex: "imageUrl",
       key: "imageUrl",
-      width: 80,
-      align: "center" as const,
-      render: (imageUrl: string) => {
-        if (!imageUrl) return "Không có ảnh";
-
-        const fullImageUrl = imageUrl.startsWith("http")
-          ? imageUrl
-          : `${API_BASE_URL}${imageUrl}`;
-
-        return (
+      width: 90,
+      render: (imageUrl: string) =>
+        imageUrl ? (
           <Image
-            width={50}
-            src={fullImageUrl}
-            fallback="https://via.placeholder.com/50?text=No+Image"
+            width={60}
+            height={60}
+            src={getImageUrl(imageUrl)}
+            style={{ objectFit: "cover", borderRadius: 8 }}
           />
-        );
-      },
+        ) : (
+          <div
+            style={{
+              width: 60,
+              height: 60,
+              borderRadius: 8,
+              background: "#f5f5f5",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#999",
+              fontSize: 12,
+            }}
+          >
+            No image
+          </div>
+        ),
     },
     {
-      title: "Mã sản phẩm",
+      title: "Mã SP",
       dataIndex: "code",
       key: "code",
+      width: 130,
+      render: (value: string) => <Text copyable>{value}</Text>,
     },
     {
-      title: "Tên sản phẩm",
+      title: "Sản phẩm",
       dataIndex: "name",
       key: "name",
+      render: (text: string, record: ProductForTable) => (
+        <Space direction="vertical" size={0}>
+          <Text strong>{text}</Text>
+          <Text type="secondary">{record.brandName || "-"}</Text>
+        </Space>
+      ),
     },
     {
-      title: "Hãng",
-      dataIndex: "brand",
-      key: "brand",
-      align: "center" as const,
+      title: "Giá nhập",
+      key: "costPrice",
+      width: 160,
+      align: "right" as const,
+      render: (_: unknown, record: ProductForTable) => {
+        if (record.minCostPrice == null && record.maxCostPrice == null) {
+          return "-";
+        }
+
+        if (record.minCostPrice === record.maxCostPrice) {
+          return `${Number(record.minCostPrice).toLocaleString("vi-VN")} VND`;
+        }
+
+        return `${Number(record.minCostPrice).toLocaleString("vi-VN")} - ${Number(
+          record.maxCostPrice,
+        ).toLocaleString("vi-VN")} VND`;
+      },
     },
     {
       title: "Giá bán",
-      key: "price",
-      align: "center" as const,
-      render: (_: any, record: ProductList) => {
-        const { minPrice, maxPrice } = record;
-        if (minPrice === null || maxPrice === null) {
-          return "Chưa có giá";
-        }
-        const min = Number(minPrice);
-        const max = Number(maxPrice);
-
-        if (min === max) {
-          return `${min.toLocaleString("vi-VN")} ₫`;
+      key: "sellingPrice",
+      width: 160,
+      align: "right" as const,
+      render: (_: unknown, record: ProductForTable) => {
+        if (record.minPrice == null && record.maxPrice == null) {
+          return "-";
         }
 
-        return `${min.toLocaleString("vi-VN")} ₫ - ${max.toLocaleString("vi-VN")} ₫`;
+        if (record.minPrice === record.maxPrice) {
+          return `${Number(record.minPrice).toLocaleString("vi-VN")} VND`;
+        }
+
+        return `${Number(record.minPrice).toLocaleString("vi-VN")} - ${Number(
+          record.maxPrice,
+        ).toLocaleString("vi-VN")} VND`;
       },
     },
     {
-      title: "Tổng tồn kho",
+      title: "Tồn kho",
       dataIndex: "totalStock",
       key: "totalStock",
+      width: 110,
       align: "center" as const,
+      render: (value: number) => (
+        <Tag color={value > 0 ? "green" : "red"}>{value || 0}</Tag>
+      ),
     },
     {
       title: "Trạng thái",
-      dataIndex: "totalStock",
-      key: "totalStock",
-      align: "center" as const,
-      render: (stock: number) => {
-        if (stock > 0) {
-          return <Tag color="green">ĐANG BÁN</Tag>;
-        }
-        return <Tag color="red">HẾT HÀNG</Tag>;
-      },
+      key: "status",
+      width: 130,
+      render: (_: unknown, record: ProductForTable) => (
+        <Tag color={record.totalStock > 0 ? "green" : "orange"}>
+          {record.totalStock > 0 ? "Còn hàng" : "Hết hàng"}
+        </Tag>
+      ),
     },
     {
       title: "Thao tác",
       key: "action",
-      align: "center" as const,
-      render: (_text: any, record: any) => (
-        <Space size="middle">
-          <Tooltip title="Xem chi tiết sản phẩm">
+      width: 180,
+      fixed: "right" as const,
+      render: (_: unknown, record: ProductForTable) => (
+        <Space>
+          <Tooltip title="Xem biến thể và lọc SKU">
             <Button
               icon={<EyeOutlined />}
-              shape="circle"
-              type="text"
-              size="large"
-              onClick={() => showVariantDetailModal(record)}
+              onClick={() => handleViewVariants(record)}
             />
           </Tooltip>
-          <Tooltip title="Chỉnh sửa sản phẩm">
+
+          <Tooltip title="Sửa sản phẩm">
             <Button
               icon={<EditOutlined />}
-              shape="circle"
-              type="text"
-              size="large"
-              onClick={() =>
-                notification.info({ message: "Chức năng đang phát triển" })
-              }
+              onClick={() => handleOpenEditProduct(record)}
             />
           </Tooltip>
-          {record.hasVariants && (
-            <Tooltip title="Tạo phiếu kho">
-              <Button
-                icon={<InboxOutlined />}
-                shape="circle"
-                type="text"
-                size="large"
-                onClick={() => showOrderModal(record)}
-                disabled={record.hasPendingOrder}
-              />
-            </Tooltip>
-          )}
+
           <Popconfirm
-            title="Xóa sản phẩm?"
-            description="Hành động này sẽ xóa sản phẩm và tất cả biến thể liên quan. Bạn có chắc chắn?"
-            onConfirm={async () => {
-              try {
-                setLoading(true);
-                await productService.deleteProduct(record.id);
-                notification.success({
-                  message: "Thành công",
-                  description: "Sản phẩm đã được xóa thành công!",
-                });
-                fetchProducts();
-              } catch (error: any) {
-                console.error("Lỗi khi xóa sản phẩm:", error);
-                notification.error({
-                  message: "Lỗi",
-                  description:
-                    error.response?.data?.message || "Không thể xóa sản phẩm.",
-                });
-              } finally {
-                setLoading(false);
-              }
-            }}
-            okText="Đồng ý"
-            cancelText="Không"
+            title="Xóa sản phẩm"
+            description="Bạn có chắc muốn xóa sản phẩm này?"
+            okText="Xóa"
+            cancelText="Hủy"
+            onConfirm={() => handleDeleteProduct(record.id)}
           >
-            <Tooltip title="Xóa">
-              <Button
-                icon={<DeleteOutlined />}
-                danger
-                shape="circle"
-                size="large"
-              />
-            </Tooltip>
+            <Button danger icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
       ),
@@ -455,92 +652,219 @@ const ProductManagementPage = () => {
   ];
 
   return (
-    <Card
-      style={{
-        borderRadius: 14,
-        border: "1px solid #e5e7eb",
-        boxShadow: "0 6px 16px rgb(0 0 0 / 8%)",
-      }}
-      bodyStyle={{ padding: 24 }}
-      bordered={false}
-      title={
-        <Title level={3} style={{ margin: 0, color: "#0f172a" }}>
-          Quản lý sản phẩm
-        </Title>
-      }
-    >
+    <Card style={{ borderRadius: 8 }}>
       <Space direction="vertical" style={{ width: "100%" }} size="large">
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            paddingBottom: 10,
-          }}
-        >
-          <Search
-            placeholder="Tìm kiếm theo tên hoặc mã sản phẩm"
-            style={{ maxWidth: 420, width: "100%" }}
-            allowClear
-            onSearch={(v) => console.log("Search", v)}
-          />
+        <Space style={{ width: "100%", justifyContent: "space-between" }}>
+          <Space direction="vertical" size={0}>
+            <Title level={3} style={{ margin: 0 }}>
+              Quản lý sản phẩm
+            </Title>
+
+          </Space>
+
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            onClick={showAddModal}
-            style={{ borderRadius: 8, minWidth: 170 }}
+            onClick={() => setIsModalOpen(true)}
           >
-            Thêm mới sản phẩm
+            Thêm sản phẩm
           </Button>
-        </div>
+        </Space>
+
+        <Card size="small" style={{ borderRadius: 8 }}>
+          <Space direction="vertical" style={{ width: "100%" }} size="middle">
+            <Row gutter={[12, 12]} align="middle">
+              <Col xs={24} md={10}>
+                <Search
+                  placeholder="Tìm tên, mã sản phẩm, thương hiệu..."
+                  allowClear
+                  value={filters.keyword}
+                  onChange={(e) => updateFilters({ keyword: e.target.value })}
+                  onSearch={(value) => updateFilters({ keyword: value })}
+                />
+              </Col>
+
+              <Col xs={24} md={7}>
+                <Segmented
+                  block
+                  value={filters.stockStatus}
+                  onChange={(value) =>
+                    updateFilters({
+                      stockStatus: value as ProductFilters["stockStatus"],
+                    })
+                  }
+                  options={[
+                    { label: "Tất cả", value: "all" },
+                    { label: "Còn hàng", value: "inStock" },
+                    { label: "Hết hàng", value: "outOfStock" },
+                  ]}
+                />
+              </Col>
+
+              <Col xs={24} md={7}>
+                <Space style={{ width: "100%", justifyContent: "flex-end" }}>
+                  <Badge count={activeFilterCount} size="small">
+                    <Button onClick={() => setAdvancedOpen((prev) => !prev)}>
+                      Bộ lọc nâng cao
+                    </Button>
+                  </Badge>
+
+                  <Button onClick={resetFilters}>Reset</Button>
+                </Space>
+              </Col>
+            </Row>
+
+            {advancedOpen && (
+              <Row gutter={[12, 12]}>
+                <Col xs={24} md={6}>
+                  <Select
+                    allowClear
+                    style={{ width: "100%" }}
+                    placeholder="Danh mục"
+                    value={filters.categoryId}
+                    onChange={(value) =>
+                      updateFilters({ categoryId: value ?? null })
+                    }
+                    options={categories.map((item) => ({
+                      value: item.id,
+                      label: item.name,
+                    }))}
+                  />
+                </Col>
+
+                <Col xs={24} md={6}>
+                  <Select
+                    allowClear
+                    style={{ width: "100%" }}
+                    placeholder="Thương hiệu"
+                    value={filters.brandName}
+                    onChange={(value) =>
+                      updateFilters({ brandName: value ?? null })
+                    }
+                    options={brands.map((item) => ({
+                      value: item.name,
+                      label: item.name,
+                    }))}
+                  />
+                </Col>
+
+                <Col xs={12} md={3}>
+                  <InputNumber<number>
+                    min={0}
+                    style={{ width: "100%" }}
+                    placeholder="Giá từ"
+                    value={filters.minPrice}
+                    onChange={(value) =>
+                      updateFilters({ minPrice: value ?? null })
+                    }
+                  />
+                </Col>
+
+                <Col xs={12} md={3}>
+                  <InputNumber<number>
+                    min={0}
+                    style={{ width: "100%" }}
+                    placeholder="Giá đến"
+                    value={filters.maxPrice}
+                    onChange={(value) =>
+                      updateFilters({ maxPrice: value ?? null })
+                    }
+                  />
+                </Col>
+
+                <Col xs={12} md={3}>
+                  <InputNumber<number>
+                    min={0}
+                    style={{ width: "100%" }}
+                    placeholder="Tồn từ"
+                    value={filters.minStock}
+                    onChange={(value) =>
+                      updateFilters({ minStock: value ?? null })
+                    }
+                  />
+                </Col>
+
+                <Col xs={12} md={3}>
+                  <InputNumber<number>
+                    min={0}
+                    style={{ width: "100%" }}
+                    placeholder="Tồn đến"
+                    value={filters.maxStock}
+                    onChange={(value) =>
+                      updateFilters({ maxStock: value ?? null })
+                    }
+                  />
+                </Col>
+              </Row>
+            )}
+          </Space>
+        </Card>
+
         <Table
           columns={columns}
-          dataSource={products}
-          pagination={{ pageSize: 8 }}
+          dataSource={filteredProducts as any}
           loading={loading}
-          rowKey="key"
-          size="middle"
+          rowKey="id"
           bordered
-          style={{ borderRadius: 10, background: "#ffffff" }}
-        />
-
-        <Modal
-          title="Thêm mới sản phẩm"
-          open={isModalOpen}
-          onCancel={() => setIsModalOpen(false)}
-          footer={null}
-          width={1000}
-          destroyOnClose
-        >
-          <AddProductForm
-            onFinish={handleAddProduct}
-            onCancel={() => setIsModalOpen(false)}
-          />
-        </Modal>
-        <VariantDetailModal
-          open={isVariantDetailModalOpen}
-          productId={selectedProductId}
-          onCancel={handleCancelVariantDetailModal}
-          onEdit={handleEditVariant}
-          onDelete={handleDeleteVariant}
-          onAddVariant={handleAddVariant}
-        />
-
-        <EditVariantModal
-          open={isEditVariantModalOpen}
-          variant={editingVariant}
-          onCancel={() => setIsEditVariantModalOpen(false)}
-          onSave={handleSaveVariant}
-        />
-
-        <CreateOrderModal
-          open={isOrderModalOpen}
-          product={selectedProduct}
-          onCancel={() => setIsOrderModalOpen(false)}
-          onSubmit={handleCreateOrder}
+          scroll={{ x: 1060 }}
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: true,
+            showTotal: (total) => `Tổng ${total} sản phẩm`,
+          }}
         />
       </Space>
+
+      <Modal
+        title="Thêm sản phẩm"
+        open={isModalOpen}
+        onCancel={() => setIsModalOpen(false)}
+        footer={null}
+        width={1200}
+        destroyOnHidden
+      >
+        <AddProductForm
+          onCancel={() => setIsModalOpen(false)}
+          onFinish={handleAddProductFinish}
+        />
+      </Modal>
+
+      <VariantDetailModal
+        open={isVariantDetailModalOpen}
+        productId={selectedProductId}
+        onCancel={() => {
+          setIsVariantDetailModalOpen(false);
+          setSelectedProductId(null);
+        }}
+        onEdit={handleOpenEditVariant}
+        onDelete={handleDeleteVariant}
+        onAddVariant={handleAddVariant}
+        refreshKey={variantDetailRefreshKey}
+      />
+
+      <EditProductModal
+        open={isEditProductModalOpen}
+        productId={editingProductId}
+        confirmLoading={editProductLoading}
+        onCancel={() => {
+          setIsEditProductModalOpen(false);
+          setEditingProductId(null);
+        }}
+        onSave={handleUpdateProduct}
+      />
+
+      <EditVariantModal
+        open={isEditVariantModalOpen}
+        variant={editingVariant}
+        confirmLoading={editVariantLoading}
+        onCancel={() => {
+          setIsEditVariantModalOpen(false);
+          setEditingVariant(null);
+        }}
+        onSave={handleUpdateVariant}
+      />
     </Card>
   );
 };
+
 export default ProductManagementPage;

@@ -1,6 +1,7 @@
 package com.vn.backend.controller;
 
 import com.vn.backend.dto.request.ProductCreateRequest;
+import com.vn.backend.dto.request.ProductUpdateRequest;
 import com.vn.backend.dto.response.PageResponse;
 import com.vn.backend.dto.response.ProductDetailResponse;
 import com.vn.backend.dto.response.ProductListResponse;
@@ -27,20 +28,35 @@ public class ProductController {
     public ResponseEntity<PageResponse<ProductListResponse>> getProducts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size,
-            @RequestParam(required = false) Long categoryId
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Long brandId,
+            @RequestParam(defaultValue = "false") boolean includeInactive
     ) {
-        return ResponseEntity.ok(productService.getProductList(page, size, categoryId));
+        return ResponseEntity.ok(
+                productService.getProductList(page, size, categoryId, brandId, includeInactive)
+        );
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ProductDetailResponse> getProductDetail(@PathVariable Long id) {
-        return ResponseEntity.ok(productService.getProductDetail(id));
+    public ResponseEntity<ProductDetailResponse> getProductDetail(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "false") boolean includeInactive
+    ) {
+        return ResponseEntity.ok(productService.getProductDetail(id, includeInactive));
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Product> create(@RequestBody @Valid ProductCreateRequest request) {
         Product product = productService.create(request);
         return ResponseEntity.ok(product);
+    }
+
+    @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ProductDetailResponse> update(
+            @PathVariable Long id,
+            @RequestBody @Valid ProductUpdateRequest request
+    ) {
+        return ResponseEntity.ok(productService.update(id, request));
     }
 
     @PostMapping(value = "/with-images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
