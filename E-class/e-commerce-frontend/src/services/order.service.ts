@@ -7,6 +7,13 @@ interface ShippingInfo {
   province?: string;
   district?: string;
   ward?: string;
+  provinceId?: number;
+  districtId?: number;
+  wardCode?: string;
+  provinceName?: string;
+  districtName?: string;
+  wardName?: string;
+  shippingFee?: number;
   note?: string;
 }
 
@@ -38,10 +45,6 @@ export interface OnlineVnpayReturnResponse {
   orderId?: number;
 }
 
-export interface ReturnRequestDTO {
-  reason: string;
-}
-
 export const orderService = {
   placeOrder: (orderData: PlaceOrderDTO) => {
     return axiosClient.post("/v1/orders", orderData);
@@ -67,10 +70,6 @@ export const orderService = {
 
   cancelOrder: (orderId: number) => {
     return axiosClient.put(`/v1/orders/${orderId}/cancel`);
-  },
-
-  requestReturn: (orderId: number, payload: ReturnRequestDTO) => {
-    return axiosClient.post(`/v1/orders/${orderId}/return-request`, payload);
   },
 
   getUserShippingAddresses: () => {

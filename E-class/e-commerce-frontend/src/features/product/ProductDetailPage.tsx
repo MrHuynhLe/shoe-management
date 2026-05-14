@@ -61,7 +61,7 @@ const getProductImage = (product: any) => {
 const ProductDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, fetchOrderCount } = useAuth();
 
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(false);
@@ -308,6 +308,7 @@ const ProductDetailPage = () => {
           });
 
           message.success("Đã thêm vào giỏ hàng.");
+          fetchOrderCount();
         } catch (error: any) {
           message.error(
             error?.response?.data?.message ||

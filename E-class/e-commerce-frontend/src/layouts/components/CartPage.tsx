@@ -22,6 +22,7 @@ import { cartService } from "@/services/cart.service";
 import { useNavigate, useLocation } from "react-router-dom";
 import { orderService } from "@/services/order.service";
 import MyOrdersPage from "./MyOrdersPage";
+import { useAuth } from "@/services/AuthContext";
 
 const { Title, Text } = Typography;
 
@@ -49,6 +50,7 @@ const CartPage = () => {
   const [ordersFetched, setOrdersFetched] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const { fetchOrderCount } = useAuth();
 
   const activeTab = useMemo(
     () => new URLSearchParams(location.search).get("tab") || "cart",
@@ -79,6 +81,7 @@ const CartPage = () => {
       }));
 
       setCartItems(items);
+      fetchOrderCount();
     } catch (error: any) {
       console.error("Failed to fetch cart:", error);
 
@@ -140,6 +143,7 @@ const CartPage = () => {
       await cartService.updateItemQuantity(cartItemId, quantity);
       message.success("Cập nhật số lượng thành công!");
       fetchCart();
+      fetchOrderCount();
     } catch (error) {
       message.error("Cập nhật số lượng thất bại!");
       console.error("Failed to update quantity:", error);
@@ -151,6 +155,7 @@ const CartPage = () => {
       await cartService.removeItem(cartItemId);
       message.success("Đã xóa sản phẩm khỏi giỏ hàng!");
       fetchCart();
+      fetchOrderCount();
       setSelectedRowKeys(selectedRowKeys.filter((k) => k !== cartItemId));
     } catch (error) {
       message.error("Xóa sản phẩm thất bại!");

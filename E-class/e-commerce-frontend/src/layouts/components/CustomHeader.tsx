@@ -30,6 +30,16 @@ const CustomHeader = () => {
   const navigate = useNavigate();
   const { isAuthenticated, user, logout, orderCount } = useAuth();
 
+  const handleSearch = (value: string) => {
+    const keyword = value.trim();
+    if (!keyword) {
+      navigate("/products");
+      return;
+    }
+
+    navigate(`/products?keyword=${encodeURIComponent(keyword)}`);
+  };
+
   const handleUserMenuClick = ({ key }: { key: string }) => {
     if (key === "logout") {
       logout();
@@ -133,7 +143,12 @@ const CustomHeader = () => {
           style={{ display: "flex", justifyContent: "flex-end", alignItems: "center" }}
         >
           <Space size={12} align="center" wrap>
-            <Input.Search placeholder="Tìm kiếm sản phẩm..." style={{ width: 280,padding:25 }} />
+            <Input.Search
+              allowClear
+              placeholder="Tìm kiếm sản phẩm..."
+              style={{ width: 280, padding: 25 }}
+              onSearch={handleSearch}
+            />
 
             <Link to="/cart" style={{ color: "#1b6eea", display: "inline-flex" }}>
               <Badge count={orderCount} size="small">

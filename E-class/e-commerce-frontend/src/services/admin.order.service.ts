@@ -15,10 +15,4 @@ export const adminOrderService = {
     });
   },
 
-  reviewReturn: (
-    orderId: number,
-    payload: { action: "APPROVE" | "REJECT"; note?: string },
-  ) => {
-    return axiosClient.patch(`/v1/orders/${orderId}/return-review`, payload);
-  },
 };

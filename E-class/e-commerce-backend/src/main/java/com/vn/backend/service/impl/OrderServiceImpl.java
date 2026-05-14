@@ -204,17 +204,22 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        List<Integer> itemQuantities = request.getItems().stream()
-                .map(OrderItemRequest::getQuantity)
-                .toList();
+        BigDecimal shippingFee;
+        if (request.getShippingInfo().getShippingFee() != null) {
+            shippingFee = BigDecimal.valueOf(request.getShippingInfo().getShippingFee());
+        } else {
+            List<Integer> itemQuantities = request.getItems().stream()
+                    .map(OrderItemRequest::getQuantity)
+                    .toList();
 
-        BigDecimal shippingFee = ghtkLogicHandler.calculateShippingFee(
-                request.getShippingInfo().getProvince(),
-                request.getShippingInfo().getDistrict(),
-                request.getShippingInfo().getAddress(),
-                subTotal,
-                itemQuantities
-        );
+            shippingFee = ghtkLogicHandler.calculateShippingFee(
+                    request.getShippingInfo().getProvince(),
+                    request.getShippingInfo().getDistrict(),
+                    request.getShippingInfo().getAddress(),
+                    subTotal,
+                    itemQuantities
+            );
+        }
 
         BigDecimal totalAmount = subTotal.add(shippingFee).subtract(discountAmount);
 
@@ -241,9 +246,12 @@ public class OrderServiceImpl implements OrderService {
         shippingDetails.setShippingPhone(request.getShippingInfo().getPhone());
         shippingDetails.setShippingAddress(request.getShippingInfo().getAddress());
         shippingDetails.setShippingNote(request.getShippingInfo().getNote());
-        shippingDetails.setProvince(request.getShippingInfo().getProvince());
-        shippingDetails.setDistrict(request.getShippingInfo().getDistrict());
-        shippingDetails.setWard(request.getShippingInfo().getWard());
+        shippingDetails.setProvince(defaultText(request.getShippingInfo().getProvinceName(), request.getShippingInfo().getProvince()));
+        shippingDetails.setDistrict(defaultText(request.getShippingInfo().getDistrictName(), request.getShippingInfo().getDistrict()));
+        shippingDetails.setWard(defaultText(request.getShippingInfo().getWardName(), request.getShippingInfo().getWard()));
+        shippingDetails.setProvinceId(request.getShippingInfo().getProvinceId());
+        shippingDetails.setDistrictId(request.getShippingInfo().getDistrictId());
+        shippingDetails.setWardCode(request.getShippingInfo().getWardCode());
         order.setShippingDetails(shippingDetails);
 
         for (OrderItem item : orderItems) {
@@ -580,6 +588,12 @@ public class OrderServiceImpl implements OrderService {
                     response.setProvince(details.getProvince());
                     response.setDistrict(details.getDistrict());
                     response.setWard(details.getWard());
+                    response.setProvinceId(details.getProvinceId());
+                    response.setDistrictId(details.getDistrictId());
+                    response.setWardCode(details.getWardCode());
+                    response.setProvinceName(details.getProvince());
+                    response.setDistrictName(details.getDistrict());
+                    response.setWardName(details.getWard());
                     response.setNote(details.getShippingNote());
                     return response;
                 })

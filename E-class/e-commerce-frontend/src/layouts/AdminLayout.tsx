@@ -13,7 +13,7 @@ import ProLayout, { PageContainer } from "@ant-design/pro-layout";
 import proViVN from "@ant-design/pro-provider/es/locale/vi_VN";
 import { Avatar, Badge, ConfigProvider, Dropdown, Space } from "antd";
 import antdViVN from "antd/locale/vi_VN";
-import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import ChatbotWidget from "@/features/chatbot/ChatbotWidget";
 import logo from "@/assets/logo-shoe-shop.png";
 import { useAuth } from "@/services/AuthContext";
@@ -21,11 +21,19 @@ import { useAuth } from "@/services/AuthContext";
 const AdminLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  const token = localStorage.getItem("token");
+  const storedUser = localStorage.getItem("user");
+  const currentUser = user || (storedUser ? safeParseUser(storedUser) : null);
+  const isAdmin = String(currentUser?.role || "").toUpperCase() === "ADMIN";
+
+  if (!token || !isAdmin) {
+    return <Navigate to="/admin/login" replace state={{ from: location }} />;
+  }
 
   const handleLogout = () => {
     logout();
-    navigate("/login");
+    navigate("/admin/login");
   };
 
   const userMenuItems = [
@@ -207,6 +215,14 @@ const AdminLayout = () => {
       </>
     </ConfigProvider>
   );
+};
+
+const safeParseUser = (value: string) => {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
 };
 
 export default AdminLayout;
