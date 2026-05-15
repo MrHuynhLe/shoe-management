@@ -34,6 +34,8 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
+
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
@@ -42,6 +44,7 @@ public class UserServiceImpl implements UserService {
     private final UserProfileRepository profileRepository;
     private final EmployeeRepository employeeRepository;
     private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public List<UserResponse> getAllUsers() {
@@ -94,7 +97,7 @@ public class UserServiceImpl implements UserService {
         User user = new User();
         user.setUsername(req.getUsername());
         user.setEmail(req.getEmail());
-        user.setPasswordHash(req.getPassword()); 
+        user.setPasswordHash(passwordEncoder.encode(req.getPassword()));
         user.setIsActive(true);
         user.setRole(role);
         user.setUserProfile(profile);
