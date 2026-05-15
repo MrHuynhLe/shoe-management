@@ -180,6 +180,13 @@ public class OrderServiceImpl implements OrderService {
                 variantsMap
         );
 
+        if (StringUtils.hasText(request.getVoucherCode()) && Boolean.FALSE.equals(quote.getVoucherValid())) {
+            throw new InvalidRequestException(defaultText(
+                    quote.getVoucherMessage(),
+                    "Voucher khong con hop le."
+            ));
+        }
+
         for (CheckoutQuoteItemResponse quoteItem : quote.getItems()) {
             ProductVariant variant = variantsMap.get(quoteItem.getVariantId());
 
@@ -425,6 +432,7 @@ public class OrderServiceImpl implements OrderService {
         response.setProductImage(imageUrl);
         response.setSize(resolveVariantAttribute(variant, "SIZE"));
         response.setColor(resolveVariantAttribute(variant, "COLOR"));
+        response.setMaterial(resolveVariantAttribute(variant, "MATERIAL"));
         response.setQuantity(item.getQuantity());
         response.setPrice(unitPrice);
         response.setOriginalPrice(originalPrice);

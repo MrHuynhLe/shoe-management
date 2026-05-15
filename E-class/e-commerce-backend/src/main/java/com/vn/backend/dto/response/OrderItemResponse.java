@@ -18,6 +18,7 @@ public class OrderItemResponse {
     private String productImage;
     private String size;
     private String color;
+    private String material;
     private int quantity;
     private BigDecimal price;
     private BigDecimal originalPrice;

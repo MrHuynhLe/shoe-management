@@ -18,6 +18,7 @@ public class CheckoutQuoteItemResponse {
     private String variantCode;
     private String size;
     private String color;
+    private String material;
     private String imageUrl;
     private Integer quantity;
     private BigDecimal originalPrice;

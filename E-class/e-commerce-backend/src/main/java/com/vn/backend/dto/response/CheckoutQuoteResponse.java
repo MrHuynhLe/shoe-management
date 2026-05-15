@@ -22,4 +22,6 @@ public class CheckoutQuoteResponse {
     private BigDecimal productRevenue;
     private BigDecimal finalTotal;
     private String voucherCode;
+    private Boolean voucherValid;
+    private String voucherMessage;
 }

@@ -255,6 +255,7 @@ public class CartServiceImpl implements CartService {
 
             String size = extractAttributeValue(variant, "SIZE");
             String color = extractAttributeValue(variant, "COLOR");
+            String material = extractAttributeValue(variant, "MATERIAL");
 
             ProductPriceResponse priceSnapshot = applyCurrentPriceSnapshot(item, variant);
 
@@ -272,6 +273,7 @@ public class CartServiceImpl implements CartService {
             itemResp.setVariantCode(variant.getCode());
             itemResp.setSize(size);
             itemResp.setColor(color);
+            itemResp.setMaterial(material);
             itemResp.setPrice(unitPrice);
             itemResp.setOriginalPrice(originalPrice);
             itemResp.setUnitPrice(unitPrice);

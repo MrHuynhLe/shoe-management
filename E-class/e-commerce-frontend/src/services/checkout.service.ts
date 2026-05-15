@@ -7,6 +7,7 @@ export interface CheckoutQuoteItem {
   variantCode?: string | null;
   size?: string | null;
   color?: string | null;
+  material?: string | null;
   imageUrl?: string | null;
   quantity: number;
   originalPrice: number;
@@ -26,6 +27,8 @@ export interface CheckoutQuoteResponse {
   productRevenue: number;
   finalTotal: number;
   voucherCode?: string | null;
+  voucherValid?: boolean | null;
+  voucherMessage?: string | null;
 }
 
 export const checkoutService = {

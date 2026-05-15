@@ -8,6 +8,7 @@ export interface PosOrderItemResponse {
   productName: string;
   color?: string | null;
   size?: string | null;
+  material?: string | null;
   price: number;
   quantity: number;
   lineTotal: number;
@@ -42,6 +43,7 @@ export interface PosProductSearchResponse {
   productName: string;
   color?: string | null;
   size?: string | null;
+  material?: string | null;
   sellingPrice: number;
   stockQuantity: number;
   imageUrl?: string | null;

@@ -97,6 +97,7 @@ public class CheckoutQuoteServiceImpl implements CheckoutQuoteService {
                     .variantCode(variant.getCode())
                     .size(extractAttributeValue(variant, "SIZE"))
                     .color(extractAttributeValue(variant, "COLOR"))
+                    .material(extractAttributeValue(variant, "MATERIAL"))
                     .imageUrl(resolveImageUrl(variant))
                     .quantity(item.getQuantity())
                     .originalPrice(originalPrice)
@@ -109,14 +110,25 @@ public class CheckoutQuoteServiceImpl implements CheckoutQuoteService {
 
         BigDecimal voucherDiscountAmount = BigDecimal.ZERO;
         String appliedVoucherCode = null;
+        Boolean voucherValid = null;
+        String voucherMessage = null;
         if (StringUtils.hasText(voucherCode)) {
-            ValidateDiscountResponse discountResponse = discountService.validateDiscountForSubtotal(
-                    voucherCode,
-                    subtotalBeforeVoucher,
-                    userDetails
-            );
-            voucherDiscountAmount = defaultZero(discountResponse.getDiscountAmount());
-            appliedVoucherCode = discountResponse.getCode();
+            try {
+                ValidateDiscountResponse discountResponse = discountService.validateDiscountForSubtotal(
+                        voucherCode,
+                        subtotalBeforeVoucher,
+                        userDetails
+                );
+                voucherDiscountAmount = defaultZero(discountResponse.getDiscountAmount());
+                appliedVoucherCode = discountResponse.getCode();
+                voucherValid = true;
+                voucherMessage = discountResponse.getMessage();
+            } catch (InvalidRequestException ex) {
+                voucherDiscountAmount = BigDecimal.ZERO;
+                appliedVoucherCode = null;
+                voucherValid = false;
+                voucherMessage = ex.getMessage();
+            }
         }
 
         BigDecimal shippingFee = calculateShippingFee(shippingInfo, subtotalBeforeVoucher, quantities);
@@ -133,6 +145,8 @@ public class CheckoutQuoteServiceImpl implements CheckoutQuoteService {
                 .productRevenue(productRevenue)
                 .finalTotal(finalTotal)
                 .voucherCode(appliedVoucherCode)
+                .voucherValid(voucherValid)
+                .voucherMessage(voucherMessage)
                 .build();
     }
 
