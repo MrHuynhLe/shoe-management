@@ -3,6 +3,7 @@ import MainLayout from "@/layouts/MainLayout";
 import AdminLayout from "@/layouts/AdminLayout";
 import Home from "@/features/home/Home";
 import ProductPage from "@/features/product/ProductPage";
+import PromotionsPage from "@/features/product/PromotionsPage";
 import ProductDetailPage from "@/features/product/ProductDetailPage";
 import CartPage from "@/layouts/components/CartPage";
 import AccountPage from "@/layouts/Account";
@@ -25,6 +26,7 @@ import CouponManagementPage from "@/features/admin/CouponManagement";
 import PosManagementPage from "@/features/admin/PosManagement";
 import PosVnpayReturn from "@/features/admin/PosVnpayReturn";
 import OnlineVnpayReturn from "@/layouts/components/OnlineVnpayReturn";
+import ReviewManagement from "@/features/admin/ReviewManagement";
 
 import ProfilePage from "@/layouts/components/ProfilePage";
 import CheckoutPage from "@/layouts/components/CheckoutPage";
@@ -35,6 +37,8 @@ export const router = createBrowserRouter([
       { index: true, element: <Home /> },
       { path: "profile", element: <ProfilePage /> },
       { path: "products", element: <ProductPage /> },
+      { path: "promotions", element: <PromotionsPage /> },
+      { path: "san-pham-khuyen-mai", element: <PromotionsPage /> },
       { path: "products/:id", element: <ProductDetailPage /> },
       { path: "cart", element: <CartPage /> },
       { path: "account", element: <AccountPage /> },
@@ -75,6 +79,7 @@ export const router = createBrowserRouter([
       { path: "pos", element: <PosManagementPage /> },
       { path: "pos/vnpay-return", element: <PosVnpayReturn /> },
       { path: "orders", element: <OrderManagementPage /> },
+      { path: "reviews", element: <ReviewManagement /> },
 
       { path: "revenue", element: <DashboardPage /> },
     ],

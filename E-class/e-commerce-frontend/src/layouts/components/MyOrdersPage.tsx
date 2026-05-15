@@ -261,6 +261,7 @@ const MyOrdersPage = ({
         orderId={selectedOrderId}
         visible={isModalVisible}
         onClose={() => setIsModalVisible(false)}
+        onReviewSubmitted={onUpdate}
       />
     </>
   );

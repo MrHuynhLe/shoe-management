@@ -45,6 +45,7 @@ import com.vn.backend.repository.PaymentMethodRepository;
 import com.vn.backend.repository.PaymentRepository;
 import com.vn.backend.repository.ProductVariantRepository;
 import com.vn.backend.repository.PromotionRepository;
+import com.vn.backend.repository.ReviewRepository;
 import com.vn.backend.repository.UserRepository;
 import com.vn.backend.security.CustomUserDetails;
 import com.vn.backend.service.CheckoutQuoteService;
@@ -98,6 +99,7 @@ public class OrderServiceImpl implements OrderService {
     private final InventoryTransactionRepository inventoryTransactionRepository;
     private final ProductPriceService productPriceService;
     private final CheckoutQuoteService checkoutQuoteService;
+    private final ReviewRepository reviewRepository;
 
     private static final String ORDER_TYPE_ONLINE = "ONLINE";
 
@@ -415,10 +417,14 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal productDiscountPercent = defaultZero(item.getProductDiscountPercent());
 
         OrderItemResponse response = new OrderItemResponse();
+        response.setOrderItemId(item.getId());
         response.setProductId(variant.getProduct().getId());
         response.setProductName(variant.getProduct().getName());
         response.setVariantInfo(variant.getCode());
         response.setImageUrl(imageUrl);
+        response.setProductImage(imageUrl);
+        response.setSize(resolveVariantAttribute(variant, "SIZE"));
+        response.setColor(resolveVariantAttribute(variant, "COLOR"));
         response.setQuantity(item.getQuantity());
         response.setPrice(unitPrice);
         response.setOriginalPrice(originalPrice);
@@ -430,7 +436,37 @@ public class OrderServiceImpl implements OrderService {
         response.setIsSale(item.getPromotionId() != null && productDiscountPercent.compareTo(BigDecimal.ZERO) > 0);
         response.setSubtotal(lineTotal);
         response.setLineTotal(lineTotal);
+        reviewRepository.findByOrderItemIdAndStatusTrue(item.getId()).ifPresentOrElse(
+                review -> {
+                    response.setReviewed(true);
+                    response.setReviewId(review.getId());
+                },
+                () -> {
+                    response.setReviewed(false);
+                    response.setReviewId(null);
+                }
+        );
+        response.setCanReview(isReviewableOrderStatus(item.getOrder().getStatus()) && !Boolean.TRUE.equals(response.getReviewed()));
         return response;
+    }
+
+    private String resolveVariantAttribute(ProductVariant variant, String attributeCode) {
+        if (variant == null || variant.getVariantAttributeValues() == null) {
+            return null;
+        }
+
+        return variant.getVariantAttributeValues()
+                .stream()
+                .filter(vav -> vav.getAttributeValue() != null
+                        && vav.getAttributeValue().getAttribute() != null
+                        && attributeCode.equalsIgnoreCase(vav.getAttributeValue().getAttribute().getCode()))
+                .map(vav -> vav.getAttributeValue().getValue())
+                .findFirst()
+                .orElse(null);
+    }
+
+    private boolean isReviewableOrderStatus(String status) {
+        return "COMPLETED".equalsIgnoreCase(status) || "DELIVERED".equalsIgnoreCase(status);
     }
 
     @Override

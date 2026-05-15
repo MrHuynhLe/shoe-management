@@ -49,8 +49,12 @@ public class SecurityConfig {
                                 "/v1/attributes/*/values",
                                 "/v1/colors/**",
                                 "/v1/shipping-providers/active",
-                                "/v1/promotions/public"
+                                "/v1/promotions/public",
+                                "/v1/products/*/reviews"
                         ).permitAll()
+
+                        .requestMatchers(HttpMethod.POST, "/v1/order-items/*/reviews")
+                        .authenticated()
 
 
                         .requestMatchers("/v1/cart/**")

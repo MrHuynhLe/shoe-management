@@ -1,4 +1,5 @@
-import { Card, Col, Empty, Row, Space, Tag, Tooltip, Typography } from "antd";
+import { Button, Card, Col, Empty, Row, Space, Tag, Tooltip, Typography } from "antd";
+import { HeartOutlined } from "@ant-design/icons";
 import { Link } from "react-router-dom";
 import { ProductList } from "./product.model";
 import { resolveImageUrl } from "@/utils/utils";
@@ -80,7 +81,7 @@ const ProductListDisplay = ({ products, hideTitle = false }: ProductProps) => {
           const imageUrl = resolveImageUrl(rawImage);
 
           return (
-            <Col key={p.id} xs={24} sm={12} md={8} xl={6}>
+            <Col key={p.id} xs={24} sm={12} md={8} lg={6} xl={4}>
               <Card
                 hoverable
                 className="product-card"
@@ -93,6 +94,13 @@ const ProductListDisplay = ({ products, hideTitle = false }: ProductProps) => {
                         {Number(p.discountPercent).toFixed(0)}%
                       </Tag>
                     )}
+                    <Button
+                      shape="circle"
+                      size="small"
+                      icon={<HeartOutlined />}
+                      className="product-favorite-button"
+                      onClick={(event) => event.preventDefault()}
+                    />
                     <img
                       alt={p.name}
                       src={imageUrl || fallbackImage}
@@ -105,14 +113,16 @@ const ProductListDisplay = ({ products, hideTitle = false }: ProductProps) => {
                 }
               >
                 <Meta
-                  title={
-                    <Link to={`/products/${p.id}`}>
-                      <Tooltip title={p.name}>
-                        <span className="product-card-title">{p.name}</span>
-                      </Tooltip>
-                    </Link>
-                  }
+                  title={null}
                   description={
+                    <Space direction="vertical" size={8} style={{ width: "100%" }}>
+                      <Link to={`/products/${p.id}`}>
+                        <Tooltip title={p.name}>
+                          <span className="product-card-title">{p.name}</span>
+                        </Tooltip>
+                      </Link>
+                      <div>
+                    {
                     p.isSale && Number(p.discountPercent) > 0 ? (
                       <Space direction="vertical" size={2}>
                         <span className="product-price">
@@ -131,6 +141,9 @@ const ProductListDisplay = ({ products, hideTitle = false }: ProductProps) => {
                     ) : (
                       <span className="product-price">{formatFromRange(p.minPrice, p.maxPrice)}</span>
                     )
+                    }
+                      </div>
+                    </Space>
                   }
                 />
               </Card>
