@@ -17,18 +17,15 @@ import { ClearOutlined } from "@ant-design/icons";
 import ProductListDisplay from "./Products";
 import { productService } from "@/services/product.service";
 import { PageResponse, ProductList as ProductItem } from "./product.model";
-import { useSearchParams } from "react-router-dom";
 
 const { Content, Sider } = Layout;
 const { Text, Title } = Typography;
 
-const ProductPage = () => {
+const PromotionsPage = () => {
   const [products, setProducts] = useState<PageResponse<ProductItem>>();
   const [categories, setCategories] = useState<any[]>([]);
   const [brands, setBrands] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchParams] = useSearchParams();
-  const keyword = (searchParams.get("keyword") || "").trim();
   const [filters, setFilters] = useState<{
     categoryId?: number | null;
     brandId?: number | null;
@@ -42,29 +39,26 @@ const ProductPage = () => {
     const fetchProducts = async () => {
       setLoading(true);
       try {
-        const params = {
+        const res = await productService.filterProducts({
           page: pagination.current - 1,
           size: pagination.pageSize,
-          keyword: keyword || undefined,
+          isSale: true,
           categoryId: filters.categoryId,
           brandId: filters.brandId,
-          isSale: false,
-        };
-        const res = await productService.filterProducts(params);
+        });
         setProducts(res.data);
-      } catch (error) {
-        message.error("Không thể tải danh sách sản phẩm.");
+      } catch (error: any) {
+        message.error(
+          error?.response?.data?.message ||
+            "Không thể tải danh sách sản phẩm khuyến mãi.",
+        );
       } finally {
         setLoading(false);
       }
     };
 
     fetchProducts();
-  }, [filters, pagination, keyword]);
-
-  useEffect(() => {
-    setPagination((prev) => ({ ...prev, current: 1 }));
-  }, [keyword]);
+  }, [filters, pagination]);
 
   useEffect(() => {
     const fetchOptions = async () => {
@@ -75,7 +69,7 @@ const ProductPage = () => {
         ]);
         setCategories(categoryRes.data || []);
         setBrands(brandRes.data || []);
-      } catch (error) {
+      } catch {
         message.error("Không thể tải bộ lọc sản phẩm.");
       }
     };
@@ -84,12 +78,12 @@ const ProductPage = () => {
   }, []);
 
   const handleCategoryChange = (categoryId: any) => {
-    setFilters((prevFilters) => ({ ...prevFilters, categoryId }));
+    setFilters((prev) => ({ ...prev, categoryId }));
     setPagination((prev) => ({ ...prev, current: 1 }));
   };
 
   const handleBrandChange = (brandId: any) => {
-    setFilters((prevFilters) => ({ ...prevFilters, brandId }));
+    setFilters((prev) => ({ ...prev, brandId }));
     setPagination((prev) => ({ ...prev, current: 1 }));
   };
 
@@ -104,12 +98,10 @@ const ProductPage = () => {
     <Space direction="vertical" size={20} style={{ width: "100%" }}>
       <div className="app-section" style={{ padding: 24 }}>
         <Title level={2} style={{ margin: 0 }}>
-          Sản phẩm
+          Sản phẩm khuyến mãi
         </Title>
         <Text type="secondary">
-          {keyword
-            ? `Kết quả tìm kiếm cho "${keyword}".`
-            : "Lọc theo danh mục hoặc thương hiệu để tìm mẫu giày phù hợp."}
+          Lọc theo danh mục hoặc thương hiệu để xem sản phẩm đang có đợt giảm giá.
         </Text>
       </div>
 
@@ -195,7 +187,7 @@ const ProductPage = () => {
                   </Space>
                 ) : (
                   !loading && (
-                    <Empty description="Không tìm thấy sản phẩm nào phù hợp." />
+                    <Empty description="Không tìm thấy sản phẩm khuyến mãi nào" />
                   )
                 )}
               </Spin>
@@ -207,4 +199,4 @@ const ProductPage = () => {
   );
 };
 
-export default ProductPage;
+export default PromotionsPage;

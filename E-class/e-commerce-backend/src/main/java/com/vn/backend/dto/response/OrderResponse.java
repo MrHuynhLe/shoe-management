@@ -18,7 +18,14 @@ public class OrderResponse {
     private BigDecimal discountPercent;
     private String voucherCode;
     private BigDecimal subtotalAmount;
+    private BigDecimal originalSubtotal;
+    private BigDecimal productDiscountTotal;
+    private BigDecimal subtotalBeforeVoucher;
+    private BigDecimal voucherDiscountAmount;
+    private BigDecimal productRevenue;
+    private BigDecimal shippingFee;
     private BigDecimal totalAmount;
+    private BigDecimal finalTotal;
     private String status;
     private OffsetDateTime createdAt;
     private CustomerResponse customer;

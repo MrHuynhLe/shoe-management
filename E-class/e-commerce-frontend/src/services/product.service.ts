@@ -25,6 +25,10 @@ export const productService = {
     return axiosClient.get("/v1/products", { params });
   },
 
+  filterProducts: (params?: any) => {
+    return axiosClient.get("/v1/products/filter", { params });
+  },
+
   getProductById: (productId: number, includeInactive = false) => {
     return axiosClient.get(`/v1/products/${productId}`, {
       params: {

@@ -246,10 +246,20 @@ a:hover {
 }
 
 .product-card-cover {
+  position: relative;
   display: block;
   aspect-ratio: 1 / 1;
   overflow: hidden;
   background: var(--app-surface-soft);
+}
+
+.product-sale-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  margin: 0;
+  font-weight: 700;
 }
 
 .product-card-cover img {
@@ -278,6 +288,12 @@ a:hover {
   color: var(--app-danger);
   font-size: 16px;
   font-weight: 750;
+}
+
+.product-original-price {
+  color: var(--app-muted);
+  font-size: 13px;
+  text-decoration: line-through;
 }
 
 @media (max-width: 992px) {

@@ -2,8 +2,10 @@ package com.vn.backend.controller;
 
 import com.vn.backend.dto.request.ShippingEstimateRequest;
 import com.vn.backend.dto.response.ShippingEstimateResponse;
+import com.vn.backend.dto.response.ProductPriceResponse;
 import com.vn.backend.entity.ProductVariant;
 import com.vn.backend.repository.ProductVariantRepository;
+import com.vn.backend.service.ProductPriceService;
 import com.vn.backend.service.impl.GHTKLogicHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +24,7 @@ public class ShippingController {
 
     private final GHTKLogicHandler ghtkLogicHandler;
     private final ProductVariantRepository productVariantRepository;
+    private final ProductPriceService productPriceService;
 
     @PostMapping("/estimate")
     public ResponseEntity<ShippingEstimateResponse> estimateShippingFee(@RequestBody ShippingEstimateRequest request) {
@@ -29,7 +32,8 @@ public class ShippingController {
                 .map(item -> {
                     ProductVariant variant = productVariantRepository.findById(item.getVariantId())
                             .orElseThrow(() -> new RuntimeException("Variant not found"));
-                    return variant.getSellingPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
+                    ProductPriceResponse price = productPriceService.calculateCurrentPrice(variant);
+                    return price.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
                 })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 

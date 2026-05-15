@@ -8,6 +8,7 @@ import com.vn.backend.dto.response.ProductListResponse;
 import com.vn.backend.entity.Product;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public interface ProductService {
@@ -18,6 +19,20 @@ public interface ProductService {
             Long categoryId,
             Long brandId,
             boolean includeInactive
+    );
+
+    PageResponse<ProductListResponse> filterProducts(
+            int page,
+            int size,
+            String keyword,
+            Long categoryId,
+            Long brandId,
+            String sizeValue,
+            String color,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
+            String sort,
+            Boolean isSale
     );
 
     ProductDetailResponse getProductDetail(Long id, boolean includeInactive);

@@ -31,6 +31,13 @@ export interface Variant {
   code: string;
   costPrice: number;
   sellingPrice: number;
+  originalPrice?: number;
+  unitPrice?: number;
+  salePrice?: number;
+  discountPercent?: number;
+  isSale?: boolean;
+  promotionId?: number | null;
+  promotionName?: string | null;
   stockQuantity: number;
   isActive: boolean;
   attributes: ProductVariantAttributes;

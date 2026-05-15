@@ -133,6 +133,8 @@ public class SecurityConfig {
 
                         .requestMatchers("/v1/promotions/**")
                         .hasRole("ADMIN")
+                        .requestMatchers("/promotions/**")
+                        .hasRole("ADMIN")
                         .requestMatchers("/v1/coupons/**")
                         .hasRole("ADMIN")
                         .anyRequest().authenticated()

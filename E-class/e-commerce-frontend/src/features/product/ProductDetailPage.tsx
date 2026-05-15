@@ -12,8 +12,6 @@ import {
   Spin,
   notification,
   InputNumber,
-  Card,
-  Tooltip,
   Form,
   Input,
   Rate,
@@ -36,11 +34,15 @@ import apiClient from "@/services/api";
 import { ProductDetail, Variant } from "../admin/VariantDetailModal";
 import { PageResponse, ProductList } from "./product.model";
 import { resolveImageUrl } from "@/utils/utils";
+import ProductListDisplay from "./Products";
 
 const { Title, Text, Paragraph } = Typography;
 
 const NO_IMAGE_PLACEHOLDER =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath fill='%23cccccc' d='M448 80h-80L288 0 160 80H80c-26.5 0-48 21.5-48 48v304c0 26.5 21.5 48 48 48h368c26.5 0 48-21.5 48-48V128c0-26.5-21.5-48-48-48zm-224 48c44.2 0 80 35.8 80 80s-35.8 80-80 80-80-35.8-80-80 35.8-80 80-80zm144 256H96v-16c0-44.2 89.5-64 128-64s89.5 19.8 128 64v16z'/%3E%3C/svg%3E";
+
+const formatMoney = (value?: number | string) =>
+  `${Number(value || 0).toLocaleString("vi-VN")} ₫`;
 
 const getProductImage = (product: any) => {
   return (
@@ -425,9 +427,32 @@ const ProductDetailPage = () => {
               level={3}
               style={{ color: "#d0021b", marginTop: 0, fontWeight: "600" }}
             >
-              {selectedVariant
-                ? `${selectedVariant.sellingPrice.toLocaleString("vi-VN")} ₫`
-                : "Chọn Size và Màu để xem giá"}
+              {selectedVariant ? (
+                <Space direction="vertical" size={2}>
+                  <span>
+                    {formatMoney(
+                      selectedVariant.salePrice ??
+                        selectedVariant.unitPrice ??
+                        selectedVariant.sellingPrice,
+                    )}
+                  </span>
+                  {selectedVariant.isSale &&
+                    Number(selectedVariant.discountPercent || 0) > 0 &&
+                    Number(selectedVariant.originalPrice ?? selectedVariant.sellingPrice) >
+                      Number(selectedVariant.salePrice ?? selectedVariant.unitPrice ?? selectedVariant.sellingPrice) && (
+                      <Space size={8}>
+                        <Text delete type="secondary" style={{ fontSize: 16 }}>
+                          {formatMoney(selectedVariant.originalPrice ?? selectedVariant.sellingPrice)}
+                        </Text>
+                        <Tag color="red">
+                          -{Number(selectedVariant.discountPercent).toFixed(0)}%
+                        </Tag>
+                      </Space>
+                    )}
+                </Space>
+              ) : (
+                "Chọn Size và Màu để xem giá"
+              )}
             </Title>
 
             <Space>
@@ -585,7 +610,7 @@ const SuggestedProducts = ({
     setLoading(true);
 
     productService
-      .getProducts({ page: 0, size: 4 })
+      .filterProducts({ page: 0, size: 4 })
       .then((res) => {
         const filteredProducts = {
           ...res.data,
@@ -608,64 +633,9 @@ const SuggestedProducts = ({
         Có thể bạn cũng thích
       </Title>
 
-      <Row gutter={[16, 16]}>
-        {products?.content.map((p) => (
-          <Col key={p.id} xs={24} sm={12} md={8} lg={6}>
-            <Card
-              hoverable
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                height: "100%",
-                transition: "transform 0.3s ease, box-shadow 0.3s ease",
-              }}
-              bodyStyle={{ padding: "16px", flex: "1" }}
-              cover={
-                <Link
-                  to={`/products/${p.id}`}
-                  style={{ display: "block", aspectRatio: "1 / 1" }}
-                >
-                  <img
-                    alt={p.name}
-                    src={resolveImageUrl(getProductImage(p))}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                    }}
-                    onError={(e) => {
-                      console.error(
-                        "IMAGE LOAD ERROR:",
-                        p.name,
-                        getProductImage(p),
-                      );
-                      e.currentTarget.onerror = null;
-                      e.currentTarget.src = NO_IMAGE_PLACEHOLDER;
-                    }}
-                  />
-                </Link>
-              }
-            >
-              <Card.Meta
-                title={
-                  <Link to={`/products/${p.id}`}>
-                    <Tooltip title={p.name}>{p.name}</Tooltip>
-                  </Link>
-                }
-                description={
-                  <Typography.Text strong style={{ color: "#d0021b" }}>
-                    {p.minPrice !== null && p.maxPrice !== null
-                      ? p.minPrice === p.maxPrice
-                        ? `${p.minPrice.toLocaleString("vi-VN")} ₫`
-                        : `${p.minPrice.toLocaleString("vi-VN")} ₫ - ${p.maxPrice.toLocaleString("vi-VN")} ₫`
-                      : "Chưa có giá"}
-                  </Typography.Text>
-                }
-              />
-            </Card>
-          </Col>
-        ))}
-      </Row>
+      {products?.content?.length ? (
+        <ProductListDisplay products={products.content} hideTitle />
+      ) : null}
     </div>
   );
 };

@@ -19,14 +19,25 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
                 o.id AS order_id,
                 DATE_TRUNC('day', o.created_at) AS bucket,
                 COALESCE(SUM(oi.quantity), 0) AS items_sold,
-                COALESCE(SUM(oi.quantity * (oi.price_at_purchase - oi.cost_price_at_purchase)), 0) AS profit,
-                GREATEST(
-                    COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0) - COALESCE(o.discount_amount, 0),
-                    0
+                COALESCE(
+                    o.product_revenue,
+                    GREATEST(
+                        COALESCE(NULLIF(o.subtotal_before_voucher, 0), COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0))
+                            - COALESCE(o.discount_amount, 0),
+                        0
+                    )
+                ) - COALESCE(SUM(oi.quantity * oi.cost_price_at_purchase), 0) AS profit,
+                COALESCE(
+                    o.product_revenue,
+                    GREATEST(
+                        COALESCE(NULLIF(o.subtotal_before_voucher, 0), COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0))
+                            - COALESCE(o.discount_amount, 0),
+                        0
+                    )
                 ) AS revenue
             FROM orders o
             JOIN order_items oi ON oi.order_id = o.id
-            WHERE o.status IN ('COMPLETED', 'RETURN_REQUESTED', 'RETURN_REJECTED')
+            WHERE o.status = 'COMPLETED'
               AND (
                     :orderType IS NULL
                     OR :orderType = 'ALL'
@@ -34,7 +45,7 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
               )
               AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
               AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
-            GROUP BY o.id, DATE_TRUNC('day', o.created_at), o.discount_amount
+            GROUP BY o.id, DATE_TRUNC('day', o.created_at), o.discount_amount, o.product_revenue, o.subtotal_before_voucher
         )
         SELECT
             TO_CHAR(bucket, 'YYYY-MM-DD') AS label,
@@ -58,14 +69,25 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
                 o.id AS order_id,
                 DATE_TRUNC('week', o.created_at) AS bucket,
                 COALESCE(SUM(oi.quantity), 0) AS items_sold,
-                COALESCE(SUM(oi.quantity * (oi.price_at_purchase - oi.cost_price_at_purchase)), 0) AS profit,
-                GREATEST(
-                    COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0) - COALESCE(o.discount_amount, 0),
-                    0
+                COALESCE(
+                    o.product_revenue,
+                    GREATEST(
+                        COALESCE(NULLIF(o.subtotal_before_voucher, 0), COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0))
+                            - COALESCE(o.discount_amount, 0),
+                        0
+                    )
+                ) - COALESCE(SUM(oi.quantity * oi.cost_price_at_purchase), 0) AS profit,
+                COALESCE(
+                    o.product_revenue,
+                    GREATEST(
+                        COALESCE(NULLIF(o.subtotal_before_voucher, 0), COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0))
+                            - COALESCE(o.discount_amount, 0),
+                        0
+                    )
                 ) AS revenue
             FROM orders o
             JOIN order_items oi ON oi.order_id = o.id
-            WHERE o.status IN ('COMPLETED', 'RETURN_REQUESTED', 'RETURN_REJECTED')
+            WHERE o.status = 'COMPLETED'
               AND (
                     :orderType IS NULL
                     OR :orderType = 'ALL'
@@ -73,7 +95,7 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
               )
               AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
               AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
-            GROUP BY o.id, DATE_TRUNC('week', o.created_at), o.discount_amount
+            GROUP BY o.id, DATE_TRUNC('week', o.created_at), o.discount_amount, o.product_revenue, o.subtotal_before_voucher
         )
         SELECT
             TO_CHAR(bucket, 'YYYY-MM-DD') AS label,
@@ -97,14 +119,25 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
                 o.id AS order_id,
                 DATE_TRUNC('month', o.created_at) AS bucket,
                 COALESCE(SUM(oi.quantity), 0) AS items_sold,
-                COALESCE(SUM(oi.quantity * (oi.price_at_purchase - oi.cost_price_at_purchase)), 0) AS profit,
-                GREATEST(
-                    COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0) - COALESCE(o.discount_amount, 0),
-                    0
+                COALESCE(
+                    o.product_revenue,
+                    GREATEST(
+                        COALESCE(NULLIF(o.subtotal_before_voucher, 0), COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0))
+                            - COALESCE(o.discount_amount, 0),
+                        0
+                    )
+                ) - COALESCE(SUM(oi.quantity * oi.cost_price_at_purchase), 0) AS profit,
+                COALESCE(
+                    o.product_revenue,
+                    GREATEST(
+                        COALESCE(NULLIF(o.subtotal_before_voucher, 0), COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0))
+                            - COALESCE(o.discount_amount, 0),
+                        0
+                    )
                 ) AS revenue
             FROM orders o
             JOIN order_items oi ON oi.order_id = o.id
-            WHERE o.status IN ('COMPLETED', 'RETURN_REQUESTED', 'RETURN_REJECTED')
+            WHERE o.status = 'COMPLETED'
               AND (
                     :orderType IS NULL
                     OR :orderType = 'ALL'
@@ -112,7 +145,7 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
               )
               AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
               AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
-            GROUP BY o.id, DATE_TRUNC('month', o.created_at), o.discount_amount
+            GROUP BY o.id, DATE_TRUNC('month', o.created_at), o.discount_amount, o.product_revenue, o.subtotal_before_voucher
         )
         SELECT
             TO_CHAR(bucket, 'YYYY-MM') AS label,
@@ -136,14 +169,25 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
                 o.id AS order_id,
                 o.customer_id AS customer_id,
                 COALESCE(SUM(oi.quantity), 0) AS total_products_sold,
-                GREATEST(
-                    COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0) - COALESCE(o.discount_amount, 0),
-                    0
+                COALESCE(
+                    o.product_revenue,
+                    GREATEST(
+                        COALESCE(NULLIF(o.subtotal_before_voucher, 0), COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0))
+                            - COALESCE(o.discount_amount, 0),
+                        0
+                    )
                 ) AS total_revenue,
-                COALESCE(SUM(oi.quantity * (oi.price_at_purchase - oi.cost_price_at_purchase)), 0) AS total_profit
+                COALESCE(
+                    o.product_revenue,
+                    GREATEST(
+                        COALESCE(NULLIF(o.subtotal_before_voucher, 0), COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0))
+                            - COALESCE(o.discount_amount, 0),
+                        0
+                    )
+                ) - COALESCE(SUM(oi.quantity * oi.cost_price_at_purchase), 0) AS total_profit
             FROM orders o
             JOIN order_items oi ON oi.order_id = o.id
-            WHERE o.status IN ('COMPLETED', 'RETURN_REQUESTED', 'RETURN_REJECTED')
+            WHERE o.status = 'COMPLETED'
               AND (
                     :orderType IS NULL
                     OR :orderType = 'ALL'
@@ -151,7 +195,7 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
               )
               AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
               AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
-            GROUP BY o.id, o.customer_id, o.discount_amount
+            GROUP BY o.id, o.customer_id, o.discount_amount, o.product_revenue, o.subtotal_before_voucher
         )
         SELECT
             COUNT(order_id) AS totalOrders,
@@ -169,30 +213,59 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
 
     @Query(
             value = """
+                WITH order_item_base AS (
+                    SELECT
+                        p.id AS product_id,
+                        p.code AS product_code,
+                        p.name AS product_name,
+                        b.name AS brand_name,
+                        c.name AS category_name,
+                        oi.quantity AS quantity,
+                        COALESCE(oi.line_total, oi.quantity * oi.price_at_purchase, 0) AS line_total,
+                        COALESCE(oi.quantity * oi.cost_price_at_purchase, 0) AS cost_total,
+                        COALESCE(
+                            NULLIF(o.subtotal_before_voucher, 0),
+                            SUM(COALESCE(oi.line_total, oi.quantity * oi.price_at_purchase, 0))
+                                OVER (PARTITION BY o.id),
+                            0
+                        ) AS order_subtotal,
+                        COALESCE(o.discount_amount, 0) AS voucher_discount
+                    FROM order_items oi
+                    JOIN orders o ON o.id = oi.order_id
+                    JOIN product_variants pv ON pv.id = oi.product_variant_id
+                    JOIN products p ON p.id = pv.product_id
+                    LEFT JOIN brands b ON b.id = p.brand_id
+                    LEFT JOIN categories c ON c.id = p.category_id
+                    WHERE o.status = 'COMPLETED'
+                      AND (
+                            :orderType IS NULL
+                            OR :orderType = 'ALL'
+                            OR UPPER(o.order_type) = UPPER(:orderType)
+                      )
+                      AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
+                      AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
+                ),
+                allocated AS (
+                    SELECT
+                        *,
+                        CASE
+                            WHEN order_subtotal > 0
+                            THEN voucher_discount * line_total / order_subtotal
+                            ELSE 0
+                        END AS allocated_voucher_discount
+                    FROM order_item_base
+                )
                 SELECT
-                    p.id AS productId,
-                    p.code AS productCode,
-                    p.name AS productName,
-                    b.name AS brandName,
-                    c.name AS categoryName,
-                    COALESCE(SUM(oi.quantity), 0) AS totalSold,
-                    COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0) AS revenue,
-                    COALESCE(SUM(oi.quantity * (oi.price_at_purchase - oi.cost_price_at_purchase)), 0) AS profit
-                FROM order_items oi
-                JOIN orders o ON o.id = oi.order_id
-                JOIN product_variants pv ON pv.id = oi.product_variant_id
-                JOIN products p ON p.id = pv.product_id
-                LEFT JOIN brands b ON b.id = p.brand_id
-                LEFT JOIN categories c ON c.id = p.category_id
-                WHERE o.status IN ('COMPLETED', 'RETURN_REQUESTED', 'RETURN_REJECTED')
-                  AND (
-                        :orderType IS NULL
-                        OR :orderType = 'ALL'
-                        OR UPPER(o.order_type) = UPPER(:orderType)
-                  )
-                  AND (:fromDate IS NULL OR o.created_at >= CAST(:fromDate AS timestamp))
-                  AND (:toDate IS NULL OR o.created_at < (CAST(:toDate AS timestamp) + INTERVAL '1 day'))
-                GROUP BY p.id, p.code, p.name, b.name, c.name
+                    product_id AS productId,
+                    product_code AS productCode,
+                    product_name AS productName,
+                    brand_name AS brandName,
+                    category_name AS categoryName,
+                    COALESCE(SUM(quantity), 0) AS totalSold,
+                    COALESCE(SUM(GREATEST(line_total - allocated_voucher_discount, 0)), 0) AS revenue,
+                    COALESCE(SUM(GREATEST(line_total - allocated_voucher_discount, 0) - cost_total), 0) AS profit
+                FROM allocated
+                GROUP BY product_id, product_code, product_name, brand_name, category_name
                 ORDER BY totalSold DESC, revenue DESC
             """,
             countQuery = """
@@ -202,7 +275,7 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
                     JOIN orders o ON o.id = oi.order_id
                     JOIN product_variants pv ON pv.id = oi.product_variant_id
                     JOIN products p ON p.id = pv.product_id
-                    WHERE o.status IN ('COMPLETED', 'RETURN_REQUESTED', 'RETURN_REJECTED')
+                    WHERE o.status = 'COMPLETED'
                       AND (
                             :orderType IS NULL
                             OR :orderType = 'ALL'
@@ -227,14 +300,21 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
             o.status AS status,
             COUNT(*) AS totalOrders,
             COALESCE(SUM(
-                GREATEST(
-                    COALESCE((
-                        SELECT SUM(oi.quantity * oi.price_at_purchase)
-                        FROM order_items oi
-                        WHERE oi.order_id = o.id
-                    ), 0) - COALESCE(o.discount_amount, 0),
-                    0
-                )
+                CASE
+                    WHEN o.status = 'COMPLETED'
+                    THEN COALESCE(
+                        o.product_revenue,
+                        GREATEST(
+                            COALESCE(NULLIF(o.subtotal_before_voucher, 0), COALESCE((
+                                SELECT SUM(oi.quantity * oi.price_at_purchase)
+                                FROM order_items oi
+                                WHERE oi.order_id = o.id
+                            ), 0)) - COALESCE(o.discount_amount, 0),
+                            0
+                        )
+                    )
+                    ELSE 0
+                END
             ), 0) AS totalAmount
         FROM orders o
         WHERE o.status IN (
@@ -269,19 +349,22 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
             COALESCE(pm.name, 'Khác') AS paymentMethodName,
             COUNT(DISTINCT o.id) AS totalOrders,
             COALESCE(SUM(
-                GREATEST(
-                    COALESCE((
-                        SELECT SUM(oi.quantity * oi.price_at_purchase)
-                        FROM order_items oi
-                        WHERE oi.order_id = o.id
-                    ), 0) - COALESCE(o.discount_amount, 0),
-                    0
+                COALESCE(
+                    o.product_revenue,
+                    GREATEST(
+                        COALESCE(NULLIF(o.subtotal_before_voucher, 0), COALESCE((
+                            SELECT SUM(oi.quantity * oi.price_at_purchase)
+                            FROM order_items oi
+                            WHERE oi.order_id = o.id
+                        ), 0)) - COALESCE(o.discount_amount, 0),
+                        0
+                    )
                 )
             ), 0) AS revenue
         FROM payments p
         JOIN orders o ON o.id = p.order_id
         LEFT JOIN payment_methods pm ON pm.id = p.payment_method_id
-        WHERE o.status IN ('COMPLETED', 'RETURN_REQUESTED', 'RETURN_REJECTED')
+            WHERE o.status = 'COMPLETED'
           AND (
                 :orderType IS NULL
                 OR :orderType = 'ALL'
