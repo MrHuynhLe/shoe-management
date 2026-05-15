@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   Row,
   Col,
@@ -12,12 +12,6 @@ import {
   Spin,
   notification,
   InputNumber,
-  Form,
-  Input,
-  Rate,
-  List,
-  Avatar,
-  Collapse,
   message,
   Modal,
 } from "antd";
@@ -26,6 +20,9 @@ import {
   ArrowLeftOutlined,
   HeartOutlined,
   HeartFilled,
+  SafetyOutlined,
+  SyncOutlined,
+  TruckOutlined,
 } from "@ant-design/icons";
 import { productService } from "@/services/product.service";
 import { cartService } from "@/services/cart.service";
@@ -35,6 +32,7 @@ import { ProductDetail, Variant } from "../admin/VariantDetailModal";
 import { PageResponse, ProductList } from "./product.model";
 import { resolveImageUrl } from "@/utils/utils";
 import ProductListDisplay from "./Products";
+import ProductReviewsSection from "@/features/review/ProductReviewsSection";
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -339,18 +337,20 @@ const ProductDetailPage = () => {
         <Button
           icon={<ArrowLeftOutlined />}
           onClick={() => navigate("/products")}
-          style={{ marginBottom: "24px" }}
+          type="text"
+          style={{ marginBottom: 12 }}
         >
           Quay lại
         </Button>
 
-        <Row gutter={[32, 32]}>
+        <Row gutter={[28, 28]} className="product-detail-shell" style={{ padding: 24 }}>
           <Col xs={24} md={12}>
             <div
               style={{
-                border: "1px solid #f0f0f0",
-                borderRadius: "8px",
-                padding: "8px",
+                background: "#f7f7f8",
+                border: "1px solid #eef2f7",
+                borderRadius: 8,
+                padding: 12,
                 aspectRatio: "1 / 1",
                 display: "flex",
                 alignItems: "center",
@@ -383,7 +383,8 @@ const ProductDetailPage = () => {
                           selectedImage === resolvedImg
                             ? "2px solid #1677ff"
                             : "2px solid #f0f0f0",
-                        borderRadius: "4px",
+                        background: "#f7f7f8",
+                        borderRadius: 6,
                         padding: "4px",
                         cursor: "pointer",
                         transition:
@@ -419,13 +420,13 @@ const ProductDetailPage = () => {
           </Col>
 
           <Col xs={24} md={12}>
-            <Title level={2} style={{ fontWeight: "700", fontSize: "28px" }}>
+            <Title level={2} style={{ fontWeight: 800, fontSize: 28, marginTop: 0 }}>
               {product.name}
             </Title>
 
             <Title
               level={3}
-              style={{ color: "#d0021b", marginTop: 0, fontWeight: "600" }}
+              style={{ color: "#e11d2e", marginTop: 12, marginBottom: 0, fontWeight: 800 }}
             >
               {selectedVariant ? (
                 <Space direction="vertical" size={2}>
@@ -567,6 +568,7 @@ const ProductDetailPage = () => {
                   size="large"
                   onClick={handleAddToCart}
                   disabled={isOutOfStock}
+                  style={{ minWidth: 320 }}
                 >
                   {isOutOfStock ? "Hết hàng" : "Thêm vào giỏ hàng"}
                 </Button>
@@ -575,20 +577,34 @@ const ProductDetailPage = () => {
 
             <Divider />
 
-            <Collapse ghost>
-              <Collapse.Panel
-                header={
-                  <Title level={4} style={{ fontWeight: "600" }}>
-                    Đánh giá sản phẩm
-                  </Title>
-                }
-                key="1"
-              >
-                <ReviewSection productId={product.id} />
-              </Collapse.Panel>
-            </Collapse>
+            <Row gutter={[12, 12]}>
+              {[
+                [<TruckOutlined />, "Miễn phí vận chuyển", "Đơn hàng từ 500.000đ"],
+                [<SyncOutlined />, "Đổi trả dễ dàng", "Trong 7 ngày"],
+                [<SafetyOutlined />, "Thanh toán an toàn", "Hỗ trợ nhiều hình thức"],
+              ].map(([icon, title, desc]) => (
+                <Col xs={24} sm={8} key={String(title)}>
+                  <Space align="center">
+                    <span style={{ color: "#0f73ff", fontSize: 24 }}>{icon}</span>
+                    <span>
+                      <Text strong style={{ display: "block", fontSize: 13 }}>
+                        {title}
+                      </Text>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {desc}
+                      </Text>
+                    </span>
+                  </Space>
+                </Col>
+              ))}
+            </Row>
+
           </Col>
         </Row>
+
+        <Divider />
+
+        <ProductReviewsSection productId={product.id} />
 
         <Divider />
 
@@ -637,225 +653,6 @@ const SuggestedProducts = ({
         <ProductListDisplay products={products.content} hideTitle />
       ) : null}
     </div>
-  );
-};
-
-interface Review {
-  id: number;
-  productId: number;
-  reviewerName: string;
-  rating: number;
-  comment: string;
-  date: string;
-}
-
-const authService = {
-  getCurrentUser: () => {
-    return {
-      isLoggedIn: true,
-      name: "Nguyễn Văn An",
-    };
-  },
-};
-
-const reviewService = {
-  getReviewsByProductId: (productId: number): Promise<{ data: Review[] }> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const mockReviews: Review[] = [
-          {
-            id: 1,
-            productId: 1,
-            reviewerName: "Nguyễn Văn A",
-            rating: 5,
-            comment: "Sản phẩm rất đẹp và chất lượng, giao hàng nhanh.",
-            date: "2023-10-26",
-          },
-          {
-            id: 2,
-            productId: 1,
-            reviewerName: "Trần Thị B",
-            rating: 4,
-            comment: "Hài lòng với sản phẩm, nhưng giao hàng hơi chậm.",
-            date: "2023-10-25",
-          },
-          {
-            id: 3,
-            productId: 1,
-            reviewerName: "Phạm Văn C",
-            rating: 5,
-            comment: "Giày đi êm chân, đúng size. Sẽ ủng hộ shop dài dài.",
-            date: "2023-10-24",
-          },
-          {
-            id: 4,
-            productId: 2,
-            reviewerName: "Lê Thị D",
-            rating: 3,
-            comment: "Màu sắc không như mong đợi lắm, nhưng chất lượng ổn.",
-            date: "2023-10-23",
-          },
-        ];
-        resolve({ data: mockReviews.filter((r) => r.productId === productId) });
-      }, 500);
-    });
-  },
-
-  submitReview: (
-    review: Omit<Review, "id" | "date">,
-  ): Promise<{ success: boolean; data: Review }> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        console.log("Submitting review:", review);
-        const newReview: Review = {
-          ...review,
-          id: Date.now(),
-          date: new Date().toISOString().split("T")[0],
-        };
-        resolve({ success: true, data: newReview });
-      }, 500);
-    });
-  },
-};
-
-const ReviewSection = ({ productId }: { productId: number }) => {
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [loadingReviews, setLoadingReviews] = useState(false);
-  const [submittingReview, setSubmittingReview] = useState(false);
-  const [form] = Form.useForm();
-  const currentUser = authService.getCurrentUser();
-
-  const fetchReviews = () => {
-    setLoadingReviews(true);
-    reviewService
-      .getReviewsByProductId(productId)
-      .then((res) => {
-        setReviews(res.data);
-      })
-      .catch((error) => {
-        console.error("Failed to fetch reviews:", error);
-        notification.error({
-          message: "Lỗi",
-          description: "Không thể tải đánh giá sản phẩm.",
-        });
-      })
-      .finally(() => setLoadingReviews(false));
-  };
-
-  useEffect(() => {
-    fetchReviews();
-  }, [productId]);
-
-  const onFinishReview = (values: any) => {
-    setSubmittingReview(true);
-
-    const reviewData = {
-      ...values,
-      productId,
-      reviewerName: currentUser.name,
-    };
-
-    reviewService
-      .submitReview(reviewData)
-      .then(() => {
-        notification.success({
-          message: "Thành công",
-          description: "Đánh giá của bạn đã được gửi.",
-        });
-        form.resetFields();
-        fetchReviews();
-      })
-      .catch((error) => {
-        console.error("Failed to submit review:", error);
-        notification.error({
-          message: "Lỗi",
-          description: "Không thể gửi đánh giá.",
-        });
-      })
-      .finally(() => setSubmittingReview(false));
-  };
-
-  return (
-    <>
-      <Spin spinning={loadingReviews}>
-        <List
-          itemLayout="horizontal"
-          dataSource={reviews}
-          renderItem={(item) => (
-            <List.Item>
-              <List.Item.Meta
-                avatar={
-                  <Avatar
-                    src={`https://api.dicebear.com/7.x/miniavs/svg?seed=${item.reviewerName}`}
-                  />
-                }
-                title={
-                  <Space>
-                    {item.reviewerName}
-                    <Rate
-                      disabled
-                      defaultValue={item.rating}
-                      style={{ fontSize: 14 }}
-                    />
-                  </Space>
-                }
-                description={
-                  <>
-                    <Paragraph>{item.comment}</Paragraph>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      {item.date}
-                    </Text>
-                  </>
-                }
-              />
-            </List.Item>
-          )}
-        />
-      </Spin>
-
-      <Divider />
-
-      {currentUser.isLoggedIn ? (
-        <>
-          <Title level={4} style={{ fontWeight: "600" }}>
-            Gửi đánh giá của bạn
-          </Title>
-          <Form form={form} onFinish={onFinishReview} layout="vertical">
-            <Form.Item
-              name="rating"
-              label="Đánh giá sao"
-              rules={[{ required: true, message: "Vui lòng chọn số sao!" }]}
-            >
-              <Rate />
-            </Form.Item>
-
-            <Form.Item
-              name="comment"
-              label="Bình luận"
-              rules={[
-                { required: true, message: "Vui lòng nhập bình luận của bạn!" },
-              ]}
-            >
-              <Input.TextArea rows={4} />
-            </Form.Item>
-
-            <Form.Item>
-              <Button
-                type="primary"
-                htmlType="submit"
-                loading={submittingReview}
-              >
-                Gửi đánh giá
-              </Button>
-            </Form.Item>
-          </Form>
-        </>
-      ) : (
-        <Text type="secondary">
-          Vui lòng <Link to="/login">đăng nhập</Link> để gửi đánh giá.
-        </Text>
-      )}
-    </>
   );
 };
 

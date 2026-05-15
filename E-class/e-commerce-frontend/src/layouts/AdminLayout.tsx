@@ -5,6 +5,7 @@ import {
   LogoutOutlined,
   ShopOutlined,
   SolutionOutlined,
+  StarOutlined,
   TagsOutlined,
   TeamOutlined,
   UserOutlined,
@@ -149,6 +150,12 @@ const AdminLayout = () => {
               path: "/admin/orders",
               name: "Hóa đơn",
               icon: <SolutionOutlined />,
+            },
+            {
+              key: "/admin/reviews",
+              path: "/admin/reviews",
+              name: "Đánh giá",
+              icon: <StarOutlined />,
             },
             {
               key: "/admin/employees",

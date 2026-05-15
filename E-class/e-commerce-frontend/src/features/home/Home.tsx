@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { Button, Carousel, Col, Empty, Row, Space, Spin, Typography, message } from "antd";
-import { ArrowRightOutlined } from "@ant-design/icons";
+import {
+  ArrowRightOutlined,
+  CreditCardOutlined,
+  SafetyCertificateOutlined,
+  SyncOutlined,
+} from "@ant-design/icons";
 import { Link } from "react-router-dom";
 import ProductListDisplay from "@/features/product/Products";
 import { productService } from "@/services/product.service";
@@ -54,7 +59,7 @@ const Home = () => {
 
   return (
     <Space direction="vertical" size={28} style={{ width: "100%" }}>
-      <Carousel autoplay dots>
+      <Carousel autoplay dots className="shop-hero">
         {slides.map((slide) => (
           <div key={slide.title}>
             <div
@@ -63,7 +68,7 @@ const Home = () => {
                 background: `linear-gradient(90deg, rgba(8, 18, 38, 0.78), rgba(8, 18, 38, 0.2)), url(${slide.image}) center/cover`,
                 borderRadius: 10,
                 display: "flex",
-                minHeight: 420,
+                minHeight: 280,
                 overflow: "hidden",
                 padding: "48px clamp(24px, 6vw, 72px)",
               }}
@@ -73,7 +78,7 @@ const Home = () => {
                   level={1}
                   style={{
                     color: "#fff",
-                    fontSize: "clamp(32px, 5vw, 56px)",
+                    fontSize: "clamp(34px, 4vw, 52px)",
                     lineHeight: 1.05,
                     margin: 0,
                   }}
@@ -97,7 +102,7 @@ const Home = () => {
       <Row gutter={[16, 16]}>
         {[
           ["Chính hãng", "Nguồn gốc sản phẩm rõ ràng"],
-          ["Dễ đổi trả", "Hỗ trợ đổi size theo chính sách"],
+          ["Mua sắm dễ dàng", "Hỗ trợ đặt hàng nhanh chóng"],
           ["Thanh toán linh hoạt", "Tiền mặt, chuyển khoản và VNPay"],
         ].map(([title, desc]) => (
           <Col xs={24} md={8} key={title}>
@@ -121,7 +126,7 @@ const Home = () => {
             <Title level={2} style={{ margin: 0 }}>
               Sản phẩm nổi bật
             </Title>
-            <Text type="secondary">Các mẫu đang được cập nhật trong cửa hàng</Text>
+            <Text type="secondary"></Text>
           </div>
           <Link to="/products">
             <Button>Xem tất cả</Button>

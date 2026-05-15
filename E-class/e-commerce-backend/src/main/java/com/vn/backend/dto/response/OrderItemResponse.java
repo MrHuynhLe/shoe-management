@@ -10,10 +10,14 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 public class OrderItemResponse {
+    private Long orderItemId;
     private Long productId;
     private String productName;
     private String variantInfo;
     private String imageUrl;
+    private String productImage;
+    private String size;
+    private String color;
     private int quantity;
     private BigDecimal price;
     private BigDecimal originalPrice;
@@ -25,4 +29,7 @@ public class OrderItemResponse {
     private Boolean isSale;
     private BigDecimal subtotal;
     private BigDecimal lineTotal;
+    private Boolean reviewed;
+    private Boolean canReview;
+    private Long reviewId;
 }

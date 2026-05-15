@@ -8,6 +8,7 @@ import {
   Menu,
   Pagination,
   Row,
+  Select,
   Space,
   Spin,
   Typography,
@@ -28,7 +29,11 @@ const ProductPage = () => {
   const [brands, setBrands] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchParams] = useSearchParams();
-  const keyword = (searchParams.get("keyword") || "").trim();
+  const keyword = (
+    searchParams.get("search") ||
+    searchParams.get("keyword") ||
+    ""
+  ).trim();
   const [filters, setFilters] = useState<{
     categoryId?: number | null;
     brandId?: number | null;
@@ -48,7 +53,7 @@ const ProductPage = () => {
           keyword: keyword || undefined,
           categoryId: filters.categoryId,
           brandId: filters.brandId,
-          isSale: false,
+          isSale: keyword ? undefined : false,
         };
         const res = await productService.filterProducts(params);
         setProducts(res.data);
@@ -109,7 +114,7 @@ const ProductPage = () => {
         <Text type="secondary">
           {keyword
             ? `Kết quả tìm kiếm cho "${keyword}".`
-            : "Lọc theo danh mục hoặc thương hiệu để tìm mẫu giày phù hợp."}
+            : ""}
         </Text>
       </div>
 
@@ -181,6 +186,32 @@ const ProductPage = () => {
               <Spin spinning={loading}>
                 {products && products.content.length > 0 ? (
                   <Space direction="vertical" size={20} style={{ width: "100%" }}>
+                    <Space
+                      align="center"
+                      style={{ justifyContent: "space-between", width: "100%" }}
+                      wrap
+                    >
+                      <Space>
+                        <Text>Sắp xếp:</Text>
+                        <Select
+                          value="newest"
+                          style={{ width: 128 }}
+                          options={[{ value: "newest", label: "Mới nhất" }]}
+                        />
+                      </Space>
+                      <Space>
+                        <Text>Hiển thị:</Text>
+                        <Select
+                          value={pagination.pageSize}
+                          style={{ width: 120 }}
+                          onChange={(pageSize) => setPagination({ current: 1, pageSize })}
+                          options={[
+                            { value: 12, label: "12 / trang" },
+                            { value: 24, label: "24 / trang" },
+                          ]}
+                        />
+                      </Space>
+                    </Space>
                     <ProductListDisplay products={products.content} hideTitle />
                     <Pagination
                       align="center"

@@ -101,7 +101,7 @@ const PromotionsPage = () => {
           Sản phẩm khuyến mãi
         </Title>
         <Text type="secondary">
-          Lọc theo danh mục hoặc thương hiệu để xem sản phẩm đang có đợt giảm giá.
+          
         </Text>
       </div>
 
