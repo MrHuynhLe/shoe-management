@@ -34,6 +34,7 @@ interface CartItem {
   name: string;
   size?: string | null;
   color?: string | null;
+  material?: string | null;
   variantCode?: string | null;
   price: number;
   originalPrice: number;
@@ -79,6 +80,7 @@ const CartPage = () => {
         name: `${item.productName} - ${item.variantCode}`,
         size: item.size,
         color: item.color,
+        material: item.material,
         price: Number(item.unitPrice ?? item.salePrice ?? item.price ?? 0),
         originalPrice: Number(item.originalPrice ?? item.price ?? 0),
         unitPrice: Number(item.unitPrice ?? item.salePrice ?? item.price ?? 0),
@@ -210,6 +212,12 @@ const CartPage = () => {
               {record.color && (
                 <Text type="secondary">
                   Màu: <Text strong>{record.color}</Text>
+                </Text>
+              )}
+
+              {record.material && (
+                <Text type="secondary">
+                  Chất liệu: <Text strong>{record.material}</Text>
                 </Text>
               )}
             </Space>

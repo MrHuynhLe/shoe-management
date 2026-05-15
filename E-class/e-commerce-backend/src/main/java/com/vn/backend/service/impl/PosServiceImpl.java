@@ -769,6 +769,7 @@ public class PosServiceImpl implements PosService {
 
         String color = extractAttributeValue(variant, "COLOR");
         String size = extractAttributeValue(variant, "SIZE");
+        String material = extractAttributeValue(variant, "MATERIAL");
 
         return PosOrderItemResponse.builder()
                 .itemId(item.getId())
@@ -778,6 +779,7 @@ public class PosServiceImpl implements PosService {
                 .productName(product != null ? product.getName() : null)
                 .color(color)
                 .size(size)
+                .material(material)
                 .price(price)
                 .quantity(item.getQuantity())
                 .lineTotal(lineTotal)
@@ -791,6 +793,7 @@ public class PosServiceImpl implements PosService {
 
         String color = extractAttributeValue(variant, "COLOR");
         String size = extractAttributeValue(variant, "SIZE");
+        String material = extractAttributeValue(variant, "MATERIAL");
 
         return PosProductSearchResponse.builder()
                 .productVariantId(variant.getId())
@@ -800,6 +803,7 @@ public class PosServiceImpl implements PosService {
                 .productName(product != null ? product.getName() : null)
                 .color(color)
                 .size(size)
+                .material(material)
                 .sellingPrice(defaultZero(variant.getSellingPrice()))
                 .stockQuantity(variant.getStockQuantity())
                 .imageUrl(getImageUrl(variant))

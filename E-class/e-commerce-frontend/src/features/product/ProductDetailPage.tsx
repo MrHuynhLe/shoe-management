@@ -42,6 +42,36 @@ const NO_IMAGE_PLACEHOLDER =
 const formatMoney = (value?: number | string) =>
   `${Number(value || 0).toLocaleString("vi-VN")} ₫`;
 
+const getVariantAttribute = (variant: Variant | null | undefined, code: string) => {
+  if (!variant) return null;
+
+  const attrs = variant.attributes || {};
+  const direct = attrs[code] ?? attrs[code.toUpperCase()] ?? attrs[code.toLowerCase()];
+
+  if (direct != null && String(direct).trim()) {
+    return String(direct);
+  }
+
+  const normalizedCode = code.toLowerCase();
+  const directField = (variant as Record<string, unknown>)[normalizedCode];
+  const nameField = (variant as Record<string, unknown>)[`${normalizedCode}Name`];
+
+  const value = nameField ?? directField;
+  return value != null && String(value).trim() ? String(value) : null;
+};
+
+const getVariantSize = (variant: Variant | null | undefined) =>
+  getVariantAttribute(variant, "SIZE");
+
+const getVariantColor = (variant: Variant | null | undefined) =>
+  getVariantAttribute(variant, "COLOR");
+
+const getVariantMaterial = (variant: Variant | null | undefined) =>
+  getVariantAttribute(variant, "MATERIAL");
+
+const getVariantStock = (variant: Variant | null | undefined) =>
+  Number(variant?.stockQuantity ?? (variant as any)?.stock_quantity ?? 0);
+
 const getProductImage = (product: any) => {
   return (
     product?.imageUrl ||
@@ -68,6 +98,7 @@ const ProductDetailPage = () => {
   const [selectedImage, setSelectedImage] = useState<string>("");
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [selectedMaterial, setSelectedMaterial] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
@@ -112,65 +143,75 @@ const ProductDetailPage = () => {
     );
   }, [product]);
 
-  const { allSizes, allColors, variantsBySize, variantsByColor } =
+  const { allSizes, allColors, allMaterials } =
     useMemo(() => {
       if (!product) {
         return {
           allSizes: [],
           allColors: [],
-          variantsBySize: {} as Record<string, Variant[]>,
-          variantsByColor: {} as Record<string, Variant[]>,
+          allMaterials: [],
         };
       }
 
       const allSizes = [
         ...new Set(
-          sellableVariants.map((v) => v.attributes.SIZE).filter(Boolean),
+          sellableVariants.map(getVariantSize).filter(Boolean),
         ),
       ];
 
       const allColors = [
         ...new Set(
-          sellableVariants.map((v) => v.attributes.COLOR).filter(Boolean),
+          sellableVariants.map(getVariantColor).filter(Boolean),
         ),
       ];
 
-      const variantsByColor = allColors.reduce(
-        (acc, color) => {
-          acc[color] = sellableVariants.filter(
-            (v) => v.attributes.COLOR === color,
-          );
-          return acc;
-        },
-        {} as Record<string, Variant[]>,
-      );
+      const allMaterials = [
+        ...new Set(
+          sellableVariants.map(getVariantMaterial).filter(Boolean),
+        ),
+      ];
 
-      const variantsBySize = allSizes.reduce(
-        (acc, size) => {
-          acc[size] = sellableVariants.filter(
-            (v) => v.attributes.SIZE === size,
-          );
-          return acc;
-        },
-        {} as Record<string, Variant[]>,
-      );
-
-      return { allSizes, allColors, variantsBySize, variantsByColor };
+      return { allSizes, allColors, allMaterials };
     }, [product, sellableVariants]);
-    
-  
+
+  const hasMaterialOptions = allMaterials.length > 0;
+
+  const matchesSelectedSize = (variant: Variant) =>
+    !selectedSize || getVariantSize(variant) === selectedSize;
+
+  const matchesSelectedColor = (variant: Variant) =>
+    !selectedColor || getVariantColor(variant) === selectedColor;
 
   const selectedVariant = useMemo(() => {
-    if (!selectedSize || !selectedColor) return null;
+    if (!selectedSize || !selectedColor || (hasMaterialOptions && !selectedMaterial)) {
+      return null;
+    }
 
     return (
       sellableVariants.find(
         (v) =>
-          v.attributes.SIZE === selectedSize &&
-          v.attributes.COLOR === selectedColor,
+          getVariantSize(v) === selectedSize &&
+          getVariantColor(v) === selectedColor &&
+          (!hasMaterialOptions || getVariantMaterial(v) === selectedMaterial),
       ) || null
     );
-  }, [sellableVariants, selectedSize, selectedColor]);
+  }, [sellableVariants, selectedSize, selectedColor, selectedMaterial, hasMaterialOptions]);
+
+  useEffect(() => {
+    if (!selectedMaterial) return;
+
+    const materialStillExists = sellableVariants.some(
+      (variant) =>
+        matchesSelectedSize(variant) &&
+        matchesSelectedColor(variant) &&
+        getVariantMaterial(variant) === selectedMaterial,
+    );
+
+    if (!materialStillExists) {
+      setSelectedMaterial(null);
+      setQuantity(1);
+    }
+  }, [sellableVariants, selectedSize, selectedColor, selectedMaterial]);
 
   useEffect(() => {
     if (!product) return;
@@ -182,7 +223,7 @@ const ProductDetailPage = () => {
 
     if (selectedColor) {
       const variantsOfColor = product.variants.filter(
-        (v) => v.attributes.COLOR === selectedColor,
+        (v) => getVariantColor(v) === selectedColor,
       );
       const colorImages = variantsOfColor.flatMap((v) => v.images || []);
       if (colorImages.length > 0) {
@@ -208,7 +249,7 @@ const ProductDetailPage = () => {
       newImageList = selectedVariant.images;
     } else if (selectedColor) {
       const variantsOfColor = product.variants.filter(
-        (v) => v.attributes.COLOR === selectedColor,
+        (v) => getVariantColor(v) === selectedColor,
       );
       newImageList = variantsOfColor.flatMap((v) => v.images || []);
     }
@@ -220,63 +261,49 @@ const ProductDetailPage = () => {
     return [...new Set(newImageList)];
   }, [product, selectedColor, selectedVariant]);
   //
-  const availableSizesForSelectedColor = selectedColor
-    ? variantsByColor[selectedColor]
-        ?.filter((v) => (v.stockQuantity ?? 0) > 0)
-        .map((v) => v.attributes.SIZE) || []
-    : allSizes;
-
-  const availableColorsForSelectedSize = selectedSize
-    ? variantsBySize[selectedSize]
-        ?.filter((v) => (v.stockQuantity ?? 0) > 0)
-        .map((v) => v.attributes.COLOR) || []
-    : allColors;
-
   const isSizeDisabled = (size: string) => {
-    if (selectedColor && !availableSizesForSelectedColor.includes(size)) {
-      return true;
-    }
-
-    const variantsForThisSize = variantsBySize[size];
-    if (
-      !variantsForThisSize ||
-      variantsForThisSize.every((v) => (v.stockQuantity ?? 0) <= 0)
-    ) {
-      return true;
-    }
-
-    return false;
+    return !sellableVariants.some(
+      (variant) => getVariantSize(variant) === size && getVariantStock(variant) > 0,
+    );
   };
 
   const isColorDisabled = (color: string) => {
-    if (selectedSize && !availableColorsForSelectedSize.includes(color)) {
-      return true;
-    }
+    return !sellableVariants.some(
+      (variant) =>
+        getVariantColor(variant) === color &&
+        matchesSelectedSize(variant) &&
+        getVariantStock(variant) > 0,
+    );
+  };
 
-    const variantsForThisColor = variantsByColor[color];
-    if (
-      !variantsForThisColor ||
-      variantsForThisColor.every((v) => (v.stockQuantity ?? 0) <= 0)
-    ) {
-      return true;
-    }
-
-    return false;
+  const isMaterialDisabled = (material: string) => {
+    return !sellableVariants.some(
+      (variant) =>
+        getVariantMaterial(variant) === material &&
+        matchesSelectedSize(variant) &&
+        matchesSelectedColor(variant),
+    );
   };
   //
 
-  const handleSelectAttribute = (type: "size" | "color", value: string) => {
+  const handleSelectAttribute = (type: "size" | "color" | "material", value: string) => {
     if (type === "size") {
       setSelectedSize((prev) => (prev === value ? null : value));
-    } else {
+    } else if (type === "color") {
       setSelectedColor((prev) => (prev === value ? null : value));
+    } else {
+      setSelectedMaterial((prev) => (prev === value ? null : value));
     }
     setQuantity(1);
   };
 
   const handleAddToCart = async () => {
     if (!selectedVariant) {
-      message.warning("Vui lòng chọn size và màu trước khi thêm vào giỏ hàng.");
+      message.warning(
+        hasMaterialOptions
+          ? "Vui lòng chọn đầy đủ size, màu sắc và chất liệu"
+          : "Vui lòng chọn đầy đủ size và màu sắc",
+      );
       return;
     }
 
@@ -285,13 +312,13 @@ const ProductDetailPage = () => {
       return;
     }
 
-    if ((selectedVariant.stockQuantity ?? 0) <= 0) {
+    if (getVariantStock(selectedVariant) <= 0) {
       message.error("Sản phẩm này đã hết hàng.");
       return;
     }
 
-    if (quantity > (selectedVariant.stockQuantity ?? 0)) {
-      message.warning("Số lượng vượt quá tồn kho hiện có.");
+    if (quantity > getVariantStock(selectedVariant)) {
+      message.warning("Số lượng không được vượt quá tồn kho của biến thể đã chọn");
       return;
     }
 
@@ -318,7 +345,13 @@ const ProductDetailPage = () => {
       },
     });
   };
-  const selectedStock = selectedVariant?.stockQuantity ?? 0;
+  const hasCompleteSelection = Boolean(
+    selectedSize && selectedColor && (!hasMaterialOptions || selectedMaterial),
+  );
+  const selectionHint = hasMaterialOptions
+    ? "Vui lòng chọn size, màu sắc và chất liệu để xem tồn kho"
+    : "Vui lòng chọn size và màu sắc để xem tồn kho";
+  const selectedStock = getVariantStock(selectedVariant);
   const isOutOfStock = !selectedVariant || selectedStock <= 0;
   const isLowStock =
     selectedVariant != null && selectedStock > 0 && selectedStock <= 5;
@@ -452,7 +485,9 @@ const ProductDetailPage = () => {
                     )}
                 </Space>
               ) : (
-                "Chọn Size và Màu để xem giá"
+                hasMaterialOptions
+                  ? "Chọn Size, Màu và Chất liệu để xem giá"
+                  : "Chọn Size và Màu để xem giá"
               )}
             </Title>
 
@@ -461,7 +496,15 @@ const ProductDetailPage = () => {
               <Tag color="purple">{product.categoryName}</Tag>
             </Space>
 
-            {selectedVariant && (
+              {!hasCompleteSelection && (
+                <div style={{ marginTop: 8 }}>
+                  <Text type="secondary">
+                    {selectionHint}
+                  </Text>
+                </div>
+              )}
+
+              {hasCompleteSelection && selectedVariant && (
               <>
                 <div style={{ marginTop: 8 }}>
                   <Text>Tồn kho: {selectedStock}</Text>
@@ -522,6 +565,29 @@ const ProductDetailPage = () => {
               </Space>
             </div>
 
+            {hasMaterialOptions && (
+              <div>
+                <Text strong>Chất liệu:</Text>
+                <Space wrap style={{ marginTop: 8, marginBottom: 16 }}>
+                  {allMaterials.map((material) => (
+                    <Button
+                      key={material}
+                      type={selectedMaterial === material ? "primary" : "default"}
+                      onClick={() => handleSelectAttribute("material", material)}
+                      disabled={isMaterialDisabled(material)}
+                      style={{
+                        whiteSpace: "normal",
+                        minHeight: 32,
+                        maxWidth: 180,
+                      }}
+                    >
+                      {material}
+                    </Button>
+                  ))}
+                </Space>
+              </div>
+            )}
+
             <div style={{ marginTop: 8 }}>
               <Text strong>Thêm vào yêu thích:</Text>
               <Space style={{ marginLeft: 12 }}>
@@ -567,7 +633,7 @@ const ProductDetailPage = () => {
                   icon={<ShoppingCartOutlined />}
                   size="large"
                   onClick={handleAddToCart}
-                  disabled={isOutOfStock}
+                  disabled={!selectedVariant || isOutOfStock}
                   style={{ minWidth: 320 }}
                 >
                   {isOutOfStock ? "Hết hàng" : "Thêm vào giỏ hàng"}

@@ -425,6 +425,7 @@ public class OrderServiceImpl implements OrderService {
         response.setProductImage(imageUrl);
         response.setSize(resolveVariantAttribute(variant, "SIZE"));
         response.setColor(resolveVariantAttribute(variant, "COLOR"));
+        response.setMaterial(resolveVariantAttribute(variant, "MATERIAL"));
         response.setQuantity(item.getQuantity());
         response.setPrice(unitPrice);
         response.setOriginalPrice(originalPrice);

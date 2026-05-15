@@ -20,6 +20,9 @@ public class ProductVariantResponse {
     private Integer stockQuantity;
     private String binLocation;
     private Boolean isActive;
+    private String size;
+    private String color;
+    private String material;
     private Map<String, String> attributes;
     private BigDecimal originalPrice;
     private BigDecimal unitPrice;
@@ -49,6 +52,9 @@ public class ProductVariantResponse {
         this.binLocation = binLocation;
         this.isActive = isActive;
         this.attributes = attributes;
+        this.size = attributes != null ? attributes.get("SIZE") : null;
+        this.color = attributes != null ? attributes.get("COLOR") : null;
+        this.material = attributes != null ? attributes.get("MATERIAL") : null;
         this.originalPrice = sellingPrice;
         this.unitPrice = sellingPrice;
         this.salePrice = sellingPrice;

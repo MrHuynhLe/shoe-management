@@ -97,6 +97,7 @@ public class CheckoutQuoteServiceImpl implements CheckoutQuoteService {
                     .variantCode(variant.getCode())
                     .size(extractAttributeValue(variant, "SIZE"))
                     .color(extractAttributeValue(variant, "COLOR"))
+                    .material(extractAttributeValue(variant, "MATERIAL"))
                     .imageUrl(resolveImageUrl(variant))
                     .quantity(item.getQuantity())
                     .originalPrice(originalPrice)

@@ -33,6 +33,7 @@ interface OrderItem {
   productImage?: string;
   size?: string;
   color?: string;
+  material?: string;
   quantity: number;
   price: number;
   subtotal: number;
@@ -208,6 +209,16 @@ const OrderDetailModal = ({
             <Text strong>{text}</Text>
             <br />
             <Text type="secondary">{record.variantInfo}</Text>
+            {(record.size || record.color || record.material) && (
+              <>
+                <br />
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {[record.size, record.color, record.material]
+                    .filter(Boolean)
+                    .join(" / ")}
+                </Text>
+              </>
+            )}
           </div>
         </div>
       ),
@@ -451,8 +462,8 @@ const OrderDetailModal = ({
             <div>
               <Text strong>{reviewingItem.productName}</Text>
               <br />
-              <Text type="secondary">
-                {[reviewingItem.size, reviewingItem.color].filter(Boolean).join(" / ") ||
+            <Text type="secondary">
+                {[reviewingItem.size, reviewingItem.color, reviewingItem.material].filter(Boolean).join(" / ") ||
                   reviewingItem.variantInfo}
               </Text>
             </div>

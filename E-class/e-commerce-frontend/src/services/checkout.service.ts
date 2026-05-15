@@ -7,6 +7,7 @@ export interface CheckoutQuoteItem {
   variantCode?: string | null;
   size?: string | null;
   color?: string | null;
+  material?: string | null;
   imageUrl?: string | null;
   quantity: number;
   originalPrice: number;

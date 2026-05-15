@@ -1069,9 +1069,16 @@ const CheckoutPage = () => {
                           </Text>
                         }
                         description={
-                          <Row justify="space-between">
-                            <Col>
-                              <Text type="secondary">SL: {item.quantity}</Text>
+                          <Row justify="space-between" gutter={[12, 8]}>
+                            <Col flex="auto">
+                              <Space direction="vertical" size={2}>
+                                <Text type="secondary">SL: {item.quantity}</Text>
+                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                  {[item.size, item.color, item.material]
+                                    .filter(Boolean)
+                                    .join(" / ")}
+                                </Text>
+                              </Space>
                             </Col>
                             <Col>
                               <Space direction="vertical" size={0} align="end">
