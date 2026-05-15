@@ -15,4 +15,11 @@ public class ShippingInfoRequest {
     private String province;
     private String district;
     private String ward;
+    private Integer provinceId;
+    private Integer districtId;
+    private String wardCode;
+    private String provinceName;
+    private String districtName;
+    private String wardName;
+    private Integer shippingFee;
 }

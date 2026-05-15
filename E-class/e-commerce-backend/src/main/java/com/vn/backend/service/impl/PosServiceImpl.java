@@ -10,6 +10,7 @@ import com.vn.backend.dto.response.pos.PosAvailableDiscountResponse;
 import com.vn.backend.dto.response.pos.PosOrderItemResponse;
 import com.vn.backend.dto.response.pos.PosOrderResponse;
 import com.vn.backend.dto.response.pos.PosProductSearchResponse;
+import com.vn.backend.dto.response.ProductPriceResponse;
 import com.vn.backend.entity.AttributeValue;
 import com.vn.backend.entity.Coupon;
 import com.vn.backend.entity.CouponUsage;
@@ -44,6 +45,7 @@ import com.vn.backend.repository.PromotionRepository;
 import com.vn.backend.repository.StoreRepository;
 import com.vn.backend.repository.UserProfileRepository;
 import com.vn.backend.service.PosService;
+import com.vn.backend.service.ProductPriceService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -92,6 +94,7 @@ public class PosServiceImpl implements PosService {
     private final CouponRepository couponRepository;
     private final CouponUsageRepository couponUsageRepository;
     private final UserProfileRepository userProfileRepository;
+    private final ProductPriceService productPriceService;
 
     @Override
     public PosOrderResponse createOrder(PosCreateOrderRequest request) {
@@ -142,6 +145,7 @@ public class PosServiceImpl implements PosService {
                 .store(store)
                 .totalAmount(BigDecimal.ZERO)
                 .discountAmount(BigDecimal.ZERO)
+                .productRevenue(BigDecimal.ZERO)
                 .shippingFee(BigDecimal.ZERO)
                 .status(ORDER_STATUS_DRAFT)
                 .orderType(ORDER_TYPE_POS)
@@ -221,14 +225,24 @@ public class PosServiceImpl implements PosService {
         if (existingItemOpt.isPresent()) {
             OrderItem existingItem = existingItemOpt.get();
             existingItem.setQuantity(existingItem.getQuantity() + addQty);
+            applyCurrentPriceSnapshot(existingItem, variant);
             orderItemRepository.save(existingItem);
         } else {
+            ProductPriceResponse price = productPriceService.calculateCurrentPrice(variant);
+            BigDecimal unitPrice = defaultZero(price.getUnitPrice());
+            BigDecimal originalPrice = defaultZero(price.getOriginalPrice());
+            BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(addQty));
             OrderItem newItem = OrderItem.builder()
                     .order(order)
                     .productVariant(variant)
                     .quantity(addQty)
-                    .priceAtPurchase(variant.getSellingPrice())
-                    .costPriceAtPurchase(variant.getCostPrice())
+                    .priceAtPurchase(unitPrice)
+                    .originalPriceAtPurchase(originalPrice)
+                    .productDiscountPercent(defaultZero(price.getDiscountPercent()))
+                    .productDiscountAmount(originalPrice.subtract(unitPrice).multiply(BigDecimal.valueOf(addQty)))
+                    .promotionId(price.getPromotionId())
+                    .lineTotal(lineTotal)
+                    .costPriceAtPurchase(defaultZero(variant.getCostPrice()))
                     .build();
 
             orderItemRepository.save(newItem);
@@ -298,6 +312,7 @@ public class PosServiceImpl implements PosService {
         }
 
         item.setQuantity(newQty);
+        applyCurrentPriceSnapshot(item, variant);
         orderItemRepository.save(item);
 
         recalculateOrderAmounts(order);
@@ -507,6 +522,7 @@ public class PosServiceImpl implements PosService {
         }
 
         order.setDiscountAmount(discountAmount);
+        order.setProductRevenue(totalAmount.subtract(discountAmount).max(BigDecimal.ZERO));
         order.setVoucherCode(appliedVoucherCode);
         order.setCustomerPaid(customerPaid);
         order.setNote(request.getNote() != null ? request.getNote() : order.getNote());
@@ -645,12 +661,35 @@ public class PosServiceImpl implements PosService {
     private void recalculateOrderAmounts(Order order) {
         List<OrderItem> items = orderItemRepository.findByOrder_Id(order.getId().longValue());
 
+        BigDecimal originalSubtotal = BigDecimal.ZERO;
+        BigDecimal productDiscountTotal = BigDecimal.ZERO;
         BigDecimal total = items.stream()
-                .map(i -> defaultZero(i.getPriceAtPurchase())
-                        .multiply(BigDecimal.valueOf(i.getQuantity())))
+                .map(i -> {
+                    BigDecimal lineTotal = defaultZero(i.getLineTotal());
+                    if (lineTotal.compareTo(BigDecimal.ZERO) == 0) {
+                        lineTotal = defaultZero(i.getPriceAtPurchase())
+                                .multiply(BigDecimal.valueOf(i.getQuantity()));
+                        i.setLineTotal(lineTotal);
+                    }
+                    return lineTotal;
+                })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        for (OrderItem item : items) {
+            BigDecimal originalPrice = defaultZero(item.getOriginalPriceAtPurchase());
+            if (originalPrice.compareTo(BigDecimal.ZERO) == 0) {
+                originalPrice = defaultZero(item.getPriceAtPurchase());
+            }
+            BigDecimal itemOriginalSubtotal = originalPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
+            originalSubtotal = originalSubtotal.add(itemOriginalSubtotal);
+            productDiscountTotal = productDiscountTotal.add(itemOriginalSubtotal.subtract(defaultZero(item.getLineTotal())));
+        }
+
         order.setTotalAmount(total);
+        order.setOriginalSubtotal(originalSubtotal);
+        order.setProductDiscountTotal(productDiscountTotal);
+        order.setSubtotalBeforeVoucher(total);
+        order.setProductRevenue(total.subtract(defaultZero(order.getDiscountAmount())).max(BigDecimal.ZERO));
 
         if (order.getDiscountAmount() == null) {
             order.setDiscountAmount(BigDecimal.ZERO);
@@ -663,6 +702,21 @@ public class PosServiceImpl implements PosService {
         if (order.getCustomerPaid() == null) {
             order.setCustomerPaid(BigDecimal.ZERO);
         }
+    }
+
+    private void applyCurrentPriceSnapshot(OrderItem item, ProductVariant variant) {
+        ProductPriceResponse price = productPriceService.calculateCurrentPrice(variant);
+        BigDecimal unitPrice = defaultZero(price.getUnitPrice());
+        BigDecimal originalPrice = defaultZero(price.getOriginalPrice());
+        BigDecimal quantity = BigDecimal.valueOf(item.getQuantity());
+
+        item.setPriceAtPurchase(unitPrice);
+        item.setOriginalPriceAtPurchase(originalPrice);
+        item.setProductDiscountPercent(defaultZero(price.getDiscountPercent()));
+        item.setProductDiscountAmount(originalPrice.subtract(unitPrice).multiply(quantity));
+        item.setPromotionId(price.getPromotionId());
+        item.setLineTotal(unitPrice.multiply(quantity));
+        item.setCostPriceAtPurchase(defaultZero(variant.getCostPrice()));
     }
 
     private PosOrderResponse mapToOrderResponse(Order order) {
@@ -709,10 +763,14 @@ public class PosServiceImpl implements PosService {
         Product product = variant.getProduct();
 
         BigDecimal price = defaultZero(item.getPriceAtPurchase());
-        BigDecimal lineTotal = price.multiply(BigDecimal.valueOf(item.getQuantity()));
+        BigDecimal lineTotal = defaultZero(item.getLineTotal());
+        if (lineTotal.compareTo(BigDecimal.ZERO) == 0) {
+            lineTotal = price.multiply(BigDecimal.valueOf(item.getQuantity()));
+        }
 
         String color = extractAttributeValue(variant, "COLOR");
         String size = extractAttributeValue(variant, "SIZE");
+        String material = extractAttributeValue(variant, "MATERIAL");
 
         return PosOrderItemResponse.builder()
                 .itemId(item.getId())
@@ -722,6 +780,7 @@ public class PosServiceImpl implements PosService {
                 .productName(product != null ? product.getName() : null)
                 .color(color)
                 .size(size)
+                .material(material)
                 .price(price)
                 .quantity(item.getQuantity())
                 .lineTotal(lineTotal)
@@ -735,6 +794,7 @@ public class PosServiceImpl implements PosService {
 
         String color = extractAttributeValue(variant, "COLOR");
         String size = extractAttributeValue(variant, "SIZE");
+        String material = extractAttributeValue(variant, "MATERIAL");
 
         return PosProductSearchResponse.builder()
                 .productVariantId(variant.getId())
@@ -744,6 +804,7 @@ public class PosServiceImpl implements PosService {
                 .productName(product != null ? product.getName() : null)
                 .color(color)
                 .size(size)
+                .material(material)
                 .sellingPrice(defaultZero(variant.getSellingPrice()))
                 .stockQuantity(variant.getStockQuantity())
                 .imageUrl(getImageUrl(variant))

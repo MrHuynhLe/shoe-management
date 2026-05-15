@@ -5,6 +5,7 @@ import com.vn.backend.dto.request.ProductUpdateRequest;
 import com.vn.backend.dto.response.PageResponse;
 import com.vn.backend.dto.response.ProductDetailResponse;
 import com.vn.backend.dto.response.ProductListResponse;
+import com.vn.backend.dto.response.ProductPriceResponse;
 import com.vn.backend.dto.response.ProductVariantResponse;
 import com.vn.backend.entity.Brand;
 import com.vn.backend.entity.Category;
@@ -22,17 +23,20 @@ import com.vn.backend.repository.ProductRepository;
 import com.vn.backend.repository.ProductVariantRepository;
 import com.vn.backend.repository.SupplierRepository;
 import com.vn.backend.service.FileStorageService;
+import com.vn.backend.service.ProductPriceService;
 import com.vn.backend.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.text.Normalizer;
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.Comparator;
@@ -51,6 +55,7 @@ public class ProductServiceImpl implements ProductService {
     private final ProductVariantRepository productVariantRepository;
     private final FileStorageService fileStorageService;
     private final SupplierRepository supplierRepository;
+    private final ProductPriceService productPriceService;
 
     @Override
     @Transactional
@@ -154,6 +159,37 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional(readOnly = true)
+    public PageResponse<ProductListResponse> filterProducts(
+            int page,
+            int size,
+            String keyword,
+            Long categoryId,
+            Long brandId,
+            String sizeValue,
+            String color,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
+            String sort,
+            Boolean isSale
+    ) {
+        Pageable pageable = PageRequest.of(page, size, resolveSort(sort));
+        Page<Product> pageData = productRepository.filterProducts(
+                pageable,
+                StringUtils.hasText(keyword) ? "%" + keyword.trim().toLowerCase() + "%" : null,
+                categoryId,
+                brandId,
+                StringUtils.hasText(sizeValue) ? sizeValue.trim().toLowerCase() : null,
+                StringUtils.hasText(color) ? color.trim().toLowerCase() : null,
+                minPrice,
+                maxPrice,
+                isSale,
+                OffsetDateTime.now()
+        );
+        return PageMapper.toPageResponse(pageData, this::mapProductToSaleAwareListResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public ProductDetailResponse getProductDetail(Long id, boolean includeInactive) {
         Product p = productRepository.findDetailById(id, includeInactive)
                 .orElseThrow(() -> new RuntimeException("PRODUCT_NOT_FOUND"));
@@ -165,24 +201,7 @@ public class ProductServiceImpl implements ProductService {
                 : productVariants.stream()
                 .filter(v -> v.getDeletedAt() == null)
                 .filter(v -> includeInactive || Boolean.TRUE.equals(v.getIsActive()))
-                .map(v -> new ProductVariantResponse(
-                        v.getId(),
-                        v.getCode(),
-                        v.getBarcode(),
-                        v.getCostPrice(),
-                        v.getSellingPrice(),
-                        v.getStockQuantity(),
-                        v.getBinLocation(),
-                        v.getIsActive(),
-                        v.getVariantAttributeValues() == null
-                                ? java.util.Collections.emptyMap()
-                                : v.getVariantAttributeValues().stream()
-                                .collect(java.util.stream.Collectors.toMap(
-                                        av -> av.getAttributeValue().getAttribute().getCode(),
-                                        av -> av.getAttributeValue().getValue(),
-                                        (oldVal, newVal) -> oldVal
-                                ))
-                ))
+                .map(this::mapVariantToSaleAwareResponse)
                 .toList();
 
         List<String> images = p.getImages() == null
@@ -352,5 +371,126 @@ public class ProductServiceImpl implements ProductService {
                 .replaceAll("^-|-$", "");
 
         return normalized.length() > 30 ? normalized.substring(0, 30) : normalized;
+    }
+
+    private Sort resolveSort(String sort) {
+        if ("priceAsc".equalsIgnoreCase(sort) || "price_asc".equalsIgnoreCase(sort)) {
+            return Sort.by(Sort.Direction.ASC, "id");
+        }
+        if ("priceDesc".equalsIgnoreCase(sort) || "price_desc".equalsIgnoreCase(sort)) {
+            return Sort.by(Sort.Direction.DESC, "id");
+        }
+        return Sort.by(Sort.Direction.DESC, "id");
+    }
+
+    private ProductListResponse mapProductToSaleAwareListResponse(Product product) {
+        List<ProductVariant> activeVariants = product.getVariants() == null
+                ? List.of()
+                : product.getVariants().stream()
+                .filter(v -> v.getDeletedAt() == null)
+                .filter(v -> Boolean.TRUE.equals(v.getIsActive()))
+                .toList();
+
+        BigDecimal minOriginal = null;
+        BigDecimal maxOriginal = null;
+        BigDecimal minSale = null;
+        BigDecimal maxSale = null;
+        BigDecimal discountPercent = null;
+        int totalStock = 0;
+        int saleVariantCount = 0;
+
+        for (ProductVariant variant : activeVariants) {
+            ProductPriceResponse currentPrice = productPriceService.calculateCurrentPrice(variant);
+            BigDecimal original = currentPrice.getOriginalPrice();
+            if (original == null) {
+                continue;
+            }
+            totalStock += variant.getStockQuantity() == null ? 0 : variant.getStockQuantity();
+            minOriginal = min(minOriginal, original);
+            maxOriginal = max(maxOriginal, original);
+
+            BigDecimal finalPrice = currentPrice.getUnitPrice();
+            if (Boolean.TRUE.equals(currentPrice.getIsSale())) {
+                discountPercent = max(discountPercent, currentPrice.getDiscountPercent());
+                saleVariantCount++;
+            }
+            minSale = min(minSale, finalPrice);
+            maxSale = max(maxSale, finalPrice);
+        }
+
+        ProductListResponse response = new ProductListResponse();
+        response.setId(product.getId());
+        response.setCode(product.getCode());
+        response.setName(product.getName());
+        response.setBrandName(product.getBrand() != null ? product.getBrand().getName() : null);
+        response.setCategoryName(product.getCategory() != null ? product.getCategory().getName() : null);
+        response.setImageUrl(product.getImages() == null || product.getImages().isEmpty()
+                ? null
+                : product.getImages().stream()
+                .sorted(Comparator.comparing((ProductImage img) -> Boolean.TRUE.equals(img.getIsPrimary()) ? 0 : 1)
+                        .thenComparing(ProductImage::getDisplayOrder, Comparator.nullsLast(Integer::compareTo)))
+                .map(ProductImage::getImageUrl)
+                .findFirst()
+                .orElse(null));
+        response.setTotalStock(totalStock);
+        response.setMinOriginalPrice(minOriginal);
+        response.setMaxOriginalPrice(maxOriginal);
+        response.setMinPrice(minSale);
+        response.setMaxPrice(maxSale);
+        response.setSalePrice(minSale);
+        response.setMinSalePrice(minSale);
+        response.setMaxSalePrice(maxSale);
+        response.setDiscountPercent(discountPercent);
+        response.setIsSale(discountPercent != null && discountPercent.compareTo(BigDecimal.ZERO) > 0);
+        response.setSaleVariantCount(saleVariantCount);
+        response.setActiveVariantCount(activeVariants.size());
+        response.setIsActive(product.getIsActive());
+        return response;
+    }
+
+    private ProductVariantResponse mapVariantToSaleAwareResponse(ProductVariant variant) {
+        ProductPriceResponse price = productPriceService.calculateCurrentPrice(variant);
+
+        ProductVariantResponse response = new ProductVariantResponse(
+                variant.getId(),
+                variant.getCode(),
+                variant.getBarcode(),
+                variant.getCostPrice(),
+                variant.getSellingPrice(),
+                variant.getStockQuantity(),
+                variant.getBinLocation(),
+                variant.getIsActive(),
+                variant.getVariantAttributeValues() == null
+                        ? java.util.Collections.emptyMap()
+                        : variant.getVariantAttributeValues().stream()
+                        .collect(java.util.stream.Collectors.toMap(
+                                av -> av.getAttributeValue().getAttribute().getCode(),
+                                av -> av.getAttributeValue().getValue(),
+                                (oldVal, newVal) -> oldVal
+                        ))
+        );
+
+        response.setOriginalPrice(price.getOriginalPrice());
+        response.setUnitPrice(price.getUnitPrice());
+        response.setSalePrice(price.getSalePrice());
+        response.setDiscountPercent(price.getDiscountPercent());
+        response.setIsSale(price.getIsSale());
+        response.setPromotionId(price.getPromotionId());
+        response.setPromotionName(price.getPromotionName());
+        return response;
+    }
+
+    private BigDecimal min(BigDecimal current, BigDecimal candidate) {
+        if (candidate == null) {
+            return current;
+        }
+        return current == null || candidate.compareTo(current) < 0 ? candidate : current;
+    }
+
+    private BigDecimal max(BigDecimal current, BigDecimal candidate) {
+        if (candidate == null) {
+            return current;
+        }
+        return current == null || candidate.compareTo(current) > 0 ? candidate : current;
     }
 }

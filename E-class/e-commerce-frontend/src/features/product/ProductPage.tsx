@@ -8,6 +8,7 @@ import {
   Menu,
   Pagination,
   Row,
+  Select,
   Space,
   Spin,
   Typography,
@@ -17,6 +18,7 @@ import { ClearOutlined } from "@ant-design/icons";
 import ProductListDisplay from "./Products";
 import { productService } from "@/services/product.service";
 import { PageResponse, ProductList as ProductItem } from "./product.model";
+import { useSearchParams } from "react-router-dom";
 
 const { Content, Sider } = Layout;
 const { Text, Title } = Typography;
@@ -26,6 +28,12 @@ const ProductPage = () => {
   const [categories, setCategories] = useState<any[]>([]);
   const [brands, setBrands] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchParams] = useSearchParams();
+  const keyword = (
+    searchParams.get("search") ||
+    searchParams.get("keyword") ||
+    ""
+  ).trim();
   const [filters, setFilters] = useState<{
     categoryId?: number | null;
     brandId?: number | null;
@@ -42,10 +50,12 @@ const ProductPage = () => {
         const params = {
           page: pagination.current - 1,
           size: pagination.pageSize,
+          keyword: keyword || undefined,
           categoryId: filters.categoryId,
           brandId: filters.brandId,
+          isSale: keyword ? undefined : false,
         };
-        const res = await productService.getProducts(params);
+        const res = await productService.filterProducts(params);
         setProducts(res.data);
       } catch (error) {
         message.error("Không thể tải danh sách sản phẩm.");
@@ -55,7 +65,11 @@ const ProductPage = () => {
     };
 
     fetchProducts();
-  }, [filters, pagination]);
+  }, [filters, pagination, keyword]);
+
+  useEffect(() => {
+    setPagination((prev) => ({ ...prev, current: 1 }));
+  }, [keyword]);
 
   useEffect(() => {
     const fetchOptions = async () => {
@@ -98,7 +112,9 @@ const ProductPage = () => {
           Sản phẩm
         </Title>
         <Text type="secondary">
-          Lọc theo danh mục hoặc thương hiệu để tìm mẫu giày phù hợp.
+          {keyword
+            ? `Kết quả tìm kiếm cho "${keyword}".`
+            : ""}
         </Text>
       </div>
 
@@ -170,6 +186,32 @@ const ProductPage = () => {
               <Spin spinning={loading}>
                 {products && products.content.length > 0 ? (
                   <Space direction="vertical" size={20} style={{ width: "100%" }}>
+                    <Space
+                      align="center"
+                      style={{ justifyContent: "space-between", width: "100%" }}
+                      wrap
+                    >
+                      <Space>
+                        <Text>Sắp xếp:</Text>
+                        <Select
+                          value="newest"
+                          style={{ width: 128 }}
+                          options={[{ value: "newest", label: "Mới nhất" }]}
+                        />
+                      </Space>
+                      <Space>
+                        <Text>Hiển thị:</Text>
+                        <Select
+                          value={pagination.pageSize}
+                          style={{ width: 120 }}
+                          onChange={(pageSize) => setPagination({ current: 1, pageSize })}
+                          options={[
+                            { value: 12, label: "12 / trang" },
+                            { value: 24, label: "24 / trang" },
+                          ]}
+                        />
+                      </Space>
+                    </Space>
                     <ProductListDisplay products={products.content} hideTitle />
                     <Pagination
                       align="center"

@@ -71,6 +71,7 @@ const formatUsagePercent = (value?: number | null) => {
 const buildVariantText = (
   color?: string | null,
   size?: string | null,
+  material?: string | null,
   variantCode?: string | null,
   barcode?: string | null,
 ) => {
@@ -78,6 +79,7 @@ const buildVariantText = (
 
   if (color) meta.push(`Màu: ${color}`);
   if (size) meta.push(`Size: ${size}`);
+  if (material) meta.push(`Chất liệu: ${material}`);
 
   const variantInfo = meta.join(" | ");
 
@@ -1091,6 +1093,7 @@ const PosManagement = () => {
               {buildVariantText(
                 record.color,
                 record.size,
+                record.material,
                 record.variantCode,
                 record.barcode,
               )}
@@ -1258,6 +1261,7 @@ const PosManagement = () => {
             {buildVariantText(
               record.color,
               record.size,
+              record.material,
               record.variantCode,
               record.barcode,
             )}

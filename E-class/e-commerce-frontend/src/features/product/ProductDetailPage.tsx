@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   Row,
   Col,
@@ -12,14 +12,6 @@ import {
   Spin,
   notification,
   InputNumber,
-  Card,
-  Tooltip,
-  Form,
-  Input,
-  Rate,
-  List,
-  Avatar,
-  Collapse,
   message,
   Modal,
 } from "antd";
@@ -28,6 +20,9 @@ import {
   ArrowLeftOutlined,
   HeartOutlined,
   HeartFilled,
+  SafetyOutlined,
+  SyncOutlined,
+  TruckOutlined,
 } from "@ant-design/icons";
 import { productService } from "@/services/product.service";
 import { cartService } from "@/services/cart.service";
@@ -36,11 +31,46 @@ import apiClient from "@/services/api";
 import { ProductDetail, Variant } from "../admin/VariantDetailModal";
 import { PageResponse, ProductList } from "./product.model";
 import { resolveImageUrl } from "@/utils/utils";
+import ProductListDisplay from "./Products";
+import ProductReviewsSection from "@/features/review/ProductReviewsSection";
 
 const { Title, Text, Paragraph } = Typography;
 
 const NO_IMAGE_PLACEHOLDER =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath fill='%23cccccc' d='M448 80h-80L288 0 160 80H80c-26.5 0-48 21.5-48 48v304c0 26.5 21.5 48 48 48h368c26.5 0 48-21.5 48-48V128c0-26.5-21.5-48-48-48zm-224 48c44.2 0 80 35.8 80 80s-35.8 80-80 80-80-35.8-80-80 35.8-80 80-80zm144 256H96v-16c0-44.2 89.5-64 128-64s89.5 19.8 128 64v16z'/%3E%3C/svg%3E";
+
+const formatMoney = (value?: number | string) =>
+  `${Number(value || 0).toLocaleString("vi-VN")} ₫`;
+
+const getVariantAttribute = (variant: Variant | null | undefined, code: string) => {
+  if (!variant) return null;
+
+  const attrs = variant.attributes || {};
+  const direct = attrs[code] ?? attrs[code.toUpperCase()] ?? attrs[code.toLowerCase()];
+
+  if (direct != null && String(direct).trim()) {
+    return String(direct);
+  }
+
+  const normalizedCode = code.toLowerCase();
+  const directField = (variant as Record<string, unknown>)[normalizedCode];
+  const nameField = (variant as Record<string, unknown>)[`${normalizedCode}Name`];
+
+  const value = nameField ?? directField;
+  return value != null && String(value).trim() ? String(value) : null;
+};
+
+const getVariantSize = (variant: Variant | null | undefined) =>
+  getVariantAttribute(variant, "SIZE");
+
+const getVariantColor = (variant: Variant | null | undefined) =>
+  getVariantAttribute(variant, "COLOR");
+
+const getVariantMaterial = (variant: Variant | null | undefined) =>
+  getVariantAttribute(variant, "MATERIAL");
+
+const getVariantStock = (variant: Variant | null | undefined) =>
+  Number(variant?.stockQuantity ?? (variant as any)?.stock_quantity ?? 0);
 
 const getProductImage = (product: any) => {
   return (
@@ -61,13 +91,14 @@ const getProductImage = (product: any) => {
 const ProductDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, fetchOrderCount } = useAuth();
 
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string>("");
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [selectedMaterial, setSelectedMaterial] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
@@ -112,65 +143,75 @@ const ProductDetailPage = () => {
     );
   }, [product]);
 
-  const { allSizes, allColors, variantsBySize, variantsByColor } =
+  const { allSizes, allColors, allMaterials } =
     useMemo(() => {
       if (!product) {
         return {
           allSizes: [],
           allColors: [],
-          variantsBySize: {} as Record<string, Variant[]>,
-          variantsByColor: {} as Record<string, Variant[]>,
+          allMaterials: [],
         };
       }
 
       const allSizes = [
         ...new Set(
-          sellableVariants.map((v) => v.attributes.SIZE).filter(Boolean),
+          sellableVariants.map(getVariantSize).filter(Boolean),
         ),
       ];
 
       const allColors = [
         ...new Set(
-          sellableVariants.map((v) => v.attributes.COLOR).filter(Boolean),
+          sellableVariants.map(getVariantColor).filter(Boolean),
         ),
       ];
 
-      const variantsByColor = allColors.reduce(
-        (acc, color) => {
-          acc[color] = sellableVariants.filter(
-            (v) => v.attributes.COLOR === color,
-          );
-          return acc;
-        },
-        {} as Record<string, Variant[]>,
-      );
+      const allMaterials = [
+        ...new Set(
+          sellableVariants.map(getVariantMaterial).filter(Boolean),
+        ),
+      ];
 
-      const variantsBySize = allSizes.reduce(
-        (acc, size) => {
-          acc[size] = sellableVariants.filter(
-            (v) => v.attributes.SIZE === size,
-          );
-          return acc;
-        },
-        {} as Record<string, Variant[]>,
-      );
-
-      return { allSizes, allColors, variantsBySize, variantsByColor };
+      return { allSizes, allColors, allMaterials };
     }, [product, sellableVariants]);
-    
-  
+
+  const hasMaterialOptions = allMaterials.length > 0;
+
+  const matchesSelectedSize = (variant: Variant) =>
+    !selectedSize || getVariantSize(variant) === selectedSize;
+
+  const matchesSelectedColor = (variant: Variant) =>
+    !selectedColor || getVariantColor(variant) === selectedColor;
 
   const selectedVariant = useMemo(() => {
-    if (!selectedSize || !selectedColor) return null;
+    if (!selectedSize || !selectedColor || (hasMaterialOptions && !selectedMaterial)) {
+      return null;
+    }
 
     return (
       sellableVariants.find(
         (v) =>
-          v.attributes.SIZE === selectedSize &&
-          v.attributes.COLOR === selectedColor,
+          getVariantSize(v) === selectedSize &&
+          getVariantColor(v) === selectedColor &&
+          (!hasMaterialOptions || getVariantMaterial(v) === selectedMaterial),
       ) || null
     );
-  }, [sellableVariants, selectedSize, selectedColor]);
+  }, [sellableVariants, selectedSize, selectedColor, selectedMaterial, hasMaterialOptions]);
+
+  useEffect(() => {
+    if (!selectedMaterial) return;
+
+    const materialStillExists = sellableVariants.some(
+      (variant) =>
+        matchesSelectedSize(variant) &&
+        matchesSelectedColor(variant) &&
+        getVariantMaterial(variant) === selectedMaterial,
+    );
+
+    if (!materialStillExists) {
+      setSelectedMaterial(null);
+      setQuantity(1);
+    }
+  }, [sellableVariants, selectedSize, selectedColor, selectedMaterial]);
 
   useEffect(() => {
     if (!product) return;
@@ -182,7 +223,7 @@ const ProductDetailPage = () => {
 
     if (selectedColor) {
       const variantsOfColor = product.variants.filter(
-        (v) => v.attributes.COLOR === selectedColor,
+        (v) => getVariantColor(v) === selectedColor,
       );
       const colorImages = variantsOfColor.flatMap((v) => v.images || []);
       if (colorImages.length > 0) {
@@ -208,7 +249,7 @@ const ProductDetailPage = () => {
       newImageList = selectedVariant.images;
     } else if (selectedColor) {
       const variantsOfColor = product.variants.filter(
-        (v) => v.attributes.COLOR === selectedColor,
+        (v) => getVariantColor(v) === selectedColor,
       );
       newImageList = variantsOfColor.flatMap((v) => v.images || []);
     }
@@ -220,63 +261,49 @@ const ProductDetailPage = () => {
     return [...new Set(newImageList)];
   }, [product, selectedColor, selectedVariant]);
   //
-  const availableSizesForSelectedColor = selectedColor
-    ? variantsByColor[selectedColor]
-        ?.filter((v) => (v.stockQuantity ?? 0) > 0)
-        .map((v) => v.attributes.SIZE) || []
-    : allSizes;
-
-  const availableColorsForSelectedSize = selectedSize
-    ? variantsBySize[selectedSize]
-        ?.filter((v) => (v.stockQuantity ?? 0) > 0)
-        .map((v) => v.attributes.COLOR) || []
-    : allColors;
-
   const isSizeDisabled = (size: string) => {
-    if (selectedColor && !availableSizesForSelectedColor.includes(size)) {
-      return true;
-    }
-
-    const variantsForThisSize = variantsBySize[size];
-    if (
-      !variantsForThisSize ||
-      variantsForThisSize.every((v) => (v.stockQuantity ?? 0) <= 0)
-    ) {
-      return true;
-    }
-
-    return false;
+    return !sellableVariants.some(
+      (variant) => getVariantSize(variant) === size && getVariantStock(variant) > 0,
+    );
   };
 
   const isColorDisabled = (color: string) => {
-    if (selectedSize && !availableColorsForSelectedSize.includes(color)) {
-      return true;
-    }
+    return !sellableVariants.some(
+      (variant) =>
+        getVariantColor(variant) === color &&
+        matchesSelectedSize(variant) &&
+        getVariantStock(variant) > 0,
+    );
+  };
 
-    const variantsForThisColor = variantsByColor[color];
-    if (
-      !variantsForThisColor ||
-      variantsForThisColor.every((v) => (v.stockQuantity ?? 0) <= 0)
-    ) {
-      return true;
-    }
-
-    return false;
+  const isMaterialDisabled = (material: string) => {
+    return !sellableVariants.some(
+      (variant) =>
+        getVariantMaterial(variant) === material &&
+        matchesSelectedSize(variant) &&
+        matchesSelectedColor(variant),
+    );
   };
   //
 
-  const handleSelectAttribute = (type: "size" | "color", value: string) => {
+  const handleSelectAttribute = (type: "size" | "color" | "material", value: string) => {
     if (type === "size") {
       setSelectedSize((prev) => (prev === value ? null : value));
-    } else {
+    } else if (type === "color") {
       setSelectedColor((prev) => (prev === value ? null : value));
+    } else {
+      setSelectedMaterial((prev) => (prev === value ? null : value));
     }
     setQuantity(1);
   };
 
   const handleAddToCart = async () => {
     if (!selectedVariant) {
-      message.warning("Vui lòng chọn size và màu trước khi thêm vào giỏ hàng.");
+      message.warning(
+        hasMaterialOptions
+          ? "Vui lòng chọn đầy đủ size, màu sắc và chất liệu"
+          : "Vui lòng chọn đầy đủ size và màu sắc",
+      );
       return;
     }
 
@@ -285,13 +312,13 @@ const ProductDetailPage = () => {
       return;
     }
 
-    if ((selectedVariant.stockQuantity ?? 0) <= 0) {
+    if (getVariantStock(selectedVariant) <= 0) {
       message.error("Sản phẩm này đã hết hàng.");
       return;
     }
 
-    if (quantity > (selectedVariant.stockQuantity ?? 0)) {
-      message.warning("Số lượng vượt quá tồn kho hiện có.");
+    if (quantity > getVariantStock(selectedVariant)) {
+      message.warning("Số lượng không được vượt quá tồn kho của biến thể đã chọn");
       return;
     }
 
@@ -308,6 +335,7 @@ const ProductDetailPage = () => {
           });
 
           message.success("Đã thêm vào giỏ hàng.");
+          fetchOrderCount();
         } catch (error: any) {
           message.error(
             error?.response?.data?.message ||
@@ -317,7 +345,13 @@ const ProductDetailPage = () => {
       },
     });
   };
-  const selectedStock = selectedVariant?.stockQuantity ?? 0;
+  const hasCompleteSelection = Boolean(
+    selectedSize && selectedColor && (!hasMaterialOptions || selectedMaterial),
+  );
+  const selectionHint = hasMaterialOptions
+    ? "Vui lòng chọn size, màu sắc và chất liệu để xem tồn kho"
+    : "Vui lòng chọn size và màu sắc để xem tồn kho";
+  const selectedStock = getVariantStock(selectedVariant);
   const isOutOfStock = !selectedVariant || selectedStock <= 0;
   const isLowStock =
     selectedVariant != null && selectedStock > 0 && selectedStock <= 5;
@@ -336,18 +370,20 @@ const ProductDetailPage = () => {
         <Button
           icon={<ArrowLeftOutlined />}
           onClick={() => navigate("/products")}
-          style={{ marginBottom: "24px" }}
+          type="text"
+          style={{ marginBottom: 12 }}
         >
           Quay lại
         </Button>
 
-        <Row gutter={[32, 32]}>
+        <Row gutter={[28, 28]} className="product-detail-shell" style={{ padding: 24 }}>
           <Col xs={24} md={12}>
             <div
               style={{
-                border: "1px solid #f0f0f0",
-                borderRadius: "8px",
-                padding: "8px",
+                background: "#f7f7f8",
+                border: "1px solid #eef2f7",
+                borderRadius: 8,
+                padding: 12,
                 aspectRatio: "1 / 1",
                 display: "flex",
                 alignItems: "center",
@@ -380,7 +416,8 @@ const ProductDetailPage = () => {
                           selectedImage === resolvedImg
                             ? "2px solid #1677ff"
                             : "2px solid #f0f0f0",
-                        borderRadius: "4px",
+                        background: "#f7f7f8",
+                        borderRadius: 6,
                         padding: "4px",
                         cursor: "pointer",
                         transition:
@@ -416,17 +453,42 @@ const ProductDetailPage = () => {
           </Col>
 
           <Col xs={24} md={12}>
-            <Title level={2} style={{ fontWeight: "700", fontSize: "28px" }}>
+            <Title level={2} style={{ fontWeight: 800, fontSize: 28, marginTop: 0 }}>
               {product.name}
             </Title>
 
             <Title
               level={3}
-              style={{ color: "#d0021b", marginTop: 0, fontWeight: "600" }}
+              style={{ color: "#e11d2e", marginTop: 12, marginBottom: 0, fontWeight: 800 }}
             >
-              {selectedVariant
-                ? `${selectedVariant.sellingPrice.toLocaleString("vi-VN")} ₫`
-                : "Chọn Size và Màu để xem giá"}
+              {selectedVariant ? (
+                <Space direction="vertical" size={2}>
+                  <span>
+                    {formatMoney(
+                      selectedVariant.salePrice ??
+                        selectedVariant.unitPrice ??
+                        selectedVariant.sellingPrice,
+                    )}
+                  </span>
+                  {selectedVariant.isSale &&
+                    Number(selectedVariant.discountPercent || 0) > 0 &&
+                    Number(selectedVariant.originalPrice ?? selectedVariant.sellingPrice) >
+                      Number(selectedVariant.salePrice ?? selectedVariant.unitPrice ?? selectedVariant.sellingPrice) && (
+                      <Space size={8}>
+                        <Text delete type="secondary" style={{ fontSize: 16 }}>
+                          {formatMoney(selectedVariant.originalPrice ?? selectedVariant.sellingPrice)}
+                        </Text>
+                        <Tag color="red">
+                          -{Number(selectedVariant.discountPercent).toFixed(0)}%
+                        </Tag>
+                      </Space>
+                    )}
+                </Space>
+              ) : (
+                hasMaterialOptions
+                  ? "Chọn Size, Màu và Chất liệu để xem giá"
+                  : "Chọn Size và Màu để xem giá"
+              )}
             </Title>
 
             <Space>
@@ -434,7 +496,15 @@ const ProductDetailPage = () => {
               <Tag color="purple">{product.categoryName}</Tag>
             </Space>
 
-            {selectedVariant && (
+              {!hasCompleteSelection && (
+                <div style={{ marginTop: 8 }}>
+                  <Text type="secondary">
+                    {selectionHint}
+                  </Text>
+                </div>
+              )}
+
+              {hasCompleteSelection && selectedVariant && (
               <>
                 <div style={{ marginTop: 8 }}>
                   <Text>Tồn kho: {selectedStock}</Text>
@@ -495,6 +565,29 @@ const ProductDetailPage = () => {
               </Space>
             </div>
 
+            {hasMaterialOptions && (
+              <div>
+                <Text strong>Chất liệu:</Text>
+                <Space wrap style={{ marginTop: 8, marginBottom: 16 }}>
+                  {allMaterials.map((material) => (
+                    <Button
+                      key={material}
+                      type={selectedMaterial === material ? "primary" : "default"}
+                      onClick={() => handleSelectAttribute("material", material)}
+                      disabled={isMaterialDisabled(material)}
+                      style={{
+                        whiteSpace: "normal",
+                        minHeight: 32,
+                        maxWidth: 180,
+                      }}
+                    >
+                      {material}
+                    </Button>
+                  ))}
+                </Space>
+              </div>
+            )}
+
             <div style={{ marginTop: 8 }}>
               <Text strong>Thêm vào yêu thích:</Text>
               <Space style={{ marginLeft: 12 }}>
@@ -540,7 +633,8 @@ const ProductDetailPage = () => {
                   icon={<ShoppingCartOutlined />}
                   size="large"
                   onClick={handleAddToCart}
-                  disabled={isOutOfStock}
+                  disabled={!selectedVariant || isOutOfStock}
+                  style={{ minWidth: 320 }}
                 >
                   {isOutOfStock ? "Hết hàng" : "Thêm vào giỏ hàng"}
                 </Button>
@@ -549,20 +643,34 @@ const ProductDetailPage = () => {
 
             <Divider />
 
-            <Collapse ghost>
-              <Collapse.Panel
-                header={
-                  <Title level={4} style={{ fontWeight: "600" }}>
-                    Đánh giá sản phẩm
-                  </Title>
-                }
-                key="1"
-              >
-                <ReviewSection productId={product.id} />
-              </Collapse.Panel>
-            </Collapse>
+            <Row gutter={[12, 12]}>
+              {[
+                [<TruckOutlined />, "Miễn phí vận chuyển", "Đơn hàng từ 500.000đ"],
+                [<SyncOutlined />, "Đổi trả dễ dàng", "Trong 7 ngày"],
+                [<SafetyOutlined />, "Thanh toán an toàn", "Hỗ trợ nhiều hình thức"],
+              ].map(([icon, title, desc]) => (
+                <Col xs={24} sm={8} key={String(title)}>
+                  <Space align="center">
+                    <span style={{ color: "#0f73ff", fontSize: 24 }}>{icon}</span>
+                    <span>
+                      <Text strong style={{ display: "block", fontSize: 13 }}>
+                        {title}
+                      </Text>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {desc}
+                      </Text>
+                    </span>
+                  </Space>
+                </Col>
+              ))}
+            </Row>
+
           </Col>
         </Row>
+
+        <Divider />
+
+        <ProductReviewsSection productId={product.id} />
 
         <Divider />
 
@@ -584,7 +692,7 @@ const SuggestedProducts = ({
     setLoading(true);
 
     productService
-      .getProducts({ page: 0, size: 4 })
+      .filterProducts({ page: 0, size: 4 })
       .then((res) => {
         const filteredProducts = {
           ...res.data,
@@ -607,284 +715,10 @@ const SuggestedProducts = ({
         Có thể bạn cũng thích
       </Title>
 
-      <Row gutter={[16, 16]}>
-        {products?.content.map((p) => (
-          <Col key={p.id} xs={24} sm={12} md={8} lg={6}>
-            <Card
-              hoverable
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                height: "100%",
-                transition: "transform 0.3s ease, box-shadow 0.3s ease",
-              }}
-              bodyStyle={{ padding: "16px", flex: "1" }}
-              cover={
-                <Link
-                  to={`/products/${p.id}`}
-                  style={{ display: "block", aspectRatio: "1 / 1" }}
-                >
-                  <img
-                    alt={p.name}
-                    src={resolveImageUrl(getProductImage(p))}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                    }}
-                    onError={(e) => {
-                      console.error(
-                        "IMAGE LOAD ERROR:",
-                        p.name,
-                        getProductImage(p),
-                      );
-                      e.currentTarget.onerror = null;
-                      e.currentTarget.src = NO_IMAGE_PLACEHOLDER;
-                    }}
-                  />
-                </Link>
-              }
-            >
-              <Card.Meta
-                title={
-                  <Link to={`/products/${p.id}`}>
-                    <Tooltip title={p.name}>{p.name}</Tooltip>
-                  </Link>
-                }
-                description={
-                  <Typography.Text strong style={{ color: "#d0021b" }}>
-                    {p.minPrice !== null && p.maxPrice !== null
-                      ? p.minPrice === p.maxPrice
-                        ? `${p.minPrice.toLocaleString("vi-VN")} ₫`
-                        : `${p.minPrice.toLocaleString("vi-VN")} ₫ - ${p.maxPrice.toLocaleString("vi-VN")} ₫`
-                      : "Chưa có giá"}
-                  </Typography.Text>
-                }
-              />
-            </Card>
-          </Col>
-        ))}
-      </Row>
+      {products?.content?.length ? (
+        <ProductListDisplay products={products.content} hideTitle />
+      ) : null}
     </div>
-  );
-};
-
-interface Review {
-  id: number;
-  productId: number;
-  reviewerName: string;
-  rating: number;
-  comment: string;
-  date: string;
-}
-
-const authService = {
-  getCurrentUser: () => {
-    return {
-      isLoggedIn: true,
-      name: "Nguyễn Văn An",
-    };
-  },
-};
-
-const reviewService = {
-  getReviewsByProductId: (productId: number): Promise<{ data: Review[] }> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const mockReviews: Review[] = [
-          {
-            id: 1,
-            productId: 1,
-            reviewerName: "Nguyễn Văn A",
-            rating: 5,
-            comment: "Sản phẩm rất đẹp và chất lượng, giao hàng nhanh.",
-            date: "2023-10-26",
-          },
-          {
-            id: 2,
-            productId: 1,
-            reviewerName: "Trần Thị B",
-            rating: 4,
-            comment: "Hài lòng với sản phẩm, nhưng giao hàng hơi chậm.",
-            date: "2023-10-25",
-          },
-          {
-            id: 3,
-            productId: 1,
-            reviewerName: "Phạm Văn C",
-            rating: 5,
-            comment: "Giày đi êm chân, đúng size. Sẽ ủng hộ shop dài dài.",
-            date: "2023-10-24",
-          },
-          {
-            id: 4,
-            productId: 2,
-            reviewerName: "Lê Thị D",
-            rating: 3,
-            comment: "Màu sắc không như mong đợi lắm, nhưng chất lượng ổn.",
-            date: "2023-10-23",
-          },
-        ];
-        resolve({ data: mockReviews.filter((r) => r.productId === productId) });
-      }, 500);
-    });
-  },
-
-  submitReview: (
-    review: Omit<Review, "id" | "date">,
-  ): Promise<{ success: boolean; data: Review }> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        console.log("Submitting review:", review);
-        const newReview: Review = {
-          ...review,
-          id: Date.now(),
-          date: new Date().toISOString().split("T")[0],
-        };
-        resolve({ success: true, data: newReview });
-      }, 500);
-    });
-  },
-};
-
-const ReviewSection = ({ productId }: { productId: number }) => {
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [loadingReviews, setLoadingReviews] = useState(false);
-  const [submittingReview, setSubmittingReview] = useState(false);
-  const [form] = Form.useForm();
-  const currentUser = authService.getCurrentUser();
-
-  const fetchReviews = () => {
-    setLoadingReviews(true);
-    reviewService
-      .getReviewsByProductId(productId)
-      .then((res) => {
-        setReviews(res.data);
-      })
-      .catch((error) => {
-        console.error("Failed to fetch reviews:", error);
-        notification.error({
-          message: "Lỗi",
-          description: "Không thể tải đánh giá sản phẩm.",
-        });
-      })
-      .finally(() => setLoadingReviews(false));
-  };
-
-  useEffect(() => {
-    fetchReviews();
-  }, [productId]);
-
-  const onFinishReview = (values: any) => {
-    setSubmittingReview(true);
-
-    const reviewData = {
-      ...values,
-      productId,
-      reviewerName: currentUser.name,
-    };
-
-    reviewService
-      .submitReview(reviewData)
-      .then(() => {
-        notification.success({
-          message: "Thành công",
-          description: "Đánh giá của bạn đã được gửi.",
-        });
-        form.resetFields();
-        fetchReviews();
-      })
-      .catch((error) => {
-        console.error("Failed to submit review:", error);
-        notification.error({
-          message: "Lỗi",
-          description: "Không thể gửi đánh giá.",
-        });
-      })
-      .finally(() => setSubmittingReview(false));
-  };
-
-  return (
-    <>
-      <Spin spinning={loadingReviews}>
-        <List
-          itemLayout="horizontal"
-          dataSource={reviews}
-          renderItem={(item) => (
-            <List.Item>
-              <List.Item.Meta
-                avatar={
-                  <Avatar
-                    src={`https://api.dicebear.com/7.x/miniavs/svg?seed=${item.reviewerName}`}
-                  />
-                }
-                title={
-                  <Space>
-                    {item.reviewerName}
-                    <Rate
-                      disabled
-                      defaultValue={item.rating}
-                      style={{ fontSize: 14 }}
-                    />
-                  </Space>
-                }
-                description={
-                  <>
-                    <Paragraph>{item.comment}</Paragraph>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      {item.date}
-                    </Text>
-                  </>
-                }
-              />
-            </List.Item>
-          )}
-        />
-      </Spin>
-
-      <Divider />
-
-      {currentUser.isLoggedIn ? (
-        <>
-          <Title level={4} style={{ fontWeight: "600" }}>
-            Gửi đánh giá của bạn
-          </Title>
-          <Form form={form} onFinish={onFinishReview} layout="vertical">
-            <Form.Item
-              name="rating"
-              label="Đánh giá sao"
-              rules={[{ required: true, message: "Vui lòng chọn số sao!" }]}
-            >
-              <Rate />
-            </Form.Item>
-
-            <Form.Item
-              name="comment"
-              label="Bình luận"
-              rules={[
-                { required: true, message: "Vui lòng nhập bình luận của bạn!" },
-              ]}
-            >
-              <Input.TextArea rows={4} />
-            </Form.Item>
-
-            <Form.Item>
-              <Button
-                type="primary"
-                htmlType="submit"
-                loading={submittingReview}
-              >
-                Gửi đánh giá
-              </Button>
-            </Form.Item>
-          </Form>
-        </>
-      ) : (
-        <Text type="secondary">
-          Vui lòng <Link to="/login">đăng nhập</Link> để gửi đánh giá.
-        </Text>
-      )}
-    </>
   );
 };
 

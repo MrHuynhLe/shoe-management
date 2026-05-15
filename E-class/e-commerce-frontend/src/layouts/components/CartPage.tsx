@@ -22,6 +22,7 @@ import { cartService } from "@/services/cart.service";
 import { useNavigate, useLocation } from "react-router-dom";
 import { orderService } from "@/services/order.service";
 import MyOrdersPage from "./MyOrdersPage";
+import { useAuth } from "@/services/AuthContext";
 
 const { Title, Text } = Typography;
 
@@ -33,8 +34,13 @@ interface CartItem {
   name: string;
   size?: string | null;
   color?: string | null;
+  material?: string | null;
   variantCode?: string | null;
   price: number;
+  originalPrice: number;
+  unitPrice: number;
+  discountPercent: number;
+  isSale: boolean;
   quantity: number;
   total: number;
   variantId: number;
@@ -49,19 +55,21 @@ const CartPage = () => {
   const [ordersFetched, setOrdersFetched] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const { fetchOrderCount } = useAuth();
 
   const activeTab = useMemo(
     () => new URLSearchParams(location.search).get("tab") || "cart",
     [location.search],
   ); // eslint-disable-line
 
+  const formatMoney = (value: number) =>
+    `${Number(value || 0).toLocaleString("vi-VN")} \u20ab`;
+
   const fetchCart = async () => {
     try {
       setLoadingCart(true);
 
       const response = await cartService.getCart();
-      console.log("API CART:", response.data);
-      console.log("FIRST CART ITEM:", response.data.items[0]);
       const items = response.data.items.map((item: any) => ({
         key: item.cartItemId,
         id: item.cartItemId,
@@ -72,13 +80,19 @@ const CartPage = () => {
         name: `${item.productName} - ${item.variantCode}`,
         size: item.size,
         color: item.color,
-        price: item.price,
+        material: item.material,
+        price: Number(item.unitPrice ?? item.salePrice ?? item.price ?? 0),
+        originalPrice: Number(item.originalPrice ?? item.price ?? 0),
+        unitPrice: Number(item.unitPrice ?? item.salePrice ?? item.price ?? 0),
+        discountPercent: Number(item.discountPercent ?? 0),
+        isSale: Boolean(item.isSale),
         quantity: item.quantity,
-        total: item.subTotal,
+        total: Number(item.lineTotal ?? item.subTotal ?? 0),
         variantId: item.variantId,
       }));
 
       setCartItems(items);
+      fetchOrderCount();
     } catch (error: any) {
       console.error("Failed to fetch cart:", error);
 
@@ -140,6 +154,7 @@ const CartPage = () => {
       await cartService.updateItemQuantity(cartItemId, quantity);
       message.success("Cập nhật số lượng thành công!");
       fetchCart();
+      fetchOrderCount();
     } catch (error) {
       message.error("Cập nhật số lượng thất bại!");
       console.error("Failed to update quantity:", error);
@@ -151,6 +166,7 @@ const CartPage = () => {
       await cartService.removeItem(cartItemId);
       message.success("Đã xóa sản phẩm khỏi giỏ hàng!");
       fetchCart();
+      fetchOrderCount();
       setSelectedRowKeys(selectedRowKeys.filter((k) => k !== cartItemId));
     } catch (error) {
       message.error("Xóa sản phẩm thất bại!");
@@ -198,6 +214,12 @@ const CartPage = () => {
                   Màu: <Text strong>{record.color}</Text>
                 </Text>
               )}
+
+              {record.material && (
+                <Text type="secondary">
+                  Chất liệu: <Text strong>{record.material}</Text>
+                </Text>
+              )}
             </Space>
 
             {record.variantCode && (
@@ -213,7 +235,23 @@ const CartPage = () => {
       title: "Đơn giá",
       dataIndex: "price",
       key: "price",
-      render: (price: number) => price.toLocaleString("vi-VN") + " ₫",
+      render: (_price: number, record: CartItem) => (
+        <Space direction="vertical" size={0}>
+          <Text strong style={{ color: record.isSale ? "#c81d1d" : undefined }}>
+            {formatMoney(record.unitPrice)}
+          </Text>
+          {record.isSale && record.originalPrice > record.unitPrice && (
+            <Space size={6}>
+              <Text delete type="secondary" style={{ fontSize: 12 }}>
+                {formatMoney(record.originalPrice)}
+              </Text>
+              <Text type="danger" style={{ fontSize: 12, fontWeight: 600 }}>
+                -{record.discountPercent}%
+              </Text>
+            </Space>
+          )}
+        </Space>
+      ),
     },
     {
       title: "Số lượng",
@@ -224,7 +262,6 @@ const CartPage = () => {
           min={1}
           value={quantity}
           onChange={(value) => {
-            console.log("record:", record);
             handleQuantityChange(record.id, value);
           }}
         />

@@ -2,6 +2,7 @@ import {
   AppstoreOutlined,
   HomeOutlined,
   ShoppingCartOutlined,
+  TagsOutlined,
   UserOutlined,
 } from "@ant-design/icons";
 import {
@@ -29,6 +30,16 @@ const CustomHeader = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated, user, logout, orderCount } = useAuth();
+
+  const handleSearch = (value: string) => {
+    const keyword = value.trim();
+    if (!keyword) {
+      navigate("/products");
+      return;
+    }
+
+    navigate(`/products?search=${encodeURIComponent(keyword)}`);
+  };
 
   const handleUserMenuClick = ({ key }: { key: string }) => {
     if (key === "logout") {
@@ -67,13 +78,18 @@ const CustomHeader = () => {
 
   return (
     <Header className="app-header">
-      <Row align="middle" gutter={[16, 12]} style={{ minHeight: 72 }}>
-        <Col xs={24} lg={7}>
+      <Row
+        align="middle"
+        gutter={[20, 10]}
+        style={{ minHeight: 64, flexWrap: "nowrap" }}
+        className="shop-header-row"
+      >
+        <Col flex="0 0 auto">
           <Link to="/" style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <img
               src={logo}
               alt="S-Shop Logo"
-              style={{ height: 44, width: 44, objectFit: "contain" }}
+              style={{ height: 34, width: 34, objectFit: "contain" }}
             />
             <h1
               style={{
@@ -89,15 +105,15 @@ const CustomHeader = () => {
           </Link>
         </Col>
 
-        <Col xs={24} lg={7}>
+        <Col flex="auto" className="shop-header-menu">
           <ConfigProvider
             theme={{
               components: {
                 Menu: {
-                  itemHoverBg: "rgba(27, 110, 234, 0.08)",
-                  itemHoverColor: "#1b6eea",
+                  itemHoverBg: "rgba(15, 115, 255, 0.08)",
+                  itemHoverColor: "#0f73ff",
                   itemSelectedBg: "transparent",
-                  itemSelectedColor: "#1b6eea",
+                  itemSelectedColor: "#0f73ff",
                 },
               },
             }}
@@ -110,10 +126,11 @@ const CustomHeader = () => {
                 background: "transparent",
                 borderBottom: "none",
                 display: "flex",
-                fontSize: 16,
-                fontWeight: 650,
+                fontSize: 14,
+                fontWeight: 700,
                 justifyContent: "center",
-                lineHeight: "48px",
+                lineHeight: "52px",
+                minWidth: 340,
               }}
               items={[
                 { key: "/", label: "Trang chủ", icon: <HomeOutlined /> },
@@ -122,20 +139,32 @@ const CustomHeader = () => {
                   label: "Sản phẩm",
                   icon: <AppstoreOutlined />,
                 },
+                {
+                  key: "/promotions",
+                  label: "Khuyến mãi",
+                  icon: <TagsOutlined />,
+                },
               ]}
             />
           </ConfigProvider>
         </Col>
 
         <Col
-          xs={24}
-          lg={10}
+          flex="0 1 520px"
+          className="shop-header-actions"
           style={{ display: "flex", justifyContent: "flex-end", alignItems: "center" }}
         >
-          <Space size={12} align="center" wrap>
-            <Input.Search placeholder="Tìm kiếm sản phẩm..." style={{ width: 280,padding:25 }} />
+          <Space size={12} align="center" style={{ width: "100%", justifyContent: "flex-end" }}>
+            <Input.Search
+              allowClear
+              size="large"
+              placeholder="Tìm kiếm sản phẩm..."
+              className="shop-header-search"
+              style={{ width: 340 }}
+              onSearch={handleSearch}
+            />
 
-            <Link to="/cart" style={{ color: "#1b6eea", display: "inline-flex" }}>
+            <Link to="/cart" style={{ color: "#0f73ff", display: "inline-flex" }}>
               <Badge count={orderCount} size="small">
                 <Button shape="circle" icon={<ShoppingCartOutlined />} />
               </Badge>
@@ -153,13 +182,13 @@ const CustomHeader = () => {
                 onClick={(e) => e.preventDefault()}
                 style={{
                   alignItems: "center",
-                  color: "#1b6eea",
+                  color: "#0f73ff",
                   display: "flex",
                   gap: 8,
                 }}
               >
                 {isAuthenticated && user ? (
-                  <Avatar style={{ backgroundColor: "#1b6eea" }}>
+                  <Avatar style={{ backgroundColor: "#0f73ff", fontWeight: 700 }}>
                     {user.username.charAt(0).toUpperCase()}
                   </Avatar>
                 ) : (

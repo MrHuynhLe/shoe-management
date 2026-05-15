@@ -44,8 +44,24 @@ public class Order {
     private BigDecimal totalAmount = BigDecimal.ZERO;
 
     @Builder.Default
+    @Column(name = "original_subtotal", precision = 15, scale = 2)
+    private BigDecimal originalSubtotal = BigDecimal.ZERO;
+
+    @Builder.Default
+    @Column(name = "product_discount_total", precision = 15, scale = 2)
+    private BigDecimal productDiscountTotal = BigDecimal.ZERO;
+
+    @Builder.Default
+    @Column(name = "subtotal_before_voucher", precision = 15, scale = 2)
+    private BigDecimal subtotalBeforeVoucher = BigDecimal.ZERO;
+
+    @Builder.Default
     @Column(name = "discount_amount", precision = 15, scale = 2, nullable = false)
     private BigDecimal discountAmount = BigDecimal.ZERO;
+
+    @Builder.Default
+    @Column(name = "product_revenue", precision = 15, scale = 2)
+    private BigDecimal productRevenue = BigDecimal.ZERO;
 
     @Column(name = "shipping_fee", precision = 15, scale = 2, nullable = false)
     private BigDecimal shippingFee = BigDecimal.ZERO;
@@ -86,6 +102,21 @@ public class Order {
         }
         if (this.discountAmount == null) {
             this.discountAmount = BigDecimal.ZERO;
+        }
+        if (this.productRevenue == null) {
+            this.productRevenue = BigDecimal.ZERO;
+        }
+        if (this.originalSubtotal == null) {
+            this.originalSubtotal = BigDecimal.ZERO;
+        }
+        if (this.productDiscountTotal == null) {
+            this.productDiscountTotal = BigDecimal.ZERO;
+        }
+        if (this.subtotalBeforeVoucher == null) {
+            this.subtotalBeforeVoucher = BigDecimal.ZERO;
+        }
+        if (this.shippingFee == null) {
+            this.shippingFee = BigDecimal.ZERO;
         }
         if (this.customerPaid == null) {
             this.customerPaid = BigDecimal.ZERO;

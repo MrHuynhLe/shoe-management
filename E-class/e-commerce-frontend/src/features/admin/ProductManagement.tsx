@@ -1,4 +1,4 @@
-import {
+﻿import {
   Badge,
   Button,
   Card,
@@ -41,6 +41,7 @@ interface ProductList {
   name: string;
   code: string;
   brandName: string;
+  isActive?: boolean;
   totalStock: number;
   minPrice: number;
   maxPrice: number;
@@ -69,7 +70,7 @@ interface ProductFilters {
   keyword: string;
   categoryId: number | null;
   brandName: string | null;
-  stockStatus: "all" | "inStock" | "outOfStock";
+  stockStatus: "all" | "inStock" | "outOfStock" | "inactive";
   minPrice: number | null;
   maxPrice: number | null;
   minStock: number | null;
@@ -200,8 +201,13 @@ const ProductManagementPage = () => {
 
       const matchesStockStatus =
         filters.stockStatus === "all" ||
-        (filters.stockStatus === "inStock" && product.totalStock > 0) ||
-        (filters.stockStatus === "outOfStock" && product.totalStock <= 0);
+        (filters.stockStatus === "inStock" &&
+          product.isActive !== false &&
+          product.totalStock > 0) ||
+        (filters.stockStatus === "outOfStock" &&
+          product.isActive !== false &&
+          product.totalStock <= 0) ||
+        (filters.stockStatus === "inactive" && product.isActive === false);
 
       const minProductPrice = product.minPrice ?? 0;
       const matchesPrice =
@@ -610,11 +616,17 @@ const ProductManagementPage = () => {
       title: "Trạng thái",
       key: "status",
       width: 130,
-      render: (_: unknown, record: ProductForTable) => (
-        <Tag color={record.totalStock > 0 ? "green" : "orange"}>
-          {record.totalStock > 0 ? "Còn hàng" : "Hết hàng"}
-        </Tag>
-      ),
+      render: (_: unknown, record: ProductForTable) => {
+        if (record.isActive === false) {
+          return <Tag color="default">Ngừng bán</Tag>;
+        }
+
+        return (
+          <Tag color={record.totalStock > 0 ? "green" : "orange"}>
+            {record.totalStock > 0 ? "Còn hàng" : "Hết hàng"}
+          </Tag>
+        );
+      },
     },
     {
       title: "Thao tác",
@@ -697,6 +709,7 @@ const ProductManagementPage = () => {
                     { label: "Tất cả", value: "all" },
                     { label: "Còn hàng", value: "inStock" },
                     { label: "Hết hàng", value: "outOfStock" },
+                    { label: "Ngừng bán", value: "inactive" },
                   ]}
                 />
               </Col>

@@ -1,473 +1,301 @@
-import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import {
   Button,
-  message,
+  Checkbox,
+  DatePicker,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
   Popconfirm,
-  Tag,
   Space,
+  Table,
+  Tag,
   Typography,
-  Tooltip,
+  message,
 } from "antd";
-import { useState, useRef } from "react";
-import type { ProColumns, ActionType } from "@ant-design/pro-table";
-import ProTable from "@ant-design/pro-table";
-import {
-  ModalForm,
-  ProFormText,
-  ProFormSelect,
-  ProFormDigit,
-  ProFormSwitch,
-  ProFormDateTimeRangePicker,
-} from "@ant-design/pro-form";
-import {
-  promotionService,
-  PromotionRequest,
-} from "@/services/promotion.service";
+import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from "@ant-design/icons";
+import { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
+import { productService } from "@/services/product.service";
+import {
+  Promotion,
+  PromotionRequest,
+  promotionService,
+} from "@/services/promotion.service";
+import { ProductList } from "@/features/product/product.model";
 
-const { Text } = Typography;
+const { RangePicker } = DatePicker;
+const { Text, Title } = Typography;
 
-const formatDateTime = (value?: string | null) => {
-  if (!value) return "Chưa thiết lập";
-  const parsed = dayjs(value);
-  return parsed.isValid()
-    ? parsed.format("DD/MM/YYYY HH:mm")
-    : "Chưa thiết lập";
-};
-
-const formatUsageNumber = (value?: number | null) => {
-  if (value === null || value === undefined) return "Không giới hạn";
-  return value.toLocaleString("vi-VN");
-};
-
-const formatPercent = (value?: number | null) => {
-  if (value === null || value === undefined) return "-";
-  return `${value.toFixed(1)}%`;
-};
-
-const getPromotionStatus = (record: Promotion) => {
+const getStatus = (record: Promotion) => {
   const now = dayjs();
-  const start = record.startDate ? dayjs(record.startDate) : null;
-  const end = record.endDate ? dayjs(record.endDate) : null;
-
-  if (!record.isActive) {
-    return { label: "Tạm tắt", color: "default" as const };
-  }
-
-  if (
-    record.usageLimit !== null &&
-    record.remainingCount !== null &&
-    record.remainingCount <= 0
-  ) {
-    return { label: "Hết lượt dùng", color: "orange" as const };
-  }
-
-  if (start && start.isValid() && now.isBefore(start)) {
-    return { label: "Sắp diễn ra", color: "blue" as const };
-  }
-
-  if (end && end.isValid() && now.isAfter(end)) {
-    return { label: "Đã hết hạn", color: "red" as const };
-  }
-
-  return { label: "Đang diễn ra", color: "green" as const };
+  if (!record.status) return { label: "Đã tắt", color: "default" };
+  if (dayjs(record.endDate).isBefore(now)) return { label: "Hết hạn", color: "red" };
+  if (dayjs(record.startDate).isAfter(now)) return { label: "Sắp diễn ra", color: "blue" };
+  return { label: "Đang hoạt động", color: "green" };
 };
 
-const getPromotionStatusPriority = (record: Promotion) => {
-  const status = getPromotionStatus(record).label;
-
-  switch (status) {
-    case "Đang diễn ra":
-      return 1;
-    case "Sắp diễn ra":
-      return 2;
-    case "Hết lượt dùng":
-      return 3;
-    case "Đã hết hạn":
-      return 4;
-    case "Tạm tắt":
-      return 5;
-    default:
-      return 99;
-  }
-};
-
-const sortPromotions = (items: Promotion[]) => {
-  return [...items].sort((a, b) => {
-    const priorityA = getPromotionStatusPriority(a);
-    const priorityB = getPromotionStatusPriority(b);
-
-    if (priorityA !== priorityB) {
-      return priorityA - priorityB;
-    }
-
-    const startA = a.startDate
-      ? dayjs(a.startDate).valueOf()
-      : Number.MAX_SAFE_INTEGER;
-    const startB = b.startDate
-      ? dayjs(b.startDate).valueOf()
-      : Number.MAX_SAFE_INTEGER;
-
-    return startA - startB;
-  });
-};
-
-interface Promotion {
-  id: number;
-  code: string;
-  name: string;
-  discountType: "PERCENTAGE" | "FIXED_AMOUNT";
-  discountValue: number;
-  minOrderValue: number;
-  maxDiscountAmount: number;
-  usageLimit: number | null;
-  usageLimitPerCustomer: number | null;
-  startDate: string | null;
-  endDate: string | null;
-  isActive: boolean;
-
-  issuedQuantity: number | null;
-  usedCount: number;
-  remainingCount: number | null;
-  usedPercent: number | null;
-  remainingPercent: number | null;
-}
 const PromotionManagementPage = () => {
-  const [modalVisible, setModalVisible] = useState<boolean>(false);
-  const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(
-    null,
-  );
-  const actionRef = useRef<ActionType>(null);
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [products, setProducts] = useState<ProductList[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<Promotion | null>(null);
+  const [selectedProductIds, setSelectedProductIds] = useState<number[]>([]);
+  const [keyword, setKeyword] = useState("");
+  const [form] = Form.useForm();
 
-  const handleAdd = () => {
-    setEditingPromotion(null);
-    setModalVisible(true);
-  };
-
-  const handleEdit = (record: Promotion) => {
-    setEditingPromotion(record);
-    setModalVisible(true);
-  };
-
-  const handleDelete = async (id: number) => {
+  const fetchPromotions = async () => {
+    setLoading(true);
     try {
-      await promotionService.delete(id);
-      message.success("Vô hiệu hóa chương trình thành công");
-      actionRef.current?.reload();
-    } catch (error) {
-      message.error("Vô hiệu hóa thất bại");
+      const res = await promotionService.getAll({ page: 0, size: 100 });
+      setPromotions(res.data.content || []);
+    } catch (error: any) {
+      message.error(error?.response?.data?.message || "Không thể tải danh sách khuyến mãi");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSubmit = async (
-    values: Omit<PromotionRequest, "startDate" | "endDate"> & {
-      dateRange?: [string, string];
-    },
-  ) => {
-    const { dateRange, ...rest } = values;
+  const fetchProducts = async () => {
+    const res = await productService.getProducts({ page: 0, size: 500 });
+    setProducts(res.data.content || []);
+  };
+
+  useEffect(() => {
+    fetchPromotions();
+    fetchProducts().catch(() => message.error("Không thể tải danh sách sản phẩm"));
+  }, []);
+
+  const openCreate = () => {
+    setEditing(null);
+    setSelectedProductIds([]);
+    setKeyword("");
+    form.resetFields();
+    form.setFieldsValue({ status: true, discountPercent: 10 });
+    setModalOpen(true);
+  };
+
+  const openEdit = async (record: Promotion) => {
+    setEditing(record);
+    setKeyword("");
+    form.setFieldsValue({
+      name: record.name,
+      description: record.description,
+      discountPercent: Number(record.discountPercent),
+      status: record.status,
+      dateRange: [dayjs(record.startDate), dayjs(record.endDate)],
+    });
+    try {
+      const res = await promotionService.getAppliedIds(record.id);
+      setSelectedProductIds(res.data.productIds || []);
+    } catch (error: any) {
+      message.error(error?.response?.data?.message || "Không thể tải sản phẩm đã áp dụng");
+    }
+    setModalOpen(true);
+  };
+
+  const handleSubmit = async () => {
+    const values = await form.validateFields();
     const payload: PromotionRequest = {
-      ...rest,
-      startDate: dateRange ? dayjs(dateRange[0]).toISOString() : undefined,
-      endDate: dateRange ? dayjs(dateRange[1]).toISOString() : undefined,
+      name: values.name,
+      description: values.description,
+      discountPercent: values.discountPercent,
+      startDate: values.dateRange[0].toISOString(),
+      endDate: values.dateRange[1].toISOString(),
+      status: values.status ?? true,
+      productIds: selectedProductIds,
     };
 
     try {
-      if (editingPromotion) {
-        await promotionService.update(editingPromotion.id, payload);
-        message.success("Cập nhật thành công");
+      if (editing) {
+        await promotionService.update(editing.id, payload);
+        message.success("Cập nhật đợt giảm giá thành công");
       } else {
         await promotionService.create(payload);
-        message.success("Thêm mới thành công");
+        message.success("Tạo đợt giảm giá thành công");
       }
-      setModalVisible(false);
-      actionRef.current?.reload();
-      return true;
+      setModalOpen(false);
+      fetchPromotions();
     } catch (error: any) {
-      message.error(error?.response?.data?.message || "Đã có lỗi xảy ra");
-      return false;
+      message.error(error?.response?.data?.message || "Không thể lưu đợt giảm giá");
     }
   };
 
-  const columns: ProColumns<Promotion>[] = [
-    {
-      title: "STT",
-      valueType: "index",
-      width: 60,
-      search: false,
-      align: "center",
-    },
-    {
-      title: "Mã",
-      dataIndex: "code",
-      width: 130,
-      copyable: true,
-    },
-    {
-      title: (
-        <Tooltip title="Tên chương trình">
-          <span>Tên CTKM</span>
-        </Tooltip>
-      ),
-      dataIndex: "name",
-      width: 180,
-      render: (_, record) => (
-        <Tooltip title={record.name}>
-          <Text ellipsis style={{ maxWidth: 160, display: "inline-block" }}>
-            {record.name}
-          </Text>
-        </Tooltip>
-      ),
-    },
-    {
-      title: "Loại giảm",
-      dataIndex: "discountType",
-      width: 120,
-      align: "center",
-      valueType: "select",
-      valueEnum: {
-        PERCENTAGE: { text: "Phần trăm (%)" },
-        FIXED_AMOUNT: { text: "Số tiền cố định" },
-      },
-    },
-    {
-      title: "Giá trị giảm",
-      dataIndex: "discountValue",
-      width: 110,
-      search: false,
-      align: "right",
-      render: (_, record) =>
-        record.discountType === "PERCENTAGE"
-          ? `${record.discountValue}%`
-          : `${record.discountValue?.toLocaleString("vi-VN")} ₫`,
-    },
-    {
-      title: "Điều kiện",
-      dataIndex: "condition",
-      width: 190,
-      search: false,
-      render: (_, record) => (
-        <Space direction="vertical" size={0}>
-          <Text>
-            <Text type="secondary">Tối thiểu: </Text>
-            <Text strong>
-              {record.minOrderValue?.toLocaleString("vi-VN")} ₫
-            </Text>
-          </Text>
-          <Text>
-            <Text type="secondary">Tối đa: </Text>
-            <Text strong>
-              {record.maxDiscountAmount && record.maxDiscountAmount > 0
-                ? `${record.maxDiscountAmount.toLocaleString("vi-VN")} ₫`
-                : "Không giới hạn"}
-            </Text>
-          </Text>
-        </Space>
-      ),
-    },
-    {
-      title: "Phát hành",
-      dataIndex: "issuedQuantity",
-      width: 100,
-      search: false,
-      align: "center",
-      render: (_, record) => (
-        <Text>{formatUsageNumber(record.issuedQuantity)}</Text>
-      ),
-    },
-    {
-      title: "Đã dùng",
-      dataIndex: "usedCount",
-      width: 90,
-      search: false,
-      align: "center",
-      render: (_, record) => (
-        <Text>{record.usedCount?.toLocaleString("vi-VN") ?? 0}</Text>
-      ),
-    },
-    {
-      title: "Còn lại",
-      dataIndex: "remainingCount",
-      width: 90,
-      search: false,
-      align: "center",
-      render: (_, record) => (
-        <Text>{formatUsageNumber(record.remainingCount)}</Text>
-      ),
-    },
-    {
-      title: "Tỉ lệ dùng",
-      dataIndex: "usedPercent",
-      width: 140,
-      search: false,
-      render: (_, record) => (
-        <Space direction="vertical" size={0}>
-          <Text>Dùng: {formatPercent(record.usedPercent)}</Text>
-          <Text type="secondary">
-            Còn: {formatPercent(record.remainingPercent)}
-          </Text>
-        </Space>
-      ),
-    },
-    {
-      title: "Hiệu lực",
-      dataIndex: "dateRange",
-      width: 180,
-      search: false,
-      render: (_, record) => (
-        <Space direction="vertical" size={0}>
-          <Text>Từ {formatDateTime(record.startDate)}</Text>
-          <Text type="secondary">Đến {formatDateTime(record.endDate)}</Text>
-        </Space>
-      ),
-    },
-    {
-      title: "Trạng thái",
-      dataIndex: "status",
-      width: 130,
-      search: false,
-      align: "center",
-      render: (_, record) => {
-        const status = getPromotionStatus(record);
-        return <Tag color={status.color}>{status.label}</Tag>;
-      },
-    },
-    {
-      title: "Thao tác",
-      valueType: "option",
-      align: "center",
-      render: (_, record) => [
-        <Tooltip title="Sửa" key="edit">
-          <Button
-            icon={<EditOutlined />}
-            shape="circle"
-            onClick={() => handleEdit(record)}
-          />
-        </Tooltip>,
-        <Popconfirm
-          key="delete"
-          title="Vô hiệu hóa chương trình?"
-          onConfirm={() => handleDelete(record.id)}
-          okText="Đồng ý"
-          cancelText="Hủy"
-        >
-          <Tooltip title="Vô hiệu hóa">
-            <Button icon={<DeleteOutlined />} shape="circle" danger />
-          </Tooltip>
-        </Popconfirm>,
-      ],
-    },
-  ];
+  const handleDisable = async (id: number) => {
+    try {
+      await promotionService.delete(id);
+      message.success("Đã tắt đợt giảm giá");
+      fetchPromotions();
+    } catch (error: any) {
+      message.error(error?.response?.data?.message || "Không thể tắt đợt giảm giá");
+    }
+  };
+
+  const handleToggle = async (id: number) => {
+    try {
+      await promotionService.toggle(id);
+      message.success("Đã đổi trạng thái đợt giảm giá");
+      fetchPromotions();
+    } catch (error: any) {
+      message.error(error?.response?.data?.message || "Không thể đổi trạng thái");
+    }
+  };
+
+  const filteredProducts = useMemo(() => {
+    const normalized = keyword.trim().toLowerCase();
+    if (!normalized) return products;
+    return products.filter(
+      (item) =>
+        item.name?.toLowerCase().includes(normalized) ||
+        item.code?.toLowerCase().includes(normalized),
+    );
+  }, [keyword, products]);
 
   return (
-    <>
-      <ProTable<Promotion>
-        columns={columns}
-        actionRef={actionRef}
-        request={async (params) => {
-          const response = await promotionService.getAll({
-            page: (params.current || 1) - 1,
-            size: params.pageSize || 10,
-            code: params.code,
-            name: params.name,
-            discountType: params.discountType,
-          });
+    <Space direction="vertical" size="large" style={{ width: "100%" }}>
+      <Space style={{ justifyContent: "space-between", width: "100%" }}>
+        <Title level={3} style={{ margin: 0 }}>
+          Khuyến mãi sản phẩm
+        </Title>
+        <Space>
+          <Button icon={<ReloadOutlined />} onClick={fetchPromotions}>
+            Tải lại
+          </Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+            Thêm đợt giảm giá
+          </Button>
+        </Space>
+      </Space>
 
-          const pageData = response.data;
-          const sortedData = sortPromotions(pageData.content || []);
-
-          return {
-            data: sortedData,
-            success: true,
-            total: pageData.totalElements || 0,
-          };
-        }}
+      <Table
         rowKey="id"
-        pagination={{ pageSize: 10 }}
-        headerTitle="Quản lý chương trình khuyến mãi"
-        toolBarRender={() => [
-          <Button
-            key="add"
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={handleAdd}
-          >
-            Thêm chương trình
-          </Button>,
+        loading={loading}
+        dataSource={promotions}
+        columns={[
+          { title: "STT", width: 70, render: (_: unknown, __: Promotion, index: number) => index + 1 },
+          { title: "Tên chương trình", dataIndex: "name" },
+          {
+            title: "Số sản phẩm áp dụng",
+            dataIndex: "productCount",
+            width: 170,
+            align: "center",
+          },
+          {
+            title: "% giảm",
+            dataIndex: "discountPercent",
+            width: 110,
+            align: "center",
+            render: (value: number) => <Tag color="red">-{Number(value).toFixed(0)}%</Tag>,
+          },
+          {
+            title: "Thời gian",
+            width: 240,
+            render: (_: unknown, record: Promotion) => (
+              <Space direction="vertical" size={0}>
+                <Text>{dayjs(record.startDate).format("DD/MM/YYYY HH:mm")}</Text>
+                <Text type="secondary">{dayjs(record.endDate).format("DD/MM/YYYY HH:mm")}</Text>
+              </Space>
+            ),
+          },
+          {
+            title: "Trạng thái",
+            width: 150,
+            render: (_: unknown, record: Promotion) => {
+              const status = getStatus(record);
+              return <Tag color={status.color}>{status.label}</Tag>;
+            },
+          },
+          {
+            title: "Thao tác",
+            width: 190,
+            render: (_: unknown, record: Promotion) => (
+              <Space>
+                <Button icon={<EditOutlined />} onClick={() => openEdit(record)} />
+                <Button onClick={() => handleToggle(record.id)}>
+                  {record.status ? "Tắt" : "Bật"}
+                </Button>
+                <Popconfirm
+                  title="Tắt đợt giảm giá?"
+                  okText="Tắt"
+                  cancelText="Hủy"
+                  onConfirm={() => handleDisable(record.id)}
+                >
+                  <Button danger icon={<DeleteOutlined />} />
+                </Popconfirm>
+              </Space>
+            ),
+          },
         ]}
       />
-      <ModalForm
-        title={
-          editingPromotion ? "Cập nhật chương trình" : "Thêm chương trình mới"
-        }
-        width="600px"
-        open={modalVisible}
-        onOpenChange={setModalVisible}
-        onFinish={handleSubmit}
-        initialValues={
-          editingPromotion
-            ? {
-                ...editingPromotion,
-                dateRange:
-                  editingPromotion.startDate && editingPromotion.endDate
-                    ? [
-                        dayjs(editingPromotion.startDate),
-                        dayjs(editingPromotion.endDate),
-                      ]
-                    : undefined,
-              }
-            : { isActive: true, discountType: "FIXED_AMOUNT" }
-        }
-        modalProps={{
-          destroyOnClose: true,
-          onCancel: () => setEditingPromotion(null),
-        }}
+
+      <Modal
+        title={editing ? "Sửa đợt giảm giá" : "Thêm đợt giảm giá"}
+        open={modalOpen}
+        onCancel={() => setModalOpen(false)}
+        onOk={handleSubmit}
+        okText="Lưu"
+        cancelText="Hủy"
+        width={820}
+        destroyOnHidden
       >
-        <ProFormText
-          name="name"
-          label="Tên chương trình"
-          rules={[{ required: true }]}
-        />
-        <ProFormText
-          name="code"
-          label="Mã chương trình (Khách hàng nhập)"
-          rules={[{ required: true }]}
-        />
-        <ProFormSelect
-          name="discountType"
-          label="Loại giảm giá"
-          options={[
-            { label: "Số tiền cố định", value: "FIXED_AMOUNT" },
-            { label: "Phần trăm (%)", value: "PERCENTAGE" },
-          ]}
-          rules={[{ required: true }]}
-        />
-        <ProFormDigit
-          name="discountValue"
-          label="Giá trị giảm"
-          rules={[{ required: true }]}
-        />
-        <ProFormDigit name="minOrderValue" label="Giá trị đơn hàng tối thiểu" />
-        <ProFormDigit
-          name="maxDiscountAmount"
-          label="Giảm giá tối đa (cho loại %)"
-        />
-        <ProFormDateTimeRangePicker
-          name="dateRange"
-          label="Thời gian hiệu lực"
-          rules={[{ required: true }]}
-        />
-        <ProFormDigit
-          name="usageLimitPerCustomer"
-          label="Giới hạn lượt sử dụng / khách hàng"
-          placeholder="Bỏ trống nếu không giới hạn"
-        />
-        <ProFormDigit
-          name="usageLimit"
-          label="Giới hạn lượt sử dụng (bỏ trống nếu không giới hạn)"
-        />
-        <ProFormSwitch name="isActive" label="Kích hoạt" />
-      </ModalForm>
-    </>
+        <Form form={form} layout="vertical" initialValues={{ status: true }}>
+          <Form.Item name="name" label="Tên chương trình" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="description" label="Mô tả">
+            <Input.TextArea rows={2} />
+          </Form.Item>
+          <Space size="large" align="start" wrap>
+            <Form.Item
+              name="discountPercent"
+              label="Phần trăm giảm"
+              rules={[{ required: true }]}
+            >
+              <InputNumber min={1} max={100} addonAfter="%" />
+            </Form.Item>
+            <Form.Item
+              name="dateRange"
+              label="Thời gian bắt đầu/kết thúc"
+              rules={[{ required: true }]}
+            >
+              <RangePicker showTime format="DD/MM/YYYY HH:mm" />
+            </Form.Item>
+            <Form.Item name="status" valuePropName="checked" label="Kích hoạt">
+              <Checkbox />
+            </Form.Item>
+          </Space>
+
+          <Space direction="vertical" style={{ width: "100%" }}>
+            <Input.Search
+              allowClear
+              placeholder="Tìm sản phẩm theo tên hoặc mã"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+            />
+            <div style={{ maxHeight: 300, overflow: "auto", border: "1px solid #edf1f7", borderRadius: 8, padding: 12 }}>
+              <Checkbox.Group
+                value={selectedProductIds}
+                onChange={(values) => setSelectedProductIds(values as number[])}
+                style={{ width: "100%" }}
+              >
+                <Space direction="vertical" style={{ width: "100%" }}>
+                  {filteredProducts.map((product) => (
+                    <Checkbox key={product.id} value={product.id}>
+                      <Text strong>{product.name}</Text>{" "}
+                      <Text type="secondary">({product.code})</Text>
+                    </Checkbox>
+                  ))}
+                </Space>
+              </Checkbox.Group>
+            </div>
+            <Text type="secondary">
+              Đã chọn {selectedProductIds.length} sản phẩm. Backend sẽ áp dụng vào các biến thể đang bán của từng sản phẩm.
+            </Text>
+          </Space>
+        </Form>
+      </Modal>
+    </Space>
   );
 };
 

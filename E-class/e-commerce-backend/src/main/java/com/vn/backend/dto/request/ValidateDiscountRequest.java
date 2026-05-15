@@ -6,13 +6,15 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 public class ValidateDiscountRequest {
     @NotBlank
     private String code;
 
-    @NotNull
     @DecimalMin("0.0")
     private BigDecimal subtotal;
+
+    private List<OrderItemRequest> items;
 }

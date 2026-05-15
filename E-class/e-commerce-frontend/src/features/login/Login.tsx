@@ -18,11 +18,16 @@ import { useAuth } from "@/services/AuthContext";
 
 const { Text, Title } = Typography;
 
-const Login = () => {
+type LoginProps = {
+  mode?: "user" | "admin";
+};
+
+const Login = ({ mode = "user" }: LoginProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
   const from = location.state?.from?.pathname || "/";
+  const isAdminLogin = mode === "admin";
 
   const onFinish = async (values: any) => {
     try {
@@ -33,6 +38,7 @@ const Login = () => {
 
       if (response.status === 200) {
         const data = response.data;
+        const role = String(data.role || "").toUpperCase();
         const user = {
           userId: data.userId,
           username: data.username,
@@ -40,10 +46,20 @@ const Login = () => {
           employeeId: data.employeeId ?? null,
         };
 
+        if (isAdminLogin && role !== "ADMIN") {
+          message.error("Tài khoản này không có quyền truy cập trang quản trị.");
+          return;
+        }
+
+        if (!isAdminLogin && role === "ADMIN") {
+          message.error("Tài khoản admin không được đăng nhập ở màn khách hàng.");
+          return;
+        }
+
         login(data.token, user);
         message.success("Đăng nhập thành công");
 
-        if (data.role === "ADMIN") {
+        if (role === "ADMIN") {
           navigate("/admin");
         } else {
           navigate(from, { replace: true });
@@ -87,13 +103,17 @@ const Login = () => {
               />
               <div style={{ textAlign: "center" }}>
                 <Title level={2} style={{ margin: 0 }}>
-                  Đăng nhập
+                  {isAdminLogin ? "Đăng nhập Admin" : "Đăng nhập"}
                 </Title>
-                <Text type="secondary">Truy cập tài khoản S-Shop của bạn</Text>
+                <Text type="secondary">
+                  {isAdminLogin
+                    ? "Chỉ dành cho tài khoản quản trị hệ thống"
+                    : "Truy cập tài khoản S-Shop của bạn"}
+                </Text>
               </div>
             </Space>
 
-            <Form name="login" layout="vertical" onFinish={onFinish}>
+            <Form name={isAdminLogin ? "admin-login" : "login"} layout="vertical" onFinish={onFinish}>
               <Form.Item
                 name="username"
                 label="Tên đăng nhập"
@@ -129,7 +149,6 @@ const Login = () => {
                   <Form.Item name="remember" valuePropName="checked" noStyle>
                     <Checkbox>Ghi nhớ đăng nhập</Checkbox>
                   </Form.Item>
-                  <Link to="/forgot-password">Quên mật khẩu?</Link>
                 </div>
               </Form.Item>
 
@@ -138,6 +157,17 @@ const Login = () => {
                   Đăng nhập
                 </Button>
               </Form.Item>
+
+              <div style={{ marginTop: 16, textAlign: "center" }}>
+                {isAdminLogin ? (
+                  <Link to="/login">Quay lại đăng nhập khách hàng</Link>
+                ) : (
+                  <Space direction="vertical" size={8}>
+                    <Link to="/register">Đăng ký tài khoản</Link>
+                    <Link to="/admin/login">Đăng nhập dành cho admin</Link>
+                  </Space>
+                )}
+              </div>
             </Form>
           </Space>
         </Card>

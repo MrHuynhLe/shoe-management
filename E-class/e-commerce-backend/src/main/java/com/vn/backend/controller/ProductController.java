@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.math.BigDecimal;
 
 @RestController
 @RequestMapping("/v1/products")
@@ -35,6 +36,36 @@ public class ProductController {
         return ResponseEntity.ok(
                 productService.getProductList(page, size, categoryId, brandId, includeInactive)
         );
+    }
+
+    @GetMapping("/filter")
+    public ResponseEntity<PageResponse<ProductListResponse>> filterProducts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Long brandId,
+            @RequestParam(required = false) String sizeValue,
+            @RequestParam(required = false) String color,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) Boolean isSale,
+            @RequestParam(defaultValue = "false") boolean excludeSale
+    ) {
+        return ResponseEntity.ok(productService.filterProducts(
+                page,
+                size,
+                keyword,
+                categoryId,
+                brandId,
+                sizeValue,
+                color,
+                minPrice,
+                maxPrice,
+                sort,
+                excludeSale ? Boolean.FALSE : isSale
+        ));
     }
 
     @GetMapping("/{id}")

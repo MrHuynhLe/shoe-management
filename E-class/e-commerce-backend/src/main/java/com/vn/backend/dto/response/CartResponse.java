@@ -23,6 +23,9 @@ public class CartResponse {
 
     private List<CartItemResponse> items;
 
+    private BigDecimal originalSubtotal;
+    private BigDecimal productDiscountTotal;
+    private BigDecimal subtotalBeforeVoucher;
     private BigDecimal totalAmount;
     private Integer totalItems;
 

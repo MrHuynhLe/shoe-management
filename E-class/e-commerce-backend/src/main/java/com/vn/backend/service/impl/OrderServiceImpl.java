@@ -6,11 +6,14 @@ import com.vn.backend.dto.request.OrderReturnReviewRequest;
 import com.vn.backend.dto.request.PlaceOrderRequest;
 import com.vn.backend.dto.request.ValidateDiscountRequest;
 import com.vn.backend.dto.response.CustomerResponse;
+import com.vn.backend.dto.response.CheckoutQuoteItemResponse;
+import com.vn.backend.dto.response.CheckoutQuoteResponse;
 import com.vn.backend.dto.response.OrderDetailResponse;
 import com.vn.backend.dto.response.OrderItemResponse;
 import com.vn.backend.dto.response.OrderResponse;
 import com.vn.backend.dto.response.OrderShippingAddressResponse;
 import com.vn.backend.dto.response.OrderStatusHistoryResponse;
+import com.vn.backend.dto.response.ProductPriceResponse;
 import com.vn.backend.dto.response.UserProfileResponse;
 import com.vn.backend.dto.response.ValidateDiscountResponse;
 import com.vn.backend.entity.Coupon;
@@ -42,11 +45,14 @@ import com.vn.backend.repository.PaymentMethodRepository;
 import com.vn.backend.repository.PaymentRepository;
 import com.vn.backend.repository.ProductVariantRepository;
 import com.vn.backend.repository.PromotionRepository;
+import com.vn.backend.repository.ReviewRepository;
 import com.vn.backend.repository.UserRepository;
 import com.vn.backend.security.CustomUserDetails;
+import com.vn.backend.service.CheckoutQuoteService;
 import com.vn.backend.service.DiscountService;
 import com.vn.backend.service.GhtkService;
 import com.vn.backend.service.OrderService;
+import com.vn.backend.service.ProductPriceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -91,6 +97,9 @@ public class OrderServiceImpl implements OrderService {
     private final GHTKLogicHandler ghtkLogicHandler;
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final InventoryTransactionRepository inventoryTransactionRepository;
+    private final ProductPriceService productPriceService;
+    private final CheckoutQuoteService checkoutQuoteService;
+    private final ReviewRepository reviewRepository;
 
     private static final String ORDER_TYPE_ONLINE = "ONLINE";
 
@@ -118,7 +127,6 @@ public class OrderServiceImpl implements OrderService {
 
         Customer customer = resolveCustomer(userId);
 
-        BigDecimal subTotal = BigDecimal.ZERO;
         List<OrderItem> orderItems = new ArrayList<>();
 
         List<Long> requestedVariantIds = request.getItems().stream()
@@ -161,41 +169,58 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        for (OrderItemRequest itemRequest : request.getItems()) {
-            ProductVariant variant = variantsMap.get(itemRequest.getVariantId());
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
 
-            validateVariantCanBeOrdered(variant);
+        CheckoutQuoteResponse quote = checkoutQuoteService.calculate(
+                request.getItems(),
+                request.getVoucherCode(),
+                request.getShippingInfo(),
+                userDetails,
+                variantsMap
+        );
 
-            BigDecimal itemSubTotal = defaultZero(variant.getSellingPrice())
-                    .multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
+        if (StringUtils.hasText(request.getVoucherCode()) && Boolean.FALSE.equals(quote.getVoucherValid())) {
+            throw new InvalidRequestException(defaultText(
+                    quote.getVoucherMessage(),
+                    "Voucher khong con hop le."
+            ));
+        }
 
-            subTotal = subTotal.add(itemSubTotal);
+        for (CheckoutQuoteItemResponse quoteItem : quote.getItems()) {
+            ProductVariant variant = variantsMap.get(quoteItem.getVariantId());
+
+            BigDecimal originalPrice = defaultZero(quoteItem.getOriginalPrice());
+            BigDecimal unitPrice = defaultZero(quoteItem.getUnitPrice());
+            BigDecimal itemProductDiscount = originalPrice.subtract(unitPrice)
+                    .multiply(BigDecimal.valueOf(quoteItem.getQuantity()));
 
             OrderItem orderItem = OrderItem.builder()
                     .productVariant(variant)
-                    .quantity(itemRequest.getQuantity())
-                    .costPriceAtPurchase(variant.getCostPrice())
-                    .priceAtPurchase(variant.getSellingPrice())
+                    .quantity(quoteItem.getQuantity())
+                    .costPriceAtPurchase(defaultZero(variant.getCostPrice()))
+                    .priceAtPurchase(unitPrice)
+                    .originalPriceAtPurchase(originalPrice)
+                    .productDiscountPercent(defaultZero(quoteItem.getDiscountPercent()))
+                    .productDiscountAmount(itemProductDiscount)
+                    .promotionId(quoteItem.getPromotionId())
+                    .lineTotal(defaultZero(quoteItem.getLineTotal()))
                     .build();
 
             orderItems.add(orderItem);
         }
 
-        BigDecimal discountAmount = BigDecimal.ZERO;
+        BigDecimal originalSubtotal = defaultZero(quote.getOriginalSubtotal());
+        BigDecimal productDiscountTotal = defaultZero(quote.getProductDiscountTotal());
+        BigDecimal subtotalBeforeVoucher = defaultZero(quote.getSubtotalBeforeVoucher());
+        BigDecimal discountAmount = defaultZero(quote.getVoucherDiscountAmount());
+        BigDecimal shippingFee = defaultZero(quote.getShippingFee());
+        BigDecimal productRevenue = defaultZero(quote.getProductRevenue());
+        BigDecimal totalAmount = defaultZero(quote.getFinalTotal());
         Promotion appliedPromotion = null;
         Coupon appliedCoupon = null;
 
         if (StringUtils.hasText(request.getVoucherCode())) {
-            ValidateDiscountRequest discountRequest = new ValidateDiscountRequest();
-            discountRequest.setCode(request.getVoucherCode());
-            discountRequest.setSubtotal(subTotal);
-
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
-
-            ValidateDiscountResponse discountResponse = discountService.validateDiscount(discountRequest, userDetails);
-            discountAmount = defaultZero(discountResponse.getDiscountAmount());
-
             Optional<Promotion> promotionOpt = promotionRepository.findByCode(request.getVoucherCode());
             if (promotionOpt.isPresent()) {
                 appliedPromotion = promotionOpt.get();
@@ -203,20 +228,6 @@ public class OrderServiceImpl implements OrderService {
                 appliedCoupon = discountService.findCouponByCode(request.getVoucherCode());
             }
         }
-
-        List<Integer> itemQuantities = request.getItems().stream()
-                .map(OrderItemRequest::getQuantity)
-                .toList();
-
-        BigDecimal shippingFee = ghtkLogicHandler.calculateShippingFee(
-                request.getShippingInfo().getProvince(),
-                request.getShippingInfo().getDistrict(),
-                request.getShippingInfo().getAddress(),
-                subTotal,
-                itemQuantities
-        );
-
-        BigDecimal totalAmount = subTotal.add(shippingFee).subtract(discountAmount);
 
         Employee employee = null;
         if (request.getEmployeeId() != null) {
@@ -229,7 +240,11 @@ public class OrderServiceImpl implements OrderService {
                 .employee(employee)
                 .status(ORDER_STATUS_PENDING)
                 .orderType(ORDER_TYPE_ONLINE)
+                .originalSubtotal(originalSubtotal)
+                .productDiscountTotal(productDiscountTotal)
+                .subtotalBeforeVoucher(subtotalBeforeVoucher)
                 .discountAmount(discountAmount)
+                .productRevenue(productRevenue)
                 .totalAmount(totalAmount)
                 .shippingFee(shippingFee)
                 .voucherCode(request.getVoucherCode())
@@ -241,9 +256,12 @@ public class OrderServiceImpl implements OrderService {
         shippingDetails.setShippingPhone(request.getShippingInfo().getPhone());
         shippingDetails.setShippingAddress(request.getShippingInfo().getAddress());
         shippingDetails.setShippingNote(request.getShippingInfo().getNote());
-        shippingDetails.setProvince(request.getShippingInfo().getProvince());
-        shippingDetails.setDistrict(request.getShippingInfo().getDistrict());
-        shippingDetails.setWard(request.getShippingInfo().getWard());
+        shippingDetails.setProvince(defaultText(request.getShippingInfo().getProvinceName(), request.getShippingInfo().getProvince()));
+        shippingDetails.setDistrict(defaultText(request.getShippingInfo().getDistrictName(), request.getShippingInfo().getDistrict()));
+        shippingDetails.setWard(defaultText(request.getShippingInfo().getWardName(), request.getShippingInfo().getWard()));
+        shippingDetails.setProvinceId(request.getShippingInfo().getProvinceId());
+        shippingDetails.setDistrictId(request.getShippingInfo().getDistrictId());
+        shippingDetails.setWardCode(request.getShippingInfo().getWardCode());
         order.setShippingDetails(shippingDetails);
 
         for (OrderItem item : orderItems) {
@@ -335,8 +353,11 @@ public class OrderServiceImpl implements OrderService {
                 .map(payment -> payment.getPaymentMethod().getName())
                 .orElse("Chưa xác định");
 
-        BigDecimal subtotalAmount = calculateSubtotal(order.getItems());
+        BigDecimal subtotalAmount = resolveSubtotalBeforeVoucher(order);
+        BigDecimal originalSubtotal = resolveOriginalSubtotal(order);
+        BigDecimal productDiscountTotal = resolveProductDiscountTotal(order, originalSubtotal, subtotalAmount);
         BigDecimal discountAmount = defaultZero(order.getDiscountAmount());
+        BigDecimal productRevenue = resolveProductRevenue(order, subtotalAmount, discountAmount);
         BigDecimal discountPercent = calculateDiscountPercent(subtotalAmount, discountAmount);
 
         List<OrderStatusHistoryResponse> statusHistory = orderStatusHistoryRepository
@@ -358,6 +379,12 @@ public class OrderServiceImpl implements OrderService {
                 ward,
                 paymentMethodName,
                 subtotalAmount,
+                originalSubtotal,
+                productDiscountTotal,
+                subtotalAmount,
+                discountAmount,
+                productRevenue,
+                order.getTotalAmount(),
                 order.getTotalAmount(),
                 order.getVoucherCode(),
                 discountAmount,
@@ -385,15 +412,69 @@ public class OrderServiceImpl implements OrderService {
                     .orElse(null);
         }
 
-        return new OrderItemResponse(
-                variant.getProduct().getId(),
-                variant.getProduct().getName(),
-                variant.getCode(),
-                imageUrl,
-                item.getQuantity(),
-                item.getPriceAtPurchase(),
-                item.getPriceAtPurchase().multiply(BigDecimal.valueOf(item.getQuantity()))
+        BigDecimal unitPrice = defaultZero(item.getPriceAtPurchase());
+        BigDecimal originalPrice = defaultZero(item.getOriginalPriceAtPurchase());
+        if (originalPrice.compareTo(BigDecimal.ZERO) == 0) {
+            originalPrice = unitPrice;
+        }
+        BigDecimal lineTotal = defaultZero(item.getLineTotal());
+        if (lineTotal.compareTo(BigDecimal.ZERO) == 0) {
+            lineTotal = unitPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
+        }
+        BigDecimal productDiscountPercent = defaultZero(item.getProductDiscountPercent());
+
+        OrderItemResponse response = new OrderItemResponse();
+        response.setOrderItemId(item.getId());
+        response.setProductId(variant.getProduct().getId());
+        response.setProductName(variant.getProduct().getName());
+        response.setVariantInfo(variant.getCode());
+        response.setImageUrl(imageUrl);
+        response.setProductImage(imageUrl);
+        response.setSize(resolveVariantAttribute(variant, "SIZE"));
+        response.setColor(resolveVariantAttribute(variant, "COLOR"));
+        response.setMaterial(resolveVariantAttribute(variant, "MATERIAL"));
+        response.setQuantity(item.getQuantity());
+        response.setPrice(unitPrice);
+        response.setOriginalPrice(originalPrice);
+        response.setUnitPrice(unitPrice);
+        response.setSalePrice(unitPrice);
+        response.setProductDiscountPercent(productDiscountPercent);
+        response.setProductDiscountAmount(defaultZero(item.getProductDiscountAmount()));
+        response.setPromotionId(item.getPromotionId());
+        response.setIsSale(item.getPromotionId() != null && productDiscountPercent.compareTo(BigDecimal.ZERO) > 0);
+        response.setSubtotal(lineTotal);
+        response.setLineTotal(lineTotal);
+        reviewRepository.findByOrderItemIdAndStatusTrue(item.getId()).ifPresentOrElse(
+                review -> {
+                    response.setReviewed(true);
+                    response.setReviewId(review.getId());
+                },
+                () -> {
+                    response.setReviewed(false);
+                    response.setReviewId(null);
+                }
         );
+        response.setCanReview(isReviewableOrderStatus(item.getOrder().getStatus()) && !Boolean.TRUE.equals(response.getReviewed()));
+        return response;
+    }
+
+    private String resolveVariantAttribute(ProductVariant variant, String attributeCode) {
+        if (variant == null || variant.getVariantAttributeValues() == null) {
+            return null;
+        }
+
+        return variant.getVariantAttributeValues()
+                .stream()
+                .filter(vav -> vav.getAttributeValue() != null
+                        && vav.getAttributeValue().getAttribute() != null
+                        && attributeCode.equalsIgnoreCase(vav.getAttributeValue().getAttribute().getCode()))
+                .map(vav -> vav.getAttributeValue().getValue())
+                .findFirst()
+                .orElse(null);
+    }
+
+    private boolean isReviewableOrderStatus(String status) {
+        return "COMPLETED".equalsIgnoreCase(status) || "DELIVERED".equalsIgnoreCase(status);
     }
 
     @Override
@@ -580,6 +661,12 @@ public class OrderServiceImpl implements OrderService {
                     response.setProvince(details.getProvince());
                     response.setDistrict(details.getDistrict());
                     response.setWard(details.getWard());
+                    response.setProvinceId(details.getProvinceId());
+                    response.setDistrictId(details.getDistrictId());
+                    response.setWardCode(details.getWardCode());
+                    response.setProvinceName(details.getProvince());
+                    response.setDistrictName(details.getDistrict());
+                    response.setWardName(details.getWard());
                     response.setNote(details.getShippingNote());
                     return response;
                 })
@@ -671,8 +758,11 @@ public class OrderServiceImpl implements OrderService {
             customerResponse = new CustomerResponse(order.getCustomer().getId(), userProfileResponse);
         }
 
-        BigDecimal subtotalAmount = calculateSubtotal(order.getItems());
+        BigDecimal subtotalAmount = resolveSubtotalBeforeVoucher(order);
+        BigDecimal originalSubtotal = resolveOriginalSubtotal(order);
+        BigDecimal productDiscountTotal = resolveProductDiscountTotal(order, originalSubtotal, subtotalAmount);
         BigDecimal discountAmount = defaultZero(order.getDiscountAmount());
+        BigDecimal productRevenue = resolveProductRevenue(order, subtotalAmount, discountAmount);
         BigDecimal discountPercent = calculateDiscountPercent(subtotalAmount, discountAmount);
 
         Payment latestPayment = paymentRepository.findByOrder_Id(order.getId())
@@ -700,7 +790,14 @@ public class OrderServiceImpl implements OrderService {
                 .discountPercent(discountPercent)
                 .totalAmount(order.getTotalAmount())
                 .subtotalAmount(subtotalAmount)
+                .originalSubtotal(originalSubtotal)
+                .productDiscountTotal(productDiscountTotal)
+                .subtotalBeforeVoucher(subtotalAmount)
+                .voucherDiscountAmount(discountAmount)
+                .productRevenue(productRevenue)
+                .shippingFee(defaultZero(order.getShippingFee()))
                 .voucherCode(order.getVoucherCode())
+                .finalTotal(order.getTotalAmount())
                 .status(order.getStatus())
                 .createdAt(order.getCreatedAt())
                 .customer(customerResponse)
@@ -734,9 +831,62 @@ public class OrderServiceImpl implements OrderService {
 
     private BigDecimal calculateSubtotal(List<OrderItem> items) {
         return items.stream()
-                .map(item -> defaultZero(item.getPriceAtPurchase())
-                        .multiply(BigDecimal.valueOf(item.getQuantity())))
+                .map(item -> {
+                    BigDecimal lineTotal = defaultZero(item.getLineTotal());
+                    if (lineTotal.compareTo(BigDecimal.ZERO) > 0) {
+                        return lineTotal;
+                    }
+                    return defaultZero(item.getPriceAtPurchase())
+                            .multiply(BigDecimal.valueOf(item.getQuantity()));
+                })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal resolveSubtotalBeforeVoucher(Order order) {
+        BigDecimal subtotal = defaultZero(order.getSubtotalBeforeVoucher());
+        return subtotal.compareTo(BigDecimal.ZERO) > 0 ? subtotal : calculateSubtotal(order.getItems());
+    }
+
+    private BigDecimal resolveOriginalSubtotal(Order order) {
+        BigDecimal originalSubtotal = defaultZero(order.getOriginalSubtotal());
+        if (originalSubtotal.compareTo(BigDecimal.ZERO) > 0) {
+            return originalSubtotal;
+        }
+
+        return order.getItems().stream()
+                .map(item -> {
+                    BigDecimal originalPrice = defaultZero(item.getOriginalPriceAtPurchase());
+                    if (originalPrice.compareTo(BigDecimal.ZERO) == 0) {
+                        originalPrice = defaultZero(item.getPriceAtPurchase());
+                    }
+                    return originalPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
+                })
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal resolveProductDiscountTotal(
+            Order order,
+            BigDecimal originalSubtotal,
+            BigDecimal subtotalBeforeVoucher
+    ) {
+        BigDecimal productDiscountTotal = defaultZero(order.getProductDiscountTotal());
+        if (productDiscountTotal.compareTo(BigDecimal.ZERO) > 0) {
+            return productDiscountTotal;
+        }
+        return defaultZero(originalSubtotal).subtract(defaultZero(subtotalBeforeVoucher)).max(BigDecimal.ZERO);
+    }
+
+    private BigDecimal resolveProductRevenue(
+            Order order,
+            BigDecimal subtotalBeforeVoucher,
+            BigDecimal discountAmount
+    ) {
+        BigDecimal productRevenue = defaultZero(order.getProductRevenue());
+        if (productRevenue.compareTo(BigDecimal.ZERO) > 0) {
+            return productRevenue;
+        }
+
+        return defaultZero(subtotalBeforeVoucher).subtract(defaultZero(discountAmount)).max(BigDecimal.ZERO);
     }
 
     private BigDecimal calculateDiscountPercent(BigDecimal subtotalAmount, BigDecimal discountAmount) {

@@ -20,10 +20,19 @@ public class CartItemResponse {
 
     private String size;
     private String color;
+    private String material;
 
     private BigDecimal price;
+    private BigDecimal originalPrice;
+    private BigDecimal unitPrice;
+    private BigDecimal salePrice;
+    private BigDecimal discountPercent;
+    private Long promotionId;
+    private String promotionName;
+    private Boolean isSale;
     private Integer quantity;
     private Integer stockRemaining;
     private BigDecimal subTotal;
+    private BigDecimal lineTotal;
     private String imageUrl;
 }

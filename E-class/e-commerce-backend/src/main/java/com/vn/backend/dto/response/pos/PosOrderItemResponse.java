@@ -15,6 +15,7 @@ public class PosOrderItemResponse {
     private String productName;
     private String color;
     private String size;
+    private String material;
     private BigDecimal price;
     private Integer quantity;
     private BigDecimal lineTotal;

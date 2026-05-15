@@ -15,6 +15,7 @@ public class PosProductSearchResponse {
     private String productName;
     private String color;
     private String size;
+    private String material;
     private BigDecimal sellingPrice;
     private Integer stockQuantity;
     private String imageUrl;

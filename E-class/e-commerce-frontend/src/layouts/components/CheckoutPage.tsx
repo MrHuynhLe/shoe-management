@@ -1,70 +1,160 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  Row,
-  Col,
+  Avatar,
+  Button,
   Card,
+  Checkbox,
+  Col,
+  Divider,
   Form,
   Input,
-  Radio,
-  Button,
   List,
-  Avatar,
-  Checkbox,
-  Divider,
+  Modal,
+  Popconfirm,
+  Radio,
+  Row,
+  Select,
+  Space,
+  Spin,
+  Tag,
   Typography,
   message,
-  Spin,
-  Space,
-  Select,
-  Tag,
-  Modal,
 } from "antd";
-import { Popconfirm } from "antd";
 import {
   ArrowLeftOutlined,
   CreditCardOutlined,
-  TruckOutlined,
   EditOutlined,
+  TruckOutlined,
 } from "@ant-design/icons";
 import { orderService } from "@/services/order.service";
 import { useAuth } from "@/services/AuthContext";
 import { discountService } from "@/services/discount.service";
+import { checkoutService, CheckoutQuoteResponse } from "@/services/checkout.service";
 import { userService } from "@/services/userService";
-import { shippingService } from "@/services/shipping.service";
 import { couponService } from "@/services/coupon.service";
+import {
+  GhnDistrict,
+  GhnProvince,
+  GhnWard,
+  getDistricts,
+  getProvinces,
+  getWards,
+} from "@/services/ghnShippingService";
+import { resolveImageUrl } from "@/utils/utils";
+
+const { Title, Text } = Typography;
 
 interface Address {
   fullName: string;
   phone: string;
-  province: string;
-  district: string;
-  ward: string;
+  provinceId?: number;
+  districtId?: number;
+  wardCode?: string;
+  provinceName?: string;
+  districtName?: string;
+  wardName?: string;
+  province?: string;
+  district?: string;
+  ward?: string;
   address: string;
   note?: string;
 }
-
-const { Title, Text } = Typography;
 
 const CheckoutPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [form] = Form.useForm();
+  const { isAuthenticated, user } = useAuth();
+
+  const { items = [] } = location.state || {};
+  const totalQuantity = useMemo(
+    () =>
+      items.reduce(
+        (sum: number, item: any) => sum + Number(item.quantity || 0),
+        0,
+      ),
+    [items],
+  );
+
   const [loading, setLoading] = useState(false);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quote, setQuote] = useState<CheckoutQuoteResponse | null>(null);
   const [voucherCode, setVoucherCode] = useState("");
-  const [discount, setDiscount] = useState(0);
   const [appliedVoucher, setAppliedVoucher] = useState<string | null>(null);
   const [appliedVoucherInfo, setAppliedVoucherInfo] = useState<any>(null);
   const [availableVouchers, setAvailableVouchers] = useState<any[]>([]);
-  const [shippingFee, setShippingFee] = useState(0);
-  const [isEstimatingShipping, setIsEstimatingShipping] = useState(false);
+  const [voucherApplying, setVoucherApplying] = useState(false);
+  const [voucherError, setVoucherError] = useState("");
+  const [quoteError, setQuoteError] = useState("");
+
+  const [shippingError, setShippingError] = useState("");
+
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [isAddressModalVisible, setIsAddressModalVisible] = useState(false);
-  const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
-  const { isAuthenticated } = useAuth();
-  const { items, subtotal } = location.state || { items: [], subtotal: 0 };
+  const [selectingAddressIndex, setSelectingAddressIndex] = useState<number | null>(null);
+  const [defaultAddressKey, setDefaultAddressKey] = useState<string>("");
+  const hasAppliedDefaultAddressRef = useRef(false);
+  const latestQuoteRequestRef = useRef(0);
+  const latestVoucherRequestRef = useRef(0);
 
-  const total = subtotal + shippingFee - discount;
+  const [provinces, setProvinces] = useState<GhnProvince[]>([]);
+  const [districts, setDistricts] = useState<GhnDistrict[]>([]);
+  const [wards, setWards] = useState<GhnWard[]>([]);
+  const [loadingProvinces, setLoadingProvinces] = useState(false);
+  const [loadingDistricts, setLoadingDistricts] = useState(false);
+  const [loadingWards, setLoadingWards] = useState(false);
+
+  const selectedProvinceId = Form.useWatch("provinceId", form);
+  const selectedDistrictId = Form.useWatch("districtId", form);
+  const selectedWardCode = Form.useWatch("wardCode", form);
+  const selectedAddress = Form.useWatch("address", form);
+  const selectedProvinceName = Form.useWatch("provinceName", form);
+  const selectedDistrictName = Form.useWatch("districtName", form);
+  const selectedWardName = Form.useWatch("wardName", form);
+
+  const fallbackItems = useMemo(
+    () =>
+      items.map((item: any) => ({
+        productId: item.productId,
+        variantId: item.variantId,
+        productName: item.productName || item.name,
+        variantCode: item.variantCode,
+        size: item.size,
+        color: item.color,
+        material: item.material,
+        imageUrl: item.image || item.imageUrl,
+        quantity: item.quantity,
+        originalPrice: Number(item.originalPrice ?? item.price ?? item.unitPrice ?? 0),
+        unitPrice: Number(item.unitPrice ?? item.salePrice ?? item.price ?? 0),
+        discountPercent: Number(item.discountPercent ?? 0),
+        promotionId: item.promotionId,
+        lineTotal: Number(
+          item.lineTotal ??
+            item.subTotal ??
+            item.total ??
+            Number(item.quantity || 0) *
+              Number(item.unitPrice ?? item.salePrice ?? item.price ?? 0),
+        ),
+      })),
+    [items],
+  );
+  const displayItems = quote?.items?.length ? quote.items : fallbackItems;
+  const fallbackSubtotal = fallbackItems.reduce(
+    (sum: number, item: any) => sum + Number(item.lineTotal || 0),
+    0,
+  );
+  const subtotalBeforeVoucher = Number(
+    quote?.subtotalBeforeVoucher ?? fallbackSubtotal,
+  );
+  const discount = appliedVoucher ? Number(quote?.voucherDiscountAmount || 0) : 0;
+  const shippingFee = Number(quote?.shippingFee || 0);
+  const total = Math.max(subtotalBeforeVoucher - discount, 0) + shippingFee;
+  const isShippingLoading = quoteLoading;
+  const defaultAddressStorageKey = useMemo(
+    () => `checkout_default_address_${user?.userId || "guest"}`,
+    [user?.userId],
+  );
 
   const formatMoney = (value?: number | string) =>
     `${new Intl.NumberFormat("vi-VN").format(Number(value || 0))} ₫`;
@@ -72,10 +162,11 @@ const CheckoutPage = () => {
   const buildVoucherLabel = (v: any) => {
     const discountText =
       v.discountType === "PERCENTAGE"
-        ? `Giảm ${v.discountValue}%${v.maxDiscountAmount
-          ? `, tối đa ${formatMoney(v.maxDiscountAmount)}`
-          : ""
-        }`
+        ? `Giảm ${v.discountValue}%${
+            v.maxDiscountAmount
+              ? `, tối đa ${formatMoney(v.maxDiscountAmount)}`
+              : ""
+          }`
         : `Giảm ${formatMoney(v.discountValue)}`;
 
     const minOrderText =
@@ -93,6 +184,267 @@ const CheckoutPage = () => {
     return `${v.code || v.name} - ${discountText}${minOrderText}${remainingText}`;
   };
 
+  const isVoucherRelatedError = (value?: string) => {
+    const text = String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+
+    return (
+      text.includes("voucher") ||
+      text.includes("ma giam") ||
+      text.includes("khuyen mai") ||
+      text.includes("coupon")
+    );
+  };
+
+  const buildQuotePayload = (nextVoucherCode: string | null = appliedVoucher) => {
+    const values = form.getFieldsValue([
+      "customerName",
+      "phone",
+      "address",
+      "province",
+      "district",
+      "ward",
+      "provinceId",
+      "districtId",
+      "wardCode",
+      "provinceName",
+      "districtName",
+      "wardName",
+      "note",
+    ]);
+
+    const hasShippingInfo =
+      values.address && values.provinceName && values.districtName;
+
+    return {
+      items: items.map((item: any) => ({
+        variantId: item.variantId,
+        quantity: item.quantity,
+      })),
+      voucherCode: nextVoucherCode || undefined,
+      shippingInfo: hasShippingInfo
+        ? {
+            customerName: values.customerName || "Khach hang",
+            phone: values.phone || "0000000000",
+            address: values.address,
+            province: values.provinceName,
+            district: values.districtName,
+            ward: values.wardName,
+            provinceId: values.provinceId,
+            districtId: values.districtId,
+            wardCode: values.wardCode,
+            provinceName: values.provinceName,
+            districtName: values.districtName,
+            wardName: values.wardName,
+            note: values.note,
+          }
+        : undefined,
+    };
+  };
+
+  const fetchQuote = async (
+    nextVoucherCode: string | null = appliedVoucher,
+    options: {
+      silent?: boolean;
+      source?: "checkout" | "shipping" | "voucher";
+      clearVoucherOnError?: boolean;
+    } = {},
+  ) => {
+    if (!items.length) {
+      setQuote(null);
+      setQuoteError("");
+      setShippingError("");
+      setVoucherError("");
+      return null;
+    }
+
+    const requestId = ++latestQuoteRequestRef.current;
+
+    try {
+      setQuoteLoading(true);
+      if (options.source === "voucher") {
+        setVoucherError("");
+      } else if (options.source === "shipping") {
+        setShippingError("");
+      } else {
+        setQuoteError("");
+      }
+      const response = await checkoutService.quote(buildQuotePayload(nextVoucherCode));
+      if (requestId !== latestQuoteRequestRef.current) {
+        return null;
+      }
+      setQuote(response.data);
+      setQuoteError("");
+      setShippingError("");
+      setVoucherError("");
+      return response.data;
+    } catch (error: any) {
+      const errorMessage =
+        error?.response?.data?.message ||
+        "Khong the tinh lai tong tien don hang.";
+
+      if (requestId === latestQuoteRequestRef.current) {
+        if (options.source === "voucher") {
+          setVoucherError(errorMessage);
+          if (options.clearVoucherOnError) {
+            setAppliedVoucher(null);
+            setAppliedVoucherInfo(null);
+          }
+        } else if (options.source === "shipping") {
+          setShippingError("Không thể tính phí vận chuyển");
+        } else {
+          setQuoteError(errorMessage);
+        }
+
+        if (!options.silent) {
+          message.error(errorMessage);
+        }
+      }
+      throw error;
+    } finally {
+      if (requestId === latestQuoteRequestRef.current) {
+        setQuoteLoading(false);
+      }
+    }
+  };
+
+  const normalizeLocationName = (value?: string) =>
+    String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\u0111/g, "d")
+      .replace(/\u0110/g, "D")
+      .toLowerCase()
+      .replace(/\b(tinh|thanh pho|tp|quan|huyen|thi xa|phuong|xa|thi tran)\b/g, "")
+      .replace(/[^\w\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const namesMatch = (source?: string, target?: string) => {
+    const left = normalizeLocationName(source);
+    const right = normalizeLocationName(target);
+
+    return Boolean(
+      left && right && (left === right || left.includes(right) || right.includes(left)),
+    );
+  };
+
+  const getAddressKey = (address: Address) =>
+    [
+      address.fullName,
+      address.phone,
+      address.address,
+      address.provinceName || address.province,
+      address.districtName || address.district,
+      address.wardName || address.ward,
+    ]
+      .map((value) => normalizeLocationName(value))
+      .join("|");
+
+  const handleSetDefaultAddress = async (address: Address, index: number) => {
+    const key = getAddressKey(address);
+    localStorage.setItem(defaultAddressStorageKey, key);
+    setDefaultAddressKey(key);
+
+    await handleAddressSelect(address, { index });
+    message.success("Đã đặt địa chỉ mặc định.");
+  };
+
+  const resolveSavedAddress = async (address: Address) => {
+    const provinceName = address.provinceName || address.province;
+    const districtName = address.districtName || address.district;
+    const wardName = address.wardName || address.ward;
+
+    const provinceOptions = provinces.length > 0 ? provinces : await getProvinces();
+    if (provinces.length === 0) {
+      setProvinces(provinceOptions);
+    }
+
+    const province =
+      provinceOptions.find((item) => item.ProvinceID === address.provinceId) ||
+      provinceOptions.find((item) => namesMatch(item.ProvinceName, provinceName));
+
+    const provinceId = address.provinceId || province?.ProvinceID;
+    if (!provinceId) {
+      throw new Error("Không tìm thấy tỉnh/thành phố GHN cho địa chỉ đã lưu.");
+    }
+
+    const districtOptions = await getDistricts(Number(provinceId));
+    setDistricts(districtOptions);
+
+    const district =
+      districtOptions.find((item) => item.DistrictID === address.districtId) ||
+      districtOptions.find((item) => namesMatch(item.DistrictName, districtName));
+
+    const districtId = address.districtId || district?.DistrictID;
+    if (!districtId) {
+      throw new Error("Không tìm thấy quận/huyện GHN cho địa chỉ đã lưu.");
+    }
+
+    const wardOptions = await getWards(Number(districtId));
+    setWards(wardOptions);
+
+    const ward =
+      wardOptions.find((item) => item.WardCode === address.wardCode) ||
+      wardOptions.find((item) => namesMatch(item.WardName, wardName));
+
+    const wardCode = address.wardCode || ward?.WardCode;
+    if (!wardCode) {
+      throw new Error("Không tìm thấy phường/xã GHN cho địa chỉ đã lưu.");
+    }
+
+    return {
+      provinceId,
+      districtId,
+      wardCode,
+      provinceName: province?.ProvinceName || provinceName,
+      districtName: district?.DistrictName || districtName,
+      wardName: ward?.WardName || wardName,
+    };
+  };
+
+  const loadUserAddresses = async () => {
+    if (!isAuthenticated || addresses.length > 0) return;
+
+    try {
+      const response = await orderService.getUserShippingAddresses();
+      const savedAddresses = response.data || [];
+      setAddresses(savedAddresses);
+
+      if (
+        savedAddresses.length > 0 &&
+        !hasAppliedDefaultAddressRef.current &&
+        !form.getFieldValue("address")
+      ) {
+        const savedDefaultKey =
+          localStorage.getItem(defaultAddressStorageKey) || defaultAddressKey;
+        const defaultAddress =
+          savedAddresses.find(
+            (address: Address) => getAddressKey(address) === savedDefaultKey,
+          ) || savedAddresses[0];
+
+        if (savedDefaultKey) {
+          setDefaultAddressKey(savedDefaultKey);
+        }
+
+        hasAppliedDefaultAddressRef.current = true;
+        await handleAddressSelect(defaultAddress, {
+          closeModal: false,
+          showError: false,
+        });
+      }
+    } catch (error) {
+      console.error("Không thể tải danh sách địa chỉ:", error);
+    }
+  };
+
+  useEffect(() => {
+    setDefaultAddressKey(localStorage.getItem(defaultAddressStorageKey) || "");
+    hasAppliedDefaultAddressRef.current = false;
+  }, [defaultAddressStorageKey]);
+
   useEffect(() => {
     const fetchVouchers = async () => {
       try {
@@ -102,8 +454,8 @@ const CheckoutPage = () => {
         if (isAuthenticated) {
           const couponsRes = await couponService.getMyCoupons();
           coupons =
-            couponsRes.data?.map((c: any) => ({
-              ...c,
+            couponsRes.data?.map((coupon: any) => ({
+              ...coupon,
               type: "COUPON",
             })) || [];
         }
@@ -111,8 +463,8 @@ const CheckoutPage = () => {
         const promotionRes = await discountService.getPublicPromotions();
         const promotionList = promotionRes?.data?.content || promotionRes?.data || [];
         promotions =
-          promotionList.map((p: any) => ({
-            ...p,
+          promotionList.map((promotion: any) => ({
+            ...promotion,
             type: "PROMOTION",
           })) || [];
 
@@ -126,80 +478,120 @@ const CheckoutPage = () => {
     fetchVouchers();
   }, [isAuthenticated]);
 
-  const loadUserAddresses = async () => {
-    if (addresses.length === 0) {
+  useEffect(() => {
+    const fetchProvinces = async () => {
       try {
-        const response = await orderService.getUserShippingAddresses();
-        setAddresses(response.data);
+        setLoadingProvinces(true);
+        setProvinces(await getProvinces());
       } catch (error) {
-        console.error("Không thể tải danh sách địa chỉ:", error);
+        message.error("Không thể tải danh sách tỉnh/thành phố từ GHN.");
+      } finally {
+        setLoadingProvinces(false);
       }
-    }
-  };
+    };
 
-  const handleAddressSelect = (address: Address) => {
-    form.setFieldsValue({
-      customerName: address.fullName,
-      phone: address.phone,
-      province: address.province,
-      district: address.district,
-      ward: address.ward,
-      address: address.address,
-      note: address.note,
-    });
-    setSelectedAddress(address);
-    setIsAddressModalVisible(false);
-    setTimeout(() => estimateShippingCost(), 100);
-  };
+    fetchProvinces();
+  }, []);
 
-  const handleNewAddress = () => {
-    setIsAddressModalVisible(false);
-  };
+  useEffect(() => {
+    loadUserAddresses();
+  }, [isAuthenticated]);
 
-  const handleAddressFieldChange = () => {
-    estimateShippingCost();
-  };
-
-  const estimateShippingCost = async () => {
-    const { address, province, district, ward } = form.getFieldsValue([
-      "address",
-      "province",
-      "district",
-      "ward",
-    ]);
-
-    if (!province || !district || !ward || items.length === 0) {
-      setShippingFee(0);
+  useEffect(() => {
+    if (!selectedProvinceId) {
+      setDistricts([]);
       return;
     }
 
-    setIsEstimatingShipping(true);
-    try {
-      const shippingEstimateRequest = {
-        shippingInfo: {
-          province,
-          district,
-          address,
-        },
-        items: items.map((item: any) => ({
-          variantId: item.variantId,
-          quantity: item.quantity,
-        })),
-      };
+    const fetchDistricts = async () => {
+      try {
+        setLoadingDistricts(true);
+        setDistricts(await getDistricts(Number(selectedProvinceId)));
+      } catch (error) {
+        message.error("Không thể tải danh sách quận/huyện từ GHN.");
+      } finally {
+        setLoadingDistricts(false);
+      }
+    };
 
-      const response = await shippingService.estimateShippingFee(
-        shippingEstimateRequest,
-      );
-      setShippingFee(response.data.shippingFee);
-    } catch (error) {
-      message.error(
-        "Không thể ước tính phí vận chuyển. Vui lòng kiểm tra địa chỉ.",
-      );
-      setShippingFee(0);
-    } finally {
-      setIsEstimatingShipping(false);
+    fetchDistricts();
+  }, [selectedProvinceId]);
+
+  useEffect(() => {
+    if (!selectedDistrictId) {
+      setWards([]);
+      return;
     }
-  };
+
+    const fetchWards = async () => {
+      try {
+        setLoadingWards(true);
+        setWards(await getWards(Number(selectedDistrictId)));
+      } catch (error) {
+        message.error("Không thể tải danh sách phường/xã từ GHN.");
+      } finally {
+        setLoadingWards(false);
+      }
+    };
+
+    fetchWards();
+  }, [selectedDistrictId]);
+
+  useEffect(() => {
+    const calculateFeeFromQuote = async () => {
+      if (items.length === 0) {
+        setQuote(null);
+        setShippingError("");
+        setQuoteError("");
+        setVoucherError("");
+        return;
+      }
+
+      try {
+        const quoteData = await fetchQuote(appliedVoucher, {
+          silent: true,
+          source: "shipping",
+          clearVoucherOnError: Boolean(appliedVoucher),
+        });
+        if (appliedVoucher && quoteData?.voucherValid === false) {
+          setAppliedVoucher(null);
+          setAppliedVoucherInfo(null);
+          setVoucherError(
+            quoteData.voucherMessage ||
+              "Voucher không còn phù hợp với đơn hàng hiện tại.",
+          );
+          message.warning(
+            "Voucher không còn phù hợp với đơn hàng hiện tại và đã được bỏ áp dụng.",
+          );
+        }
+      } catch (error: any) {
+        if (appliedVoucher) {
+          setAppliedVoucher(null);
+          setAppliedVoucherInfo(null);
+          setVoucherError(
+            error?.response?.data?.message ||
+              "Voucher không còn phù hợp với đơn hàng hiện tại.",
+          );
+          message.warning(
+            "Voucher không còn phù hợp với đơn hàng hiện tại và đã được bỏ áp dụng.",
+          );
+        }
+      }
+    };
+
+    calculateFeeFromQuote();
+  }, [
+    items.length,
+    totalQuantity,
+    appliedVoucher,
+    selectedProvinceId,
+    selectedDistrictId,
+    selectedWardCode,
+    selectedAddress,
+    selectedProvinceName,
+    selectedDistrictName,
+    selectedWardName,
+  ]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -209,65 +601,205 @@ const CheckoutPage = () => {
           const profile = response.data;
           if (profile) {
             form.setFieldsValue({
-              customerName: profile.fullName,
-              phone: profile.phone,
-              province: profile.province,
-              district: profile.district,
+              customerName: form.getFieldValue("customerName") || profile.fullName,
+              phone: form.getFieldValue("phone") || profile.phone,
             });
           }
         })
-        .catch((err) =>
-          console.error("Không thể tải thông tin người dùng:", err),
+        .catch((error) =>
+          console.error("Không thể tải thông tin người dùng:", error),
         );
     }
   }, [isAuthenticated, form]);
 
+  const handleAddressSelect = async (
+    address: Address,
+    options: { closeModal?: boolean; showError?: boolean; index?: number } = {},
+  ) => {
+    const { closeModal = true, showError = true, index = null } = options;
+
+    try {
+      setSelectingAddressIndex(index);
+      const resolvedAddress = await resolveSavedAddress(address);
+
+      form.setFieldsValue({
+        customerName: address.fullName,
+        phone: address.phone,
+        provinceId: resolvedAddress.provinceId,
+        districtId: resolvedAddress.districtId,
+        wardCode: resolvedAddress.wardCode,
+        provinceName: resolvedAddress.provinceName,
+        districtName: resolvedAddress.districtName,
+        wardName: resolvedAddress.wardName,
+        address: address.address,
+        note: address.note,
+      });
+
+      setShippingError("");
+      setQuoteError("");
+
+      if (closeModal) {
+        setIsAddressModalVisible(false);
+      }
+    } catch (error: any) {
+      console.error("Không thể chọn địa chỉ đã lưu:", error);
+      if (showError) {
+        message.error(
+          error?.message ||
+            "Không thể dùng địa chỉ đã lưu này. Vui lòng chọn lại tỉnh/huyện/xã.",
+        );
+      }
+    } finally {
+      setSelectingAddressIndex(null);
+    }
+  };
+
+  const handleProvinceChange = (_value: number, option: any) => {
+    form.setFieldsValue({
+      provinceName: option?.label,
+      districtId: undefined,
+      districtName: undefined,
+      wardCode: undefined,
+      wardName: undefined,
+    });
+    setShippingError("");
+    setQuoteError("");
+  };
+
+  const handleDistrictChange = (_value: number, option: any) => {
+    form.setFieldsValue({
+      districtName: option?.label,
+      wardCode: undefined,
+      wardName: undefined,
+    });
+    setShippingError("");
+    setQuoteError("");
+  };
+
+  const handleWardChange = (_value: string, option: any) => {
+    form.setFieldsValue({
+      wardName: option?.label,
+    });
+  };
+
   const handleApplyVoucher = async () => {
+    if (voucherApplying) {
+      return;
+    }
+
     if (!voucherCode) {
       message.warning("Vui lòng nhập mã giảm giá.");
       return;
     }
 
-    try {
-      const response = await discountService.validateVoucher(
-        voucherCode,
-        subtotal,
-      );
-      const { discountAmount, message: successMessage } = response.data;
+    const normalizedVoucherCode = voucherCode.trim();
+    const voucherMeta = availableVouchers.find(
+      (voucher) =>
+        String(voucher.code || voucher.name || "").toLowerCase() ===
+        normalizedVoucherCode.toLowerCase(),
+    );
+    const minOrderValue = Number(voucherMeta?.minOrderValue ?? 0);
 
-      setDiscount(discountAmount);
-      setAppliedVoucher(voucherCode);
-      setAppliedVoucherInfo(response.data);
+    if (minOrderValue > 0 && subtotalBeforeVoucher < minOrderValue) {
+      const errorMessage = `Đơn hàng chưa đạt giá trị tối thiểu ${formatMoney(
+        minOrderValue,
+      )} để áp dụng voucher này.`;
+      setVoucherError(errorMessage);
+      setAppliedVoucher(null);
+      setAppliedVoucherInfo(null);
+      message.error(errorMessage);
+      return;
+    }
+
+    const voucherRequestId = ++latestVoucherRequestRef.current;
+
+    try {
+      setVoucherApplying(true);
+      setVoucherError("");
+      const quoteData = await fetchQuote(normalizedVoucherCode, {
+        silent: true,
+        source: "voucher",
+        clearVoucherOnError: true,
+      });
+      if (voucherRequestId !== latestVoucherRequestRef.current || !quoteData) {
+        return;
+      }
+      if (quoteData.voucherValid === false) {
+        const errorMessage =
+          quoteData.voucherMessage ||
+          "Mã giảm giá không hợp lệ hoặc không đủ điều kiện áp dụng.";
+        setAppliedVoucher(null);
+        setAppliedVoucherInfo(null);
+        setVoucherError(errorMessage);
+        message.error(errorMessage);
+        return;
+      }
+      setAppliedVoucher(normalizedVoucherCode);
+      setAppliedVoucherInfo(
+        voucherMeta ||
+          quoteData,
+      );
+      const successMessage = null;
 
       message.success(
-        successMessage || `Áp dụng mã "${voucherCode}" thành công!`,
+        successMessage || `Áp dụng mã "${normalizedVoucherCode}" thành công!`,
       );
     } catch (error: any) {
-      const errorMessage =
-        error.response?.data?.message ||
-        "Mã giảm giá không hợp lệ hoặc đã xảy ra lỗi.";
-      message.error(errorMessage);
+      if (voucherRequestId === latestVoucherRequestRef.current) {
+        const errorMessage =
+          error.response?.data?.message ||
+          "Mã giảm giá không hợp lệ hoặc đã xảy ra lỗi.";
+        setVoucherError(errorMessage);
+        setAppliedVoucher(null);
+        setAppliedVoucherInfo(null);
+        message.error(errorMessage);
+      }
+    } finally {
+      if (voucherRequestId === latestVoucherRequestRef.current) {
+        setVoucherApplying(false);
+      }
     }
   };
 
   const handlePlaceOrder = async (values: any) => {
+    if (!quote) {
+      message.warning("Vui long doi he thong tinh lai tong tien don hang.");
+      return;
+    }
+
+    if (shippingFee < 0 || shippingError || isShippingLoading) {
+      message.warning("Vui lòng chọn đủ địa chỉ để tính phí vận chuyển.");
+      return;
+    }
+
+    if (total <= 0) {
+      message.warning("Tổng tiền đơn hàng không hợp lệ.");
+      return;
+    }
+
     const orderData = {
       shippingInfo: {
         customerName: values.customerName,
         phone: values.phone,
         address: values.address,
-        province: values.province,
-        district: values.district,
-        ward: values.ward,
+        province: values.provinceName,
+        district: values.districtName,
+        ward: values.wardName,
+        provinceId: values.provinceId,
+        districtId: values.districtId,
+        wardCode: values.wardCode,
+        provinceName: values.provinceName,
+        districtName: values.districtName,
+        wardName: values.wardName,
         note: values.note,
       },
       shouldUpdateProfile: values.saveAddress,
       paymentMethodCode: values.paymentMethod,
-      items: items.map((item: any) => ({
+      items: (quote?.items || []).map((item: any) => ({
         variantId: item.variantId,
         quantity: item.quantity,
       })),
-      voucherCode: appliedVoucher,
+      voucherCode: appliedVoucher || undefined,
     };
 
     if (values.paymentMethod === "VNPAY") {
@@ -283,17 +815,24 @@ const CheckoutPage = () => {
     try {
       await orderService.placeOrder(orderData);
 
-      setDiscount(0);
       setAppliedVoucher(null);
       setAppliedVoucherInfo(null);
       setVoucherCode("");
+      setQuote(null);
 
       message.success("Đặt hàng thành công!");
       navigate("/cart?tab=pending");
     } catch (error: any) {
       const errorMessage =
         error.response?.data?.message || "Đặt hàng thất bại. Vui lòng thử lại.";
-      message.error(errorMessage);
+      if (appliedVoucher && isVoucherRelatedError(errorMessage)) {
+        setAppliedVoucher(null);
+        setAppliedVoucherInfo(null);
+        setVoucherError(errorMessage);
+        message.error(`${errorMessage} Vui lòng đặt hàng lại không dùng voucher.`);
+      } else {
+        message.error(errorMessage);
+      }
       console.error("Failed to place order:", error);
     } finally {
       setLoading(false);
@@ -311,7 +850,6 @@ const CheckoutPage = () => {
       );
 
       const paymentUrl = vnpayResponse.data.paymentUrl;
-
       if (!paymentUrl) {
         throw new Error("Không tạo được link thanh toán VNPAY");
       }
@@ -322,7 +860,14 @@ const CheckoutPage = () => {
         error.response?.data?.message ||
         error.message ||
         "Không thể khởi tạo thanh toán VNPAY.";
-      message.error(errorMessage);
+      if (appliedVoucher && isVoucherRelatedError(errorMessage)) {
+        setAppliedVoucher(null);
+        setAppliedVoucherInfo(null);
+        setVoucherError(errorMessage);
+        message.error(`${errorMessage} Vui lòng đặt hàng lại không dùng voucher.`);
+      } else {
+        message.error(errorMessage);
+      }
       console.error("Failed to create VNPAY payment:", error);
     } finally {
       setLoading(false);
@@ -330,16 +875,22 @@ const CheckoutPage = () => {
   };
 
   return (
-    <div style={{ padding: "24px" }}>
+    <div
+      style={{
+        fontFamily:
+          "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif",
+        padding: 24,
+      }}
+    >
       <Button
         icon={<ArrowLeftOutlined />}
         onClick={() => navigate("/cart")}
-        style={{ marginBottom: "24px" }}
+        style={{ marginBottom: 24 }}
       >
         Quay lại giỏ hàng
       </Button>
 
-      <Title level={2} style={{ marginBottom: "24px" }}>
+      <Title level={2} style={{ marginBottom: 24 }}>
         Thanh toán
       </Title>
 
@@ -350,7 +901,7 @@ const CheckoutPage = () => {
               title="1. Thông tin giao hàng"
               bordered={false}
               style={{ boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}
-              extra={isEstimatingShipping && <Spin size="small" />}
+              extra={isShippingLoading && <Spin size="small" />}
             >
               <Form.Item
                 name="customerName"
@@ -370,37 +921,59 @@ const CheckoutPage = () => {
                 <Input placeholder="Ví dụ: 0123456789" />
               </Form.Item>
 
+
               <Row gutter={16}>
                 <Col span={12}>
                   <Form.Item
-                    name="province"
+                    name="provinceId"
                     label="Tỉnh/Thành phố"
                     rules={[
                       {
                         required: true,
-                        message: "Vui lòng nhập Tỉnh/Thành phố!",
+                        message: "Vui lòng chọn tỉnh/thành phố!",
                       },
                     ]}
                   >
-                    <Input
-                      placeholder="Ví dụ: Hà Nội"
-                      onChange={handleAddressFieldChange}
+                    <Select
+                      showSearch
+                      loading={loadingProvinces}
+                      placeholder="Chọn tỉnh/thành phố"
+                      optionFilterProp="label"
+                      options={provinces.map((province) => ({
+                        value: province.ProvinceID,
+                        label: province.ProvinceName,
+                      }))}
+                      onChange={handleProvinceChange}
                     />
+                  </Form.Item>
+                  <Form.Item name="provinceName" hidden>
+                    <Input />
                   </Form.Item>
                 </Col>
 
                 <Col span={12}>
                   <Form.Item
-                    name="district"
+                    name="districtId"
                     label="Quận/Huyện"
                     rules={[
-                      { required: true, message: "Vui lòng nhập Quận/Huyện!" },
+                      { required: true, message: "Vui lòng chọn quận/huyện!" },
                     ]}
                   >
-                    <Input
-                      placeholder="Ví dụ: Quận Cầu Giấy"
-                      onChange={handleAddressFieldChange}
+                    <Select
+                      showSearch
+                      loading={loadingDistricts}
+                      disabled={!selectedProvinceId}
+                      placeholder="Chọn quận/huyện"
+                      optionFilterProp="label"
+                      options={districts.map((district) => ({
+                        value: district.DistrictID,
+                        label: district.DistrictName,
+                      }))}
+                      onChange={handleDistrictChange}
                     />
+                  </Form.Item>
+                  <Form.Item name="districtName" hidden>
+                    <Input />
                   </Form.Item>
                 </Col>
               </Row>
@@ -408,16 +981,27 @@ const CheckoutPage = () => {
               <Row gutter={16}>
                 <Col span={12}>
                   <Form.Item
-                    name="ward"
+                    name="wardCode"
                     label="Phường/Xã"
                     rules={[
-                      { required: true, message: "Vui lòng nhập Phường/Xã!" },
+                      { required: true, message: "Vui lòng chọn phường/xã!" },
                     ]}
                   >
-                    <Input
-                      placeholder="Ví dụ: Phường Dịch Vọng"
-                      onChange={handleAddressFieldChange}
+                    <Select
+                      showSearch
+                      loading={loadingWards}
+                      disabled={!selectedDistrictId}
+                      placeholder="Chọn phường/xã"
+                      optionFilterProp="label"
+                      options={wards.map((ward) => ({
+                        value: ward.WardCode,
+                        label: ward.WardName,
+                      }))}
+                      onChange={handleWardChange}
                     />
+                  </Form.Item>
+                  <Form.Item name="wardName" hidden>
+                    <Input />
                   </Form.Item>
                 </Col>
 
@@ -432,10 +1016,7 @@ const CheckoutPage = () => {
                       },
                     ]}
                   >
-                    <Input
-                      placeholder="Số nhà, tên đường"
-                      onChange={handleAddressFieldChange}
-                    />
+                    <Input placeholder="Số nhà, tên đường" />
                   </Form.Item>
                 </Col>
               </Row>
@@ -452,7 +1033,7 @@ const CheckoutPage = () => {
                 Chọn địa chỉ đã lưu
               </Button>
 
-              <Form.Item name="note" label="Ghi chú cho đơn hàng (tùy chọn)">
+              <Form.Item name="note" label="Ghi chú cho đơn hàng">
                 <Input.TextArea
                   rows={2}
                   placeholder="Ghi chú thêm cho người bán hoặc shipper"
@@ -476,69 +1057,43 @@ const CheckoutPage = () => {
                 const values = form.getFieldsValue([
                   "customerName",
                   "phone",
-                  "province",
-                  "district",
-                  "ward",
+                  "provinceName",
+                  "districtName",
+                  "wardName",
                   "address",
                 ]);
 
                 const hasCompleteAddress =
                   values.customerName &&
                   values.phone &&
-                  values.province &&
-                  values.district &&
-                  values.ward &&
+                  values.provinceName &&
+                  values.districtName &&
+                  values.wardName &&
                   values.address;
 
                 if (!hasCompleteAddress) {
                   return (
                     <Text type="secondary">
-                      Vui lòng nhập thông tin giao hàng đầy đủ
+                      Vui lòng nhập đầy đủ thông tin giao hàng.
                     </Text>
                   );
                 }
 
                 return (
-                  <div style={{ lineHeight: "1.8" }}>
-                    <div style={{ marginBottom: "8px" }}>
-                      <Text
-                        strong
-                        style={{ display: "inline-block", minWidth: "120px" }}
-                      >
-                        Người nhận:
-                      </Text>
+                  <div style={{ lineHeight: 1.8 }}>
+                    <div>
+                      <Text strong>Người nhận: </Text>
                       <Text>{values.customerName}</Text>
                     </div>
-
-                    <div style={{ marginBottom: "8px" }}>
-                      <Text
-                        strong
-                        style={{ display: "inline-block", minWidth: "120px" }}
-                      >
-                        Số điện thoại:
-                      </Text>
+                    <div>
+                      <Text strong>Số điện thoại: </Text>
                       <Text>{values.phone}</Text>
                     </div>
-
                     <div>
-                      <Text
-                        strong
-                        style={{
-                          display: "inline-block",
-                          minWidth: "120px",
-                          verticalAlign: "top",
-                        }}
-                      >
-                        Địa chỉ:
-                      </Text>
-                      <Text
-                        style={{
-                          display: "inline-block",
-                          maxWidth: "calc(100% - 120px)",
-                        }}
-                      >
-                        {values.address}, {values.ward}, {values.district},{" "}
-                        {values.province}
+                      <Text strong>Địa chỉ: </Text>
+                      <Text>
+                        {values.address}, {values.wardName},{" "}
+                        {values.districtName}, {values.provinceName}
                       </Text>
                     </div>
                   </div>
@@ -561,18 +1116,25 @@ const CheckoutPage = () => {
                   style={{ width: "100%" }}
                   placeholder="Chọn hoặc nhập mã giảm giá"
                   value={voucherCode || undefined}
-                  onSelect={(value) => {
-                    setVoucherCode(value);
-                  }}
-                  onSearch={(value) => {
-                    setVoucherCode(value);
-                  }}
+                  onSelect={(value) => setVoucherCode(value)}
+                  onSearch={(value) => setVoucherCode(value)}
                   onChange={(value) => {
-                    setVoucherCode(value || "");
-                    if (!value) {
-                      setDiscount(0);
+                    const nextCode = value || "";
+                    setVoucherCode(nextCode);
+                    if (!nextCode) {
                       setAppliedVoucher(null);
                       setAppliedVoucherInfo(null);
+                      setVoucherError("");
+                      return;
+                    }
+
+                    if (
+                      appliedVoucher &&
+                      nextCode.toLowerCase() !== appliedVoucher.toLowerCase()
+                    ) {
+                      setAppliedVoucher(null);
+                      setAppliedVoucherInfo(null);
+                      setVoucherError("");
                     }
                   }}
                   filterOption={(input, option) =>
@@ -580,9 +1142,9 @@ const CheckoutPage = () => {
                       .toLowerCase()
                       .includes(input.toLowerCase())
                   }
-                  options={availableVouchers.map((v) => ({
-                    label: buildVoucherLabel(v),
-                    value: v.code,
+                  options={availableVouchers.map((voucher) => ({
+                    label: buildVoucherLabel(voucher),
+                    value: voucher.code,
                   }))}
                   notFoundContent={
                     isAuthenticated
@@ -594,18 +1156,24 @@ const CheckoutPage = () => {
                 <Button
                   type="primary"
                   onClick={handleApplyVoucher}
-                  disabled={!!appliedVoucher || !voucherCode}
+                  loading={voucherApplying}
+                  disabled={voucherApplying || !!appliedVoucher || !voucherCode}
                 >
                   Áp dụng
                 </Button>
               </Space.Compact>
 
+              {voucherError && (
+                <div style={{ marginTop: 12 }}>
+                  <Text type="danger">{voucherError}</Text>
+                </div>
+              )}
+
               {appliedVoucher && (
-                <div style={{ marginTop: "12px" }}>
+                <div style={{ marginTop: 12 }}>
                   <Text type="success">
                     Đã áp dụng mã: <strong>{appliedVoucher}</strong>
                   </Text>
-
                   {appliedVoucherInfo && (
                     <div style={{ marginTop: 8 }}>
                       <Text type="secondary">
@@ -641,8 +1209,8 @@ const CheckoutPage = () => {
                       value="CASH"
                       style={{
                         border: "1px solid #d9d9d9",
-                        padding: "16px",
-                        borderRadius: "8px",
+                        borderRadius: 8,
+                        padding: 16,
                         width: "100%",
                       }}
                     >
@@ -654,8 +1222,8 @@ const CheckoutPage = () => {
                       value="VNPAY"
                       style={{
                         border: "1px solid #d9d9d9",
-                        padding: "16px",
-                        borderRadius: "8px",
+                        borderRadius: 8,
+                        padding: 16,
                         width: "100%",
                       }}
                     >
@@ -670,7 +1238,7 @@ const CheckoutPage = () => {
 
           <Col xs={24} lg={10}>
             <Card
-              title={`Đơn hàng (${items.length} sản phẩm)`}
+              title={`Đơn hàng (${displayItems.length || items.length} sản phẩm)`}
               bordered={false}
               style={{
                 boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
@@ -678,29 +1246,55 @@ const CheckoutPage = () => {
                 top: 24,
               }}
             >
-              <Spin spinning={loading}>
+              <Spin spinning={loading || quoteLoading}>
+                {quoteError && (
+                  <div style={{ marginBottom: 12 }}>
+                    <Text type="danger">{quoteError}</Text>
+                  </div>
+                )}
+
                 <List
                   itemLayout="horizontal"
-                  dataSource={items}
+                  dataSource={displayItems}
                   renderItem={(item: any) => (
                     <List.Item>
                       <List.Item.Meta
                         avatar={
-                          <Avatar shape="square" size={64} src={item.image} />
+                          <Avatar
+                            shape="square"
+                            size={64}
+                            src={resolveImageUrl(item.imageUrl)}
+                          />
                         }
-                        title={<Text>{item.name}</Text>}
+                        title={
+                          <Text>
+                            {item.productName}
+                            {item.variantCode ? ` - ${item.variantCode}` : ""}
+                          </Text>
+                        }
                         description={
-                          <Row justify="space-between">
-                            <Col>
-                              <Text type="secondary">SL: {item.quantity}</Text>
+                          <Row justify="space-between" gutter={[12, 8]}>
+                            <Col flex="auto">
+                              <Space direction="vertical" size={2}>
+                                <Text type="secondary">SL: {item.quantity}</Text>
+                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                  {[item.size, item.color, item.material]
+                                    .filter(Boolean)
+                                    .join(" / ")}
+                                </Text>
+                              </Space>
                             </Col>
                             <Col>
-                              <Text strong>
-                                {(item.price * item.quantity).toLocaleString(
-                                  "vi-VN",
-                                )}{" "}
-                                ₫
-                              </Text>
+                              <Space direction="vertical" size={0} align="end">
+                                <Text strong style={{ color: item.promotionId ? "#c81d1d" : undefined }}>
+                                  {formatMoney(item.lineTotal)}
+                                </Text>
+                                {item.promotionId && item.originalPrice > item.unitPrice && (
+                                  <Text delete type="secondary" style={{ fontSize: 12 }}>
+                                    {formatMoney(item.originalPrice * item.quantity)}
+                                  </Text>
+                                )}
+                              </Space>
                             </Col>
                           </Row>
                         }
@@ -712,20 +1306,24 @@ const CheckoutPage = () => {
                 <Divider />
 
                 <Row justify="space-between" style={{ marginBottom: 12 }}>
-                  <Text>Tạm tính</Text>
-                  <Text strong>{subtotal.toLocaleString("vi-VN")} ₫</Text>
+                  <Text>Tạm tính sau khuyến mãi sản phẩm</Text>
+                  <Text strong>{formatMoney(subtotalBeforeVoucher)}</Text>
                 </Row>
 
                 <Row justify="space-between" style={{ marginBottom: 12 }}>
                   <Text>Phí vận chuyển</Text>
-                  <Text strong>{shippingFee.toLocaleString("vi-VN")} ₫</Text>
+                  <Text strong>
+                    {isShippingLoading
+                      ? "Đang tính phí vận chuyển..."
+                      : shippingError || formatMoney(shippingFee)}
+                  </Text>
                 </Row>
 
                 {discount > 0 && (
                   <Row justify="space-between" style={{ marginBottom: 12 }}>
-                    <Text type="success">Giảm giá</Text>
+                    <Text type="success">Giảm giá voucher</Text>
                     <Text strong type="success">
-                      - {discount.toLocaleString("vi-VN")} ₫
+                      - {formatMoney(discount)}
                     </Text>
                   </Row>
                 )}
@@ -733,9 +1331,7 @@ const CheckoutPage = () => {
                 {appliedVoucher && (
                   <Row justify="space-between" style={{ marginBottom: 12 }}>
                     <Text>Mã đã dùng</Text>
-                    <Text strong>
-                      <Tag color="green">{appliedVoucher}</Tag>
-                    </Text>
+                    <Tag color="green">{appliedVoucher}</Tag>
                   </Row>
                 )}
 
@@ -745,8 +1341,8 @@ const CheckoutPage = () => {
                   <Title level={4} style={{ margin: 0 }}>
                     Tổng cộng
                   </Title>
-                  <Title level={4} style={{ margin: 0, color: "#c81d1d" }}>
-                    {total.toLocaleString("vi-VN")} ₫
+                  <Title level={4} style={{ color: "#c81d1d", margin: 0 }}>
+                    {formatMoney(total)}
                   </Title>
                 </Row>
 
@@ -763,7 +1359,8 @@ const CheckoutPage = () => {
                     block
                     size="large"
                     loading={loading}
-                    style={{ marginTop: "24px" }}
+                    disabled={isShippingLoading || !!shippingError || total <= 0}
+                    style={{ marginTop: 24 }}
                   >
                     {loading ? "Đang xử lý..." : "Hoàn tất đặt hàng"}
                   </Button>
@@ -779,35 +1376,62 @@ const CheckoutPage = () => {
         open={isAddressModalVisible}
         onCancel={() => setIsAddressModalVisible(false)}
         footer={null}
-        width={600}
+        width={640}
       >
         <div style={{ marginBottom: 16 }}>
           <Button
             type="primary"
-            onClick={handleNewAddress}
-            style={{ marginBottom: 16 }}
+            onClick={() => {
+              form.setFieldsValue({
+                provinceId: undefined,
+                provinceName: undefined,
+                districtId: undefined,
+                districtName: undefined,
+                wardCode: undefined,
+                wardName: undefined,
+                address: undefined,
+                note: undefined,
+              });
+              setDistricts([]);
+              setWards([]);
+              setShippingError("");
+              setQuoteError("");
+              setIsAddressModalVisible(false);
+            }}
           >
             Nhập địa chỉ mới
           </Button>
         </div>
 
         {addresses.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "20px" }}>
+          <div style={{ padding: 20, textAlign: "center" }}>
             <Text type="secondary">Không có địa chỉ đã lưu</Text>
           </div>
         ) : (
           <List
             dataSource={addresses}
-            renderItem={(address) => (
+            renderItem={(address, index) => (
               <List.Item
                 actions={[
+                  getAddressKey(address) === defaultAddressKey ? (
+                    <Tag key="default" color="blue">
+                      Mặc định
+                    </Tag>
+                  ) : (
+                    <Button
+                      key="set-default"
+                      type="link"
+                      loading={selectingAddressIndex === index}
+                      onClick={() => handleSetDefaultAddress(address, index)}
+                    >
+                      Đặt mặc định
+                    </Button>
+                  ),
                   <Button
+                    key="select"
                     type="link"
-                    onClick={() => handleAddressSelect(address)}
-                    disabled={
-                      selectedAddress?.fullName === address.fullName &&
-                      selectedAddress?.phone === address.phone
-                    }
+                    loading={selectingAddressIndex === index}
+                    onClick={() => handleAddressSelect(address, { index })}
                   >
                     Chọn
                   </Button>,
@@ -815,9 +1439,11 @@ const CheckoutPage = () => {
               >
                 <List.Item.Meta
                   title={`${address.fullName} - ${address.phone}`}
-                  description={`${address.address}${address.ward ? `, ${address.ward}` : ""
-                    }${address.district ? `, ${address.district}` : ""}${address.province ? `, ${address.province}` : ""
-                    }`}
+                  description={`${address.address}, ${
+                    address.wardName || address.ward || ""
+                  }, ${address.districtName || address.district || ""}, ${
+                    address.provinceName || address.province || ""
+                  }`}
                 />
               </List.Item>
             )}
