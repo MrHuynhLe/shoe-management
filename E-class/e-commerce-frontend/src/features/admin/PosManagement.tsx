@@ -18,11 +18,9 @@ import {
   message,
 } from "antd";
 import {
-  CheckCircleOutlined,
   DeleteOutlined,
   GiftOutlined,
   PlusOutlined,
-  PrinterOutlined,
   SearchOutlined,
   ShoppingCartOutlined,
 } from "@ant-design/icons";
@@ -40,10 +38,10 @@ import {
   paymentMethodService,
 } from "@/services/paymentMethod.service";
 
-import { useAuth } from "@/services/AuthContext";
-import { StoreResponse, storeService } from "@/services/store.service";
-
 const { Title, Text } = Typography;
+
+const DEFAULT_EMPLOYEE_ID = 2;
+const DEFAULT_STORE_ID = 1;
 
 const MAX_DRAFT_POS_ORDERS = 5;
 
@@ -168,17 +166,6 @@ const getDraftOrderStyle = (active: boolean): CSSProperties => ({
 });
 
 const PosManagement = () => {
-  const { user } = useAuth();
-  const [barcode, setBarcode] = useState("");
-  const [barcodeSearching, setBarcodeSearching] = useState(false);
-  const [receiptOpen, setReceiptOpen] = useState(false);
-  const [completedOrder, setCompletedOrder] = useState<PosOrderResponse | null>(
-    null,
-  );
-  const [completedPaymentMethodName, setCompletedPaymentMethodName] =
-    useState("");
-  const [stores, setStores] = useState<StoreResponse[]>([]);
-  const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
   const [draftOrders, setDraftOrders] = useState<PosOrderResponse[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<PosOrderResponse | null>(
@@ -263,20 +250,6 @@ const PosManagement = () => {
       setLoadingOrder(false);
     }
   };
-  const loadStores = async () => {
-    try {
-      const data = await storeService.getActiveStores();
-      setStores(data);
-
-      if (data.length > 0 && !selectedStoreId) {
-        setSelectedStoreId(data[0].id);
-      }
-    } catch (error: any) {
-      message.error(
-        error?.response?.data?.message || "Không tải được danh sách cửa hàng",
-      );
-    }
-  };
 
   const loadAvailableDiscounts = async (orderId: number) => {
     try {
@@ -308,51 +281,11 @@ const PosManagement = () => {
       setLoadingDiscounts(false);
     }
   };
-  const handleBarcodeSearch = async () => {
-    const safeBarcode = barcode.trim();
-
-    if (!selectedOrderId) {
-      message.warning("Hãy tạo hoặc chọn hóa đơn trước");
-      return;
-    }
-
-    if (!safeBarcode) {
-      message.warning("Vui lòng nhập hoặc quét mã barcode");
-      return;
-    }
-
-    try {
-      setBarcodeSearching(true);
-
-      const product = await posService.getProductByBarcode(safeBarcode);
-
-      if (!product) {
-        message.warning("Không tìm thấy sản phẩm");
-        return;
-      }
-
-      if ((product.stockQuantity ?? 0) <= 0) {
-        message.warning("Sản phẩm đang hết hàng");
-        return;
-      }
-
-      await handleAddProduct(product);
-      setBarcode("");
-    } catch (error: any) {
-      message.error(
-        error?.response?.data?.message ||
-          "Không tìm thấy sản phẩm theo barcode",
-      );
-    } finally {
-      setBarcodeSearching(false);
-    }
-  };
 
   useEffect(() => {
     loadDraftOrders();
     handleSearchProducts();
     loadPaymentMethods();
-    loadStores();
   }, []);
 
   useEffect(() => {
@@ -372,20 +305,10 @@ const PosManagement = () => {
     try {
       setCreating(true);
 
-      if (!user?.employeeId) {
-        message.warning("Tài khoản đăng nhập chưa được gắn với nhân viên");
-        return;
-      }
-
-      if (!selectedStoreId) {
-        message.warning("Vui lòng chọn cửa hàng bán hàng");
-        return;
-      }
-
       const data = await posService.createOrder({
-        employeeId: user.employeeId,
+        employeeId: DEFAULT_EMPLOYEE_ID,
         customerId: null,
-        storeId: selectedStoreId,
+        storeId: DEFAULT_STORE_ID,
         note: "Khách mua tại quầy",
       });
 
@@ -560,7 +483,7 @@ const PosManagement = () => {
       ...prev,
       customerPaid: Math.max(
         (selectedOrder?.totalAmount ?? 0) -
-          (discount.estimatedDiscountAmount ?? 0),
+        (discount.estimatedDiscountAmount ?? 0),
         0,
       ),
     }));
@@ -591,412 +514,6 @@ const PosManagement = () => {
     }
   };
 
-  const escapeHtml = (value?: string | number | null) =>
-    String(value ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-
-  const formatPrintTime = () =>
-    new Date().toLocaleString("vi-VN", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-
-  const buildReceiptHtml = (
-    order: PosOrderResponse,
-    paymentMethodName: string,
-  ) => {
-    const total = order.totalAmount ?? 0;
-    const discount = order.discountAmount ?? 0;
-    const finalAmount = order.finalAmount ?? Math.max(total - discount, 0);
-    const customerPaid = order.customerPaid ?? finalAmount;
-    const changeAmount =
-      order.changeAmount ?? Math.max(customerPaid - finalAmount, 0);
-
-    const itemRows = (order.items || [])
-      .map((item, index) => {
-        const lineTotal = item.lineTotal ?? item.price * item.quantity;
-
-        return `
-        <tr>
-          <td class="index">${index + 1}</td>
-          <td>
-            <div class="product-name">${escapeHtml(item.productName)}</div>
-            <div class="product-meta">
-              ${escapeHtml(
-                buildVariantText(
-                  item.color,
-                  item.size,
-                  item.variantCode,
-                  item.barcode,
-                ),
-              )}
-            </div>
-          </td>
-          <td class="qty">${item.quantity}</td>
-          <td class="money">${currency(lineTotal)}</td>
-        </tr>
-      `;
-      })
-      .join("");
-
-    return `
-    <!doctype html>
-    <html>
-      <head>
-        <meta charset="utf-8" />
-        <title>Hóa đơn ${escapeHtml(order.orderCode)}</title>
-        <style>
-          @page {
-            size: 80mm auto;
-            margin: 0;
-          }
-
-          * {
-            box-sizing: border-box;
-          }
-
-          body {
-            margin: 0;
-            padding: 12px;
-            background: #f3f4f6;
-            font-family: Arial, Helvetica, sans-serif;
-            color: #111827;
-          }
-
-          .receipt {
-            width: 80mm;
-            max-width: 100%;
-            margin: 0 auto;
-            background: #ffffff;
-            border-radius: 18px;
-            overflow: hidden;
-            box-shadow: 0 18px 50px rgba(15, 23, 42, 0.18);
-          }
-
-          .brand {
-            background: linear-gradient(135deg, #111827 0%, #1d4ed8 100%);
-            color: #ffffff;
-            padding: 18px 14px;
-            text-align: center;
-          }
-
-          .brand .shop-name {
-            font-size: 22px;
-            font-weight: 900;
-            letter-spacing: 1.2px;
-          }
-
-          .brand .subtitle {
-            margin-top: 4px;
-            font-size: 12px;
-            opacity: 0.9;
-          }
-
-          .content {
-            padding: 14px;
-          }
-
-          .success-box {
-            border: 1px solid #bbf7d0;
-            background: #f0fdf4;
-            color: #166534;
-            border-radius: 14px;
-            padding: 10px;
-            text-align: center;
-            font-weight: 700;
-            margin-bottom: 12px;
-          }
-
-          .info {
-            border: 1px solid #e5e7eb;
-            border-radius: 14px;
-            padding: 10px;
-            background: #f9fafb;
-            margin-bottom: 12px;
-          }
-
-          .row {
-            display: flex;
-            justify-content: space-between;
-            gap: 10px;
-            font-size: 12px;
-            margin-bottom: 7px;
-          }
-
-          .row:last-child {
-            margin-bottom: 0;
-          }
-
-          .label {
-            color: #6b7280;
-          }
-
-          .value {
-            font-weight: 700;
-            text-align: right;
-          }
-
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 8px;
-            margin-bottom: 12px;
-          }
-
-          th {
-            font-size: 11px;
-            color: #6b7280;
-            text-align: left;
-            border-bottom: 1px dashed #d1d5db;
-            padding: 8px 4px;
-          }
-
-          td {
-            vertical-align: top;
-            font-size: 12px;
-            padding: 9px 4px;
-            border-bottom: 1px dashed #e5e7eb;
-          }
-
-          .index {
-            width: 22px;
-            color: #6b7280;
-          }
-
-          .product-name {
-            font-weight: 800;
-            line-height: 1.35;
-          }
-
-          .product-meta {
-            margin-top: 3px;
-            font-size: 10.5px;
-            color: #6b7280;
-            line-height: 1.35;
-          }
-
-          .qty {
-            width: 28px;
-            text-align: center;
-            font-weight: 700;
-          }
-
-          .money {
-            width: 74px;
-            text-align: right;
-            font-weight: 700;
-          }
-
-          .summary {
-            border-radius: 14px;
-            background: #f9fafb;
-            border: 1px solid #e5e7eb;
-            padding: 10px;
-          }
-
-          .summary-row {
-            display: flex;
-            justify-content: space-between;
-            font-size: 12px;
-            margin-bottom: 8px;
-          }
-
-          .summary-row:last-child {
-            margin-bottom: 0;
-          }
-
-          .discount {
-            color: #dc2626;
-            font-weight: 800;
-          }
-
-          .final {
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px dashed #d1d5db;
-            font-size: 16px;
-            font-weight: 900;
-          }
-
-          .final .amount {
-            color: #dc2626;
-          }
-
-          .thanks {
-            text-align: center;
-            margin-top: 14px;
-            padding-top: 12px;
-            border-top: 1px dashed #d1d5db;
-          }
-
-          .thanks .main {
-            font-weight: 900;
-            font-size: 14px;
-          }
-
-          .thanks .sub {
-            margin-top: 4px;
-            font-size: 11px;
-            color: #6b7280;
-            line-height: 1.4;
-          }
-
-          @media print {
-            body {
-              background: #ffffff;
-              padding: 0;
-            }
-
-            .receipt {
-              width: 80mm;
-              box-shadow: none;
-              border-radius: 0;
-            }
-          }
-        </style>
-      </head>
-
-      <body>
-        <div class="receipt">
-          <div class="brand">
-            <div class="shop-name">SHOE STORE</div>
-            <div class="subtitle">HÓA ĐƠN BÁN HÀNG TẠI QUẦY</div>
-          </div>
-
-          <div class="content">
-            <div class="success-box">
-              THANH TOÁN THÀNH CÔNG
-            </div>
-
-            <div class="info">
-              <div class="row">
-                <span class="label">Mã hóa đơn</span>
-                <span class="value">${escapeHtml(order.orderCode)}</span>
-              </div>
-              <div class="row">
-                <span class="label">Thời gian</span>
-                <span class="value">${formatPrintTime()}</span>
-              </div>
-              <div class="row">
-                <span class="label">Khách hàng</span>
-                <span class="value">${escapeHtml(order.customerName || "Khách lẻ")}</span>
-              </div>
-              <div class="row">
-                <span class="label">Nhân viên</span>
-                <span class="value">NV #${escapeHtml(order.employeeId || "-")}</span>
-              </div>
-              <div class="row">
-                <span class="label">Cửa hàng</span>
-                <span class="value">Store #${escapeHtml(order.storeId || "-")}</span>
-              </div>
-              <div class="row">
-                <span class="label">Thanh toán</span>
-                <span class="value">${escapeHtml(paymentMethodName)}</span>
-              </div>
-            </div>
-
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Sản phẩm</th>
-                  <th class="qty">SL</th>
-                  <th class="money">Tiền</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${itemRows}
-              </tbody>
-            </table>
-
-            <div class="summary">
-              <div class="summary-row">
-                <span>Tạm tính</span>
-                <strong>${currency(total)} đ</strong>
-              </div>
-
-              <div class="summary-row">
-                <span>Giảm giá</span>
-                <strong class="discount">- ${currency(discount)} đ</strong>
-              </div>
-
-              ${
-                order.voucherCode
-                  ? `
-                    <div class="summary-row">
-                      <span>Voucher</span>
-                      <strong>${escapeHtml(order.voucherCode)}</strong>
-                    </div>
-                  `
-                  : ""
-              }
-
-              <div class="summary-row final">
-                <span>Cần thanh toán</span>
-                <span class="amount">${currency(finalAmount)} đ</span>
-              </div>
-
-              <div class="summary-row">
-                <span>Khách đưa</span>
-                <strong>${currency(customerPaid)} đ</strong>
-              </div>
-
-              <div class="summary-row">
-                <span>Tiền thừa</span>
-                <strong>${currency(changeAmount)} đ</strong>
-              </div>
-            </div>
-
-            <div class="thanks">
-              <div class="main">CẢM ƠN QUÝ KHÁCH!</div>
-              <div class="sub">
-                Hẹn gặp lại quý khách trong lần mua sắm tiếp theo.<br/>
-                Vui lòng giữ hóa đơn để đổi/trả khi cần.
-              </div>
-            </div>
-          </div>
-        </div>
-      </body>
-    </html>
-  `;
-  };
-
-  const handlePrintReceipt = (orderToPrint?: PosOrderResponse | null) => {
-    const order = orderToPrint || completedOrder;
-
-    if (!order) {
-      message.warning("Chưa có hóa đơn để in");
-      return;
-    }
-
-    const paymentName =
-      completedPaymentMethodName || selectedPaymentMethod?.name || "Tiền mặt";
-
-    const printWindow = window.open("", "_blank", "width=430,height=760");
-
-    if (!printWindow) {
-      message.error("Trình duyệt đang chặn cửa sổ in hóa đơn");
-      return;
-    }
-
-    printWindow.document.open();
-    printWindow.document.write(buildReceiptHtml(order, paymentName));
-    printWindow.document.close();
-
-    setTimeout(() => {
-      printWindow.focus();
-      printWindow.print();
-    }, 400);
-  };
-
   const handleCheckout = async () => {
     if (!selectedOrderId) {
       message.warning("Chưa chọn hóa đơn");
@@ -1014,11 +531,11 @@ const PosManagement = () => {
         customerPaid: isCashPayment ? checkoutData.customerPaid : 0,
         couponId:
           selectedDiscount?.voucherType === "COUPON"
-            ? (selectedDiscount?.id ?? null)
+            ? selectedDiscount?.id ?? null
             : null,
         promotionId:
           selectedDiscount?.voucherType === "PROMOTION"
-            ? (selectedDiscount?.id ?? null)
+            ? selectedDiscount?.id ?? null
             : null,
         note: checkoutData.note,
       };
@@ -1032,8 +549,6 @@ const PosManagement = () => {
         return;
       }
 
-      const paymentName = selectedPaymentMethod?.name || "Tiền mặt";
-
       const data = await posService.checkout(selectedOrderId, payload);
 
       message.success("Thanh toán tiền mặt thành công");
@@ -1041,10 +556,6 @@ const PosManagement = () => {
       setSelectedDiscount(null);
       setAvailableDiscounts([]);
       setSelectedOrder(data);
-
-      setCompletedOrder(data);
-      setCompletedPaymentMethodName(paymentName);
-      setReceiptOpen(true);
 
       await loadDraftOrders();
       await handleSearchProducts();
@@ -1378,18 +889,6 @@ const PosManagement = () => {
                 >
                   Hóa đơn nháp: {draftOrders.length}/{MAX_DRAFT_POS_ORDERS}
                 </Tag>
-
-                <Select
-                  placeholder="Chọn cửa hàng"
-                  style={{ width: 220 }}
-                  value={selectedStoreId}
-                  onChange={(value) => setSelectedStoreId(value)}
-                  options={stores.map((store) => ({
-                    label: store.name,
-                    value: store.id,
-                  }))}
-                />
-
                 <Button
                   type="primary"
                   icon={<PlusOutlined />}
@@ -1744,17 +1243,6 @@ const PosManagement = () => {
           title="Danh sách sản phẩm"
           extra={
             <Space wrap>
-              <Input.Search
-                placeholder="Quét hoặc nhập barcode"
-                value={barcode}
-                onChange={(e) => setBarcode(e.target.value)}
-                onSearch={handleBarcodeSearch}
-                enterButton="Thêm"
-                allowClear
-                loading={barcodeSearching}
-                style={{ width: 280 }}
-              />
-
               <Input
                 placeholder="Tìm theo tên, mã, barcode..."
                 value={keyword}
@@ -1762,7 +1250,6 @@ const PosManagement = () => {
                 onPressEnter={handleSearchProducts}
                 style={{ width: 280 }}
               />
-
               <Button
                 type="primary"
                 icon={<SearchOutlined />}
@@ -2024,274 +1511,6 @@ const PosManagement = () => {
               />
             </div>
           </Space>
-        </Modal>
-        <Modal
-          title={
-            <Space>
-              <CheckCircleOutlined style={{ color: "#52c41a" }} />
-              <span>Hóa đơn thanh toán thành công</span>
-            </Space>
-          }
-          open={receiptOpen}
-          onCancel={() => setReceiptOpen(false)}
-          width={560}
-          footer={
-            <Space>
-              <Button onClick={() => setReceiptOpen(false)}>Đóng</Button>
-              <Button
-                type="primary"
-                icon={<PrinterOutlined />}
-                onClick={() => handlePrintReceipt(completedOrder)}
-              >
-                In hóa đơn
-              </Button>
-            </Space>
-          }
-        >
-          {!completedOrder ? (
-            <Empty description="Chưa có hóa đơn" />
-          ) : (
-            <div
-              style={{
-                maxWidth: 420,
-                margin: "0 auto",
-                borderRadius: 24,
-                overflow: "hidden",
-                background: "#ffffff",
-                boxShadow: "0 20px 60px rgba(15, 23, 42, 0.16)",
-                border: "1px solid #eef2f7",
-              }}
-            >
-              <div
-                style={{
-                  background:
-                    "linear-gradient(135deg, #111827 0%, #2563eb 100%)",
-                  color: "#ffffff",
-                  padding: "24px 20px",
-                  textAlign: "center",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 28,
-                    fontWeight: 900,
-                    letterSpacing: 1.4,
-                  }}
-                >
-                  SHOE STORE
-                </div>
-
-                <div
-                  style={{
-                    marginTop: 6,
-                    opacity: 0.9,
-                    fontSize: 13,
-                    letterSpacing: 0.5,
-                  }}
-                >
-                  HÓA ĐƠN BÁN HÀNG TẠI QUẦY
-                </div>
-              </div>
-
-              <div style={{ padding: 20 }}>
-                <div
-                  style={{
-                    border: "1px solid #bbf7d0",
-                    background: "#f0fdf4",
-                    color: "#166534",
-                    borderRadius: 16,
-                    padding: 12,
-                    textAlign: "center",
-                    fontWeight: 800,
-                    marginBottom: 16,
-                  }}
-                >
-                  THANH TOÁN THÀNH CÔNG
-                </div>
-
-                <div
-                  style={{
-                    background: "#f8fafc",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: 16,
-                    padding: 14,
-                    marginBottom: 16,
-                  }}
-                >
-                  <Row justify="space-between" style={{ marginBottom: 8 }}>
-                    <Text type="secondary">Mã hóa đơn</Text>
-                    <Text strong>{completedOrder.orderCode}</Text>
-                  </Row>
-
-                  <Row justify="space-between" style={{ marginBottom: 8 }}>
-                    <Text type="secondary">Khách hàng</Text>
-                    <Text strong>
-                      {completedOrder.customerName || "Khách lẻ"}
-                    </Text>
-                  </Row>
-
-                  <Row justify="space-between" style={{ marginBottom: 8 }}>
-                    <Text type="secondary">Nhân viên</Text>
-                    <Text strong>NV #{completedOrder.employeeId || "-"}</Text>
-                  </Row>
-
-                  <Row justify="space-between" style={{ marginBottom: 8 }}>
-                    <Text type="secondary">Cửa hàng</Text>
-                    <Text strong>Store #{completedOrder.storeId || "-"}</Text>
-                  </Row>
-
-                  <Row justify="space-between">
-                    <Text type="secondary">Thanh toán</Text>
-                    <Text strong>
-                      {completedPaymentMethodName || "Tiền mặt"}
-                    </Text>
-                  </Row>
-                </div>
-
-                <div style={{ marginBottom: 16 }}>
-                  {(completedOrder.items || []).map((item, index) => {
-                    const lineTotal =
-                      item.lineTotal ?? item.price * item.quantity;
-
-                    return (
-                      <div
-                        key={item.itemId}
-                        style={{
-                          display: "flex",
-                          gap: 12,
-                          padding: "12px 0",
-                          borderBottom: "1px dashed #e5e7eb",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 28,
-                            height: 28,
-                            borderRadius: "50%",
-                            background: "#eff6ff",
-                            color: "#1d4ed8",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontWeight: 800,
-                            flexShrink: 0,
-                          }}
-                        >
-                          {index + 1}
-                        </div>
-
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 800 }}>
-                            {item.productName}
-                          </div>
-
-                          <div
-                            style={{
-                              color: "#6b7280",
-                              fontSize: 12,
-                              marginTop: 4,
-                            }}
-                          >
-                            {buildVariantText(
-                              item.color,
-                              item.size,
-                              item.variantCode,
-                              item.barcode,
-                            )}
-                          </div>
-
-                          <Row justify="space-between" style={{ marginTop: 8 }}>
-                            <Text type="secondary">
-                              {item.quantity} x {currency(item.price)} đ
-                            </Text>
-
-                            <Text strong>{currency(lineTotal)} đ</Text>
-                          </Row>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div
-                  style={{
-                    background: "#f8fafc",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: 18,
-                    padding: 16,
-                  }}
-                >
-                  <Row justify="space-between" style={{ marginBottom: 10 }}>
-                    <Text>Tạm tính</Text>
-                    <Text strong>{currency(completedOrder.totalAmount)} đ</Text>
-                  </Row>
-
-                  <Row justify="space-between" style={{ marginBottom: 10 }}>
-                    <Text>Giảm giá</Text>
-                    <Text strong style={{ color: "#dc2626" }}>
-                      - {currency(completedOrder.discountAmount)} đ
-                    </Text>
-                  </Row>
-
-                  {completedOrder.voucherCode && (
-                    <Row justify="space-between" style={{ marginBottom: 10 }}>
-                      <Text>Voucher</Text>
-                      <Text strong>{completedOrder.voucherCode}</Text>
-                    </Row>
-                  )}
-
-                  <div
-                    style={{
-                      borderTop: "1px dashed #d1d5db",
-                      paddingTop: 12,
-                      marginTop: 12,
-                    }}
-                  >
-                    <Row justify="space-between" align="middle">
-                      <Title level={5} style={{ margin: 0 }}>
-                        Cần thanh toán
-                      </Title>
-
-                      <Title level={4} style={{ margin: 0, color: "#dc2626" }}>
-                        {currency(completedOrder.finalAmount)} đ
-                      </Title>
-                    </Row>
-                  </div>
-
-                  <Row justify="space-between" style={{ marginTop: 12 }}>
-                    <Text>Khách đưa</Text>
-                    <Text strong>
-                      {currency(completedOrder.customerPaid)} đ
-                    </Text>
-                  </Row>
-
-                  <Row justify="space-between" style={{ marginTop: 10 }}>
-                    <Text>Tiền thừa</Text>
-                    <Text strong>
-                      {currency(completedOrder.changeAmount)} đ
-                    </Text>
-                  </Row>
-                </div>
-
-                <div
-                  style={{
-                    textAlign: "center",
-                    marginTop: 18,
-                    paddingTop: 14,
-                    borderTop: "1px dashed #d1d5db",
-                  }}
-                >
-                  <div style={{ fontWeight: 900, fontSize: 16 }}>
-                    CẢM ƠN QUÝ KHÁCH!
-                  </div>
-
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    Vui lòng giữ hóa đơn để đổi/trả khi cần.
-                  </Text>
-                </div>
-              </div>
-            </div>
-          )}
         </Modal>
       </Space>
     </div>

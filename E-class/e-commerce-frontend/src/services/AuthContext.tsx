@@ -5,8 +5,8 @@ interface User {
   userId: number;
   username: string;
   role: string;
-  employeeId?: number | null;
 }
+
 interface AuthContextType {
   isAuthenticated: boolean;
   user: User | null;
