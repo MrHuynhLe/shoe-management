@@ -36,6 +36,7 @@ export interface PosOrderResponse {
 }
 
 export interface PosProductSearchResponse {
+  productId: number;
   productVariantId: number;
   variantCode: string;
   barcode: string;
@@ -45,7 +46,14 @@ export interface PosProductSearchResponse {
   size?: string | null;
   material?: string | null;
   sellingPrice: number;
+  originalPrice?: number | null;
+  salePrice?: number | null;
+  finalPrice?: number | null;
+  discountAmount?: number | null;
+  discountPercent?: number | null;
+  promotionId?: number | null;
   stockQuantity: number;
+  inStock?: boolean | null;
   imageUrl?: string | null;
 }
 

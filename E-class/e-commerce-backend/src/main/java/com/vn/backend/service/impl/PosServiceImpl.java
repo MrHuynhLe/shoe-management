@@ -46,6 +46,7 @@ import com.vn.backend.repository.StoreRepository;
 import com.vn.backend.repository.UserProfileRepository;
 import com.vn.backend.service.PosService;
 import com.vn.backend.service.ProductPriceService;
+import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -94,6 +95,7 @@ public class PosServiceImpl implements PosService {
     private final CouponUsageRepository couponUsageRepository;
     private final UserProfileRepository userProfileRepository;
     private final ProductPriceService productPriceService;
+    private final EntityManager entityManager;
 
     @Override
     public PosOrderResponse createOrder(PosCreateOrderRequest request) {
@@ -188,6 +190,7 @@ public class PosServiceImpl implements PosService {
 
         return variants.stream()
                 .filter(this::isSellableVariant)
+                .sorted(Comparator.comparingInt(this::posStockSortRank))
                 .map(this::mapToProductSearchResponse)
                 .toList();
     }
@@ -218,8 +221,6 @@ public class PosServiceImpl implements PosService {
                         orderId,
                         request.getProductVariantId()
                 );
-
-        decreaseVariantStock(variant, addQty);
 
         if (existingItemOpt.isPresent()) {
             OrderItem existingItem = existingItemOpt.get();
@@ -287,8 +288,6 @@ public class PosServiceImpl implements PosService {
                 throw new IllegalArgumentException("Sản phẩm đang hết hàng hoặc không đủ tồn kho");
             }
 
-            decreaseVariantStock(variant, delta);
-
             createInventoryTransaction(
                     variant,
                     order.getStore(),
@@ -298,8 +297,6 @@ public class PosServiceImpl implements PosService {
             );
         } else if (delta < 0) {
             int returnQty = Math.abs(delta);
-
-            increaseVariantStock(variant, returnQty);
 
             createInventoryTransaction(
                     variant,
@@ -331,8 +328,6 @@ public class PosServiceImpl implements PosService {
         validateItemBelongsToOrder(item, orderId);
 
         ProductVariant variant = getLockedVariantOrThrow(item.getProductVariant().getId());
-
-        increaseVariantStock(variant, item.getQuantity());
 
         createInventoryTransaction(
                 variant,
@@ -445,6 +440,8 @@ public class PosServiceImpl implements PosService {
             throw new IllegalArgumentException("Hóa đơn chưa có sản phẩm");
         }
 
+        validateReservedDraftItems(items);
+
         PaymentMethod paymentMethod = paymentMethodRepository.findById(request.getPaymentMethodId())
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy phương thức thanh toán"));
 
@@ -555,8 +552,6 @@ public class PosServiceImpl implements PosService {
 
         for (OrderItem item : items) {
             ProductVariant variant = getLockedVariantOrThrow(item.getProductVariant().getId());
-
-            increaseVariantStock(variant, item.getQuantity());
 
             createInventoryTransaction(
                     variant,
@@ -794,8 +789,14 @@ public class PosServiceImpl implements PosService {
         String color = extractAttributeValue(variant, "COLOR");
         String size = extractAttributeValue(variant, "SIZE");
         String material = extractAttributeValue(variant, "MATERIAL");
+        ProductPriceResponse price = productPriceService.calculateCurrentPrice(variant);
+        BigDecimal originalPrice = defaultZero(price.getOriginalPrice());
+        BigDecimal finalPrice = defaultZero(price.getUnitPrice());
+        BigDecimal discountAmount = originalPrice.subtract(finalPrice).max(BigDecimal.ZERO);
+        Integer stockQuantity = variant.getStockQuantity() == null ? 0 : variant.getStockQuantity();
 
         return PosProductSearchResponse.builder()
+                .productId(product != null ? product.getId() : null)
                 .productVariantId(variant.getId())
                 .variantCode(variant.getCode())
                 .barcode(variant.getBarcode())
@@ -804,8 +805,15 @@ public class PosServiceImpl implements PosService {
                 .color(color)
                 .size(size)
                 .material(material)
-                .sellingPrice(defaultZero(variant.getSellingPrice()))
-                .stockQuantity(variant.getStockQuantity())
+                .sellingPrice(finalPrice)
+                .originalPrice(originalPrice)
+                .salePrice(price.getSalePrice())
+                .finalPrice(finalPrice)
+                .discountAmount(discountAmount)
+                .discountPercent(price.getDiscountPercent())
+                .promotionId(price.getPromotionId())
+                .stockQuantity(stockQuantity)
+                .inStock(stockQuantity > 0)
                 .imageUrl(getImageUrl(variant))
                 .build();
     }
@@ -854,6 +862,33 @@ public class PosServiceImpl implements PosService {
                 && variant.getProduct() != null
                 && variant.getProduct().getDeletedAt() == null
                 && Boolean.TRUE.equals(variant.getProduct().getIsActive());
+    }
+
+    private int posStockSortRank(ProductVariant variant) {
+        int stockQuantity = variant == null || variant.getStockQuantity() == null
+                ? 0
+                : variant.getStockQuantity();
+
+        return stockQuantity > 0 ? 0 : 1;
+    }
+
+    private void validateReservedDraftItems(List<OrderItem> items) {
+        for (OrderItem item : items) {
+            ProductVariant variant = item.getProductVariant();
+
+            if (item.getQuantity() == null || item.getQuantity() <= 0) {
+                throw new IllegalArgumentException("Số lượng sản phẩm trong hóa đơn không hợp lệ");
+            }
+
+            if (!isSellableVariant(variant)) {
+                throw new IllegalArgumentException("Sản phẩm trong hóa đơn không còn khả dụng để bán");
+            }
+
+            int currentStock = variant.getStockQuantity() == null ? 0 : variant.getStockQuantity();
+            if (currentStock < 0) {
+                throw new IllegalArgumentException("Tồn kho sản phẩm không hợp lệ");
+            }
+        }
     }
 
     private void saveOrderStatusHistory(Order order, String fromStatus, String toStatus) {
@@ -1176,7 +1211,8 @@ public class PosServiceImpl implements PosService {
         transaction.setTransactionType(transactionType);
         transaction.setCreatedAt(LocalDateTime.now());
 
-        inventoryTransactionRepository.save(transaction);
+        inventoryTransactionRepository.saveAndFlush(transaction);
+        entityManager.refresh(variant);
     }
 
     @Scheduled(cron = "0 59 23 * * ?")
@@ -1188,8 +1224,29 @@ public class PosServiceImpl implements PosService {
                 ORDER_STATUS_DRAFT
         );
 
-        if (!orders.isEmpty()) {
-            orderRepository.deleteAll(orders);
+        for (Order order : orders) {
+            cancelDraftAndReleaseReservedStock(order);
         }
+    }
+
+    private void cancelDraftAndReleaseReservedStock(Order order) {
+        List<OrderItem> items = orderItemRepository.findByOrder_Id(order.getId());
+
+        for (OrderItem item : items) {
+            ProductVariant variant = getLockedVariantOrThrow(item.getProductVariant().getId());
+
+            createInventoryTransaction(
+                    variant,
+                    order.getStore(),
+                    item.getQuantity(),
+                    INVENTORY_IN,
+                    "POS-RESERVE-CLEANUP-" + order.getId()
+            );
+        }
+
+        order.setStatus(ORDER_STATUS_CANCELLED);
+        orderRepository.save(order);
+
+        saveOrderStatusHistory(order, ORDER_STATUS_DRAFT, ORDER_STATUS_CANCELLED);
     }
 }

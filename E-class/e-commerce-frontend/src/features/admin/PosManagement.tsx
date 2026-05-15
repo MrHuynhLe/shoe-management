@@ -116,6 +116,48 @@ const getStockTextStyle = (stockQuantity?: number | null): CSSProperties => {
   return {};
 };
 
+const getPosFinalPrice = (product: PosProductSearchResponse) =>
+  product.finalPrice ?? product.salePrice ?? product.sellingPrice ?? 0;
+
+const hasPosDiscount = (product: PosProductSearchResponse) => {
+  const originalPrice = product.originalPrice ?? product.sellingPrice ?? 0;
+  const finalPrice = getPosFinalPrice(product);
+
+  return originalPrice > finalPrice;
+};
+
+const isPosProductInStock = (product: PosProductSearchResponse) =>
+  product.inStock ?? ((product.stockQuantity ?? 0) > 0);
+
+const renderPosProductPrice = (product: PosProductSearchResponse) => {
+  const originalPrice = product.originalPrice ?? product.sellingPrice ?? 0;
+  const finalPrice = getPosFinalPrice(product);
+  const discountPercent = product.discountPercent ?? 0;
+
+  if (!hasPosDiscount(product)) {
+    return <Text>{currency(originalPrice)} đ</Text>;
+  }
+
+  return (
+    <Space direction="vertical" size={2}>
+      <Text delete type="secondary" style={{ fontSize: 12 }}>
+        {currency(originalPrice)} đ
+      </Text>
+      <Space size={6} wrap>
+        <Text strong style={{ color: "#cf1322" }}>
+          {currency(finalPrice)} đ
+        </Text>
+        <Tag color="red" style={{ marginInlineEnd: 0 }}>
+          -
+          {discountPercent > 0
+            ? `${Number(discountPercent).toFixed(0)}%`
+            : currency(product.discountAmount)}
+        </Tag>
+      </Space>
+    </Space>
+  );
+};
+
 const panelCardStyle: CSSProperties = {
   borderRadius: 16,
   boxShadow: "0 6px 18px rgba(15, 23, 42, 0.06)",
@@ -343,7 +385,7 @@ const PosManagement = () => {
       return;
     }
 
-    if ((product.stockQuantity ?? 0) <= 0) {
+    if (!isPosProductInStock(product)) {
       message.warning("Sản phẩm đang hết hàng");
       return;
     }
@@ -786,15 +828,19 @@ const PosManagement = () => {
       key: "stockQuantity",
       width: 80,
       render: (value: number) => (
-        <span style={getStockTextStyle(value)}>{value}</span>
+        <Space direction="vertical" size={2}>
+          <span style={getStockTextStyle(value)}>{value}</span>
+          {(value ?? 0) <= 0 && <Tag color="red">Hết hàng</Tag>}
+        </Space>
       ),
     },
     {
       title: "Giá",
       dataIndex: "sellingPrice",
       key: "sellingPrice",
-      width: 140,
-      render: (value: number) => `${currency(value)} đ`,
+      width: 170,
+      render: (_: number, record: PosProductSearchResponse) =>
+        renderPosProductPrice(record),
     },
     {
       title: "",
@@ -805,9 +851,11 @@ const PosManagement = () => {
           type="primary"
           icon={<PlusOutlined />}
           onClick={() => handleAddProduct(record)}
-          disabled={(record.stockQuantity ?? 0) <= 0}
+          disabled={!isPosProductInStock(record)}
         >
-          {(record.stockQuantity ?? 0) <= 0 ? "Hết hàng" : "Thêm"}
+          {!isPosProductInStock(record)
+            ? "Hết hàng"
+            : "Thêm"}
         </Button>
       ),
     },
