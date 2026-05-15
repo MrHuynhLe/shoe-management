@@ -27,6 +27,8 @@ export interface CheckoutQuoteResponse {
   productRevenue: number;
   finalTotal: number;
   voucherCode?: string | null;
+  voucherValid?: boolean | null;
+  voucherMessage?: string | null;
 }
 
 export const checkoutService = {

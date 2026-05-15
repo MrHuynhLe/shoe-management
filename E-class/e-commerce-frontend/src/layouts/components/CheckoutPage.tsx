@@ -84,6 +84,9 @@ const CheckoutPage = () => {
   const [appliedVoucher, setAppliedVoucher] = useState<string | null>(null);
   const [appliedVoucherInfo, setAppliedVoucherInfo] = useState<any>(null);
   const [availableVouchers, setAvailableVouchers] = useState<any[]>([]);
+  const [voucherApplying, setVoucherApplying] = useState(false);
+  const [voucherError, setVoucherError] = useState("");
+  const [quoteError, setQuoteError] = useState("");
 
   const [shippingError, setShippingError] = useState("");
 
@@ -92,6 +95,8 @@ const CheckoutPage = () => {
   const [selectingAddressIndex, setSelectingAddressIndex] = useState<number | null>(null);
   const [defaultAddressKey, setDefaultAddressKey] = useState<string>("");
   const hasAppliedDefaultAddressRef = useRef(false);
+  const latestQuoteRequestRef = useRef(0);
+  const latestVoucherRequestRef = useRef(0);
 
   const [provinces, setProvinces] = useState<GhnProvince[]>([]);
   const [districts, setDistricts] = useState<GhnDistrict[]>([]);
@@ -108,11 +113,43 @@ const CheckoutPage = () => {
   const selectedDistrictName = Form.useWatch("districtName", form);
   const selectedWardName = Form.useWatch("wardName", form);
 
-  const quoteItems = quote?.items || [];
-  const subtotalBeforeVoucher = Number(quote?.subtotalBeforeVoucher || 0);
-  const discount = Number(quote?.voucherDiscountAmount || 0);
+  const fallbackItems = useMemo(
+    () =>
+      items.map((item: any) => ({
+        productId: item.productId,
+        variantId: item.variantId,
+        productName: item.productName || item.name,
+        variantCode: item.variantCode,
+        size: item.size,
+        color: item.color,
+        material: item.material,
+        imageUrl: item.image || item.imageUrl,
+        quantity: item.quantity,
+        originalPrice: Number(item.originalPrice ?? item.price ?? item.unitPrice ?? 0),
+        unitPrice: Number(item.unitPrice ?? item.salePrice ?? item.price ?? 0),
+        discountPercent: Number(item.discountPercent ?? 0),
+        promotionId: item.promotionId,
+        lineTotal: Number(
+          item.lineTotal ??
+            item.subTotal ??
+            item.total ??
+            Number(item.quantity || 0) *
+              Number(item.unitPrice ?? item.salePrice ?? item.price ?? 0),
+        ),
+      })),
+    [items],
+  );
+  const displayItems = quote?.items?.length ? quote.items : fallbackItems;
+  const fallbackSubtotal = fallbackItems.reduce(
+    (sum: number, item: any) => sum + Number(item.lineTotal || 0),
+    0,
+  );
+  const subtotalBeforeVoucher = Number(
+    quote?.subtotalBeforeVoucher ?? fallbackSubtotal,
+  );
+  const discount = appliedVoucher ? Number(quote?.voucherDiscountAmount || 0) : 0;
   const shippingFee = Number(quote?.shippingFee || 0);
-  const total = Number(quote?.finalTotal || 0);
+  const total = Math.max(subtotalBeforeVoucher - discount, 0) + shippingFee;
   const isShippingLoading = quoteLoading;
   const defaultAddressStorageKey = useMemo(
     () => `checkout_default_address_${user?.userId || "guest"}`,
@@ -145,6 +182,20 @@ const CheckoutPage = () => {
           : "";
 
     return `${v.code || v.name} - ${discountText}${minOrderText}${remainingText}`;
+  };
+
+  const isVoucherRelatedError = (value?: string) => {
+    const text = String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+
+    return (
+      text.includes("voucher") ||
+      text.includes("ma giam") ||
+      text.includes("khuyen mai") ||
+      text.includes("coupon")
+    );
   };
 
   const buildQuotePayload = (nextVoucherCode: string | null = appliedVoucher) => {
@@ -195,31 +246,67 @@ const CheckoutPage = () => {
 
   const fetchQuote = async (
     nextVoucherCode: string | null = appliedVoucher,
-    options: { silent?: boolean } = {},
+    options: {
+      silent?: boolean;
+      source?: "checkout" | "shipping" | "voucher";
+      clearVoucherOnError?: boolean;
+    } = {},
   ) => {
     if (!items.length) {
       setQuote(null);
+      setQuoteError("");
+      setShippingError("");
+      setVoucherError("");
       return null;
     }
 
+    const requestId = ++latestQuoteRequestRef.current;
+
     try {
       setQuoteLoading(true);
-      setShippingError("");
+      if (options.source === "voucher") {
+        setVoucherError("");
+      } else if (options.source === "shipping") {
+        setShippingError("");
+      } else {
+        setQuoteError("");
+      }
       const response = await checkoutService.quote(buildQuotePayload(nextVoucherCode));
+      if (requestId !== latestQuoteRequestRef.current) {
+        return null;
+      }
       setQuote(response.data);
+      setQuoteError("");
+      setShippingError("");
+      setVoucherError("");
       return response.data;
     } catch (error: any) {
-      setQuote(null);
       const errorMessage =
         error?.response?.data?.message ||
         "Khong the tinh lai tong tien don hang.";
-      if (!options.silent) {
-        message.error(errorMessage);
+
+      if (requestId === latestQuoteRequestRef.current) {
+        if (options.source === "voucher") {
+          setVoucherError(errorMessage);
+          if (options.clearVoucherOnError) {
+            setAppliedVoucher(null);
+            setAppliedVoucherInfo(null);
+          }
+        } else if (options.source === "shipping") {
+          setShippingError("Không thể tính phí vận chuyển");
+        } else {
+          setQuoteError(errorMessage);
+        }
+
+        if (!options.silent) {
+          message.error(errorMessage);
+        }
       }
-      setShippingError(errorMessage);
       throw error;
     } finally {
-      setQuoteLoading(false);
+      if (requestId === latestQuoteRequestRef.current) {
+        setQuoteLoading(false);
+      }
     }
   };
 
@@ -455,20 +542,40 @@ const CheckoutPage = () => {
       if (items.length === 0) {
         setQuote(null);
         setShippingError("");
+        setQuoteError("");
+        setVoucherError("");
         return;
       }
 
       try {
-        setQuoteLoading(true);
-        setShippingError("");
-
-        const response = await checkoutService.quote(buildQuotePayload(appliedVoucher));
-        setQuote(response.data);
-      } catch (error) {
-        setQuote(null);
-        setShippingError("Không thể tính phí vận chuyển");
-      } finally {
-        setQuoteLoading(false);
+        const quoteData = await fetchQuote(appliedVoucher, {
+          silent: true,
+          source: "shipping",
+          clearVoucherOnError: Boolean(appliedVoucher),
+        });
+        if (appliedVoucher && quoteData?.voucherValid === false) {
+          setAppliedVoucher(null);
+          setAppliedVoucherInfo(null);
+          setVoucherError(
+            quoteData.voucherMessage ||
+              "Voucher không còn phù hợp với đơn hàng hiện tại.",
+          );
+          message.warning(
+            "Voucher không còn phù hợp với đơn hàng hiện tại và đã được bỏ áp dụng.",
+          );
+        }
+      } catch (error: any) {
+        if (appliedVoucher) {
+          setAppliedVoucher(null);
+          setAppliedVoucherInfo(null);
+          setVoucherError(
+            error?.response?.data?.message ||
+              "Voucher không còn phù hợp với đơn hàng hiện tại.",
+          );
+          message.warning(
+            "Voucher không còn phù hợp với đơn hàng hiện tại và đã được bỏ áp dụng.",
+          );
+        }
       }
     };
 
@@ -528,8 +635,8 @@ const CheckoutPage = () => {
         note: address.note,
       });
 
-      setQuote(null);
       setShippingError("");
+      setQuoteError("");
 
       if (closeModal) {
         setIsAddressModalVisible(false);
@@ -555,8 +662,8 @@ const CheckoutPage = () => {
       wardCode: undefined,
       wardName: undefined,
     });
-    setQuote(null);
     setShippingError("");
+    setQuoteError("");
   };
 
   const handleDistrictChange = (_value: number, option: any) => {
@@ -565,8 +672,8 @@ const CheckoutPage = () => {
       wardCode: undefined,
       wardName: undefined,
     });
-    setQuote(null);
     setShippingError("");
+    setQuoteError("");
   };
 
   const handleWardChange = (_value: string, option: any) => {
@@ -576,28 +683,81 @@ const CheckoutPage = () => {
   };
 
   const handleApplyVoucher = async () => {
+    if (voucherApplying) {
+      return;
+    }
+
     if (!voucherCode) {
       message.warning("Vui lòng nhập mã giảm giá.");
       return;
     }
 
+    const normalizedVoucherCode = voucherCode.trim();
+    const voucherMeta = availableVouchers.find(
+      (voucher) =>
+        String(voucher.code || voucher.name || "").toLowerCase() ===
+        normalizedVoucherCode.toLowerCase(),
+    );
+    const minOrderValue = Number(voucherMeta?.minOrderValue ?? 0);
+
+    if (minOrderValue > 0 && subtotalBeforeVoucher < minOrderValue) {
+      const errorMessage = `Đơn hàng chưa đạt giá trị tối thiểu ${formatMoney(
+        minOrderValue,
+      )} để áp dụng voucher này.`;
+      setVoucherError(errorMessage);
+      setAppliedVoucher(null);
+      setAppliedVoucherInfo(null);
+      message.error(errorMessage);
+      return;
+    }
+
+    const voucherRequestId = ++latestVoucherRequestRef.current;
+
     try {
-      const quoteData = await fetchQuote(voucherCode);
-      setAppliedVoucher(voucherCode);
+      setVoucherApplying(true);
+      setVoucherError("");
+      const quoteData = await fetchQuote(normalizedVoucherCode, {
+        silent: true,
+        source: "voucher",
+        clearVoucherOnError: true,
+      });
+      if (voucherRequestId !== latestVoucherRequestRef.current || !quoteData) {
+        return;
+      }
+      if (quoteData.voucherValid === false) {
+        const errorMessage =
+          quoteData.voucherMessage ||
+          "Mã giảm giá không hợp lệ hoặc không đủ điều kiện áp dụng.";
+        setAppliedVoucher(null);
+        setAppliedVoucherInfo(null);
+        setVoucherError(errorMessage);
+        message.error(errorMessage);
+        return;
+      }
+      setAppliedVoucher(normalizedVoucherCode);
       setAppliedVoucherInfo(
-        availableVouchers.find((voucher) => voucher.code === voucherCode) ||
+        voucherMeta ||
           quoteData,
       );
       const successMessage = null;
 
       message.success(
-        successMessage || `Áp dụng mã "${voucherCode}" thành công!`,
+        successMessage || `Áp dụng mã "${normalizedVoucherCode}" thành công!`,
       );
     } catch (error: any) {
-      message.error(
-        error.response?.data?.message ||
-          "Mã giảm giá không hợp lệ hoặc đã xảy ra lỗi.",
-      );
+      if (voucherRequestId === latestVoucherRequestRef.current) {
+        const errorMessage =
+          error.response?.data?.message ||
+          "Mã giảm giá không hợp lệ hoặc đã xảy ra lỗi.";
+        setVoucherError(errorMessage);
+        setAppliedVoucher(null);
+        setAppliedVoucherInfo(null);
+        message.error(errorMessage);
+      }
+    } finally {
+      if (voucherRequestId === latestVoucherRequestRef.current) {
+        setVoucherApplying(false);
+      }
     }
   };
 
@@ -607,8 +767,13 @@ const CheckoutPage = () => {
       return;
     }
 
-    if (!shippingFee || shippingError || isShippingLoading) {
+    if (shippingFee < 0 || shippingError || isShippingLoading) {
       message.warning("Vui lòng chọn đủ địa chỉ để tính phí vận chuyển.");
+      return;
+    }
+
+    if (total <= 0) {
+      message.warning("Tổng tiền đơn hàng không hợp lệ.");
       return;
     }
 
@@ -630,11 +795,11 @@ const CheckoutPage = () => {
       },
       shouldUpdateProfile: values.saveAddress,
       paymentMethodCode: values.paymentMethod,
-      items: quoteItems.map((item: any) => ({
+      items: (quote?.items || []).map((item: any) => ({
         variantId: item.variantId,
         quantity: item.quantity,
       })),
-      voucherCode: appliedVoucher,
+      voucherCode: appliedVoucher || undefined,
     };
 
     if (values.paymentMethod === "VNPAY") {
@@ -658,9 +823,16 @@ const CheckoutPage = () => {
       message.success("Đặt hàng thành công!");
       navigate("/cart?tab=pending");
     } catch (error: any) {
-      message.error(
-        error.response?.data?.message || "Đặt hàng thất bại. Vui lòng thử lại.",
-      );
+      const errorMessage =
+        error.response?.data?.message || "Đặt hàng thất bại. Vui lòng thử lại.";
+      if (appliedVoucher && isVoucherRelatedError(errorMessage)) {
+        setAppliedVoucher(null);
+        setAppliedVoucherInfo(null);
+        setVoucherError(errorMessage);
+        message.error(`${errorMessage} Vui lòng đặt hàng lại không dùng voucher.`);
+      } else {
+        message.error(errorMessage);
+      }
       console.error("Failed to place order:", error);
     } finally {
       setLoading(false);
@@ -684,11 +856,18 @@ const CheckoutPage = () => {
 
       window.location.href = paymentUrl;
     } catch (error: any) {
-      message.error(
+      const errorMessage =
         error.response?.data?.message ||
-          error.message ||
-          "Không thể khởi tạo thanh toán VNPAY.",
-      );
+        error.message ||
+        "Không thể khởi tạo thanh toán VNPAY.";
+      if (appliedVoucher && isVoucherRelatedError(errorMessage)) {
+        setAppliedVoucher(null);
+        setAppliedVoucherInfo(null);
+        setVoucherError(errorMessage);
+        message.error(`${errorMessage} Vui lòng đặt hàng lại không dùng voucher.`);
+      } else {
+        message.error(errorMessage);
+      }
       console.error("Failed to create VNPAY payment:", error);
     } finally {
       setLoading(false);
@@ -940,10 +1119,22 @@ const CheckoutPage = () => {
                   onSelect={(value) => setVoucherCode(value)}
                   onSearch={(value) => setVoucherCode(value)}
                   onChange={(value) => {
-                    setVoucherCode(value || "");
-                    if (!value) {
+                    const nextCode = value || "";
+                    setVoucherCode(nextCode);
+                    if (!nextCode) {
                       setAppliedVoucher(null);
                       setAppliedVoucherInfo(null);
+                      setVoucherError("");
+                      return;
+                    }
+
+                    if (
+                      appliedVoucher &&
+                      nextCode.toLowerCase() !== appliedVoucher.toLowerCase()
+                    ) {
+                      setAppliedVoucher(null);
+                      setAppliedVoucherInfo(null);
+                      setVoucherError("");
                     }
                   }}
                   filterOption={(input, option) =>
@@ -965,11 +1156,18 @@ const CheckoutPage = () => {
                 <Button
                   type="primary"
                   onClick={handleApplyVoucher}
-                  disabled={!!appliedVoucher || !voucherCode}
+                  loading={voucherApplying}
+                  disabled={voucherApplying || !!appliedVoucher || !voucherCode}
                 >
                   Áp dụng
                 </Button>
               </Space.Compact>
+
+              {voucherError && (
+                <div style={{ marginTop: 12 }}>
+                  <Text type="danger">{voucherError}</Text>
+                </div>
+              )}
 
               {appliedVoucher && (
                 <div style={{ marginTop: 12 }}>
@@ -1040,7 +1238,7 @@ const CheckoutPage = () => {
 
           <Col xs={24} lg={10}>
             <Card
-              title={`Đơn hàng (${quoteItems.length || items.length} sản phẩm)`}
+              title={`Đơn hàng (${displayItems.length || items.length} sản phẩm)`}
               bordered={false}
               style={{
                 boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
@@ -1049,9 +1247,15 @@ const CheckoutPage = () => {
               }}
             >
               <Spin spinning={loading || quoteLoading}>
+                {quoteError && (
+                  <div style={{ marginBottom: 12 }}>
+                    <Text type="danger">{quoteError}</Text>
+                  </div>
+                )}
+
                 <List
                   itemLayout="horizontal"
-                  dataSource={quoteItems}
+                  dataSource={displayItems}
                   renderItem={(item: any) => (
                     <List.Item>
                       <List.Item.Meta
@@ -1155,7 +1359,7 @@ const CheckoutPage = () => {
                     block
                     size="large"
                     loading={loading}
-                    disabled={isShippingLoading || !!shippingError || shippingFee <= 0}
+                    disabled={isShippingLoading || !!shippingError || total <= 0}
                     style={{ marginTop: 24 }}
                   >
                     {loading ? "Đang xử lý..." : "Hoàn tất đặt hàng"}
@@ -1190,8 +1394,8 @@ const CheckoutPage = () => {
               });
               setDistricts([]);
               setWards([]);
-              setQuote(null);
               setShippingError("");
+              setQuoteError("");
               setIsAddressModalVisible(false);
             }}
           >
