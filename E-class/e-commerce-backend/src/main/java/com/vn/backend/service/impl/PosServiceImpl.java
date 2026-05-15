@@ -72,6 +72,7 @@ public class PosServiceImpl implements PosService {
 
     private static final int MAX_DRAFT_POS_ORDERS = 5;
     private static final int MAX_DRAFT_POS_ORDERS_PER_EMPLOYEE = 10;
+    private static final int POS_DRAFT_EXPIRE_MINUTES = 1;
 
     private static final String INVENTORY_IN = "IN";
     private static final String INVENTORY_OUT = "OUT";
@@ -1118,6 +1119,26 @@ public class PosServiceImpl implements PosService {
         inventoryTransactionRepository.save(transaction);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public PosProductSearchResponse getProductByBarcode(String barcode) {
+        String safeBarcode = barcode == null ? "" : barcode.trim();
+
+        if (safeBarcode.isBlank()) {
+            throw new IllegalArgumentException("Barcode không được để trống");
+        }
+
+        ProductVariant variant = productVariantRepository
+                .findActiveByBarcodeWithAttributes(safeBarcode)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy sản phẩm theo barcode"));
+
+        if (!isSellableVariant(variant)) {
+            throw new IllegalArgumentException("Sản phẩm không khả dụng để bán");
+        }
+
+        return mapToProductSearchResponse(variant);
+    }
+
     @Scheduled(cron = "0 59 23 * * ?")
     public void runEndOfDayJobToRemoveDraft() {
         System.out.println("Chạy job cuối ngày: " + LocalDateTime.now());
@@ -1130,5 +1151,76 @@ public class PosServiceImpl implements PosService {
         if (!orders.isEmpty()) {
             orderRepository.deleteAll(orders);
         }
+    }
+
+    @Scheduled(fixedRate = 30000)
+    @Transactional
+    public void cancelExpiredDraftPosOrders() {
+        OffsetDateTime expiredBefore = OffsetDateTime.now()
+                .minusMinutes(POS_DRAFT_EXPIRE_MINUTES);
+
+        List<Order> expiredDraftOrders =
+                orderRepository.findByOrderTypeAndStatusAndCreatedAtBefore(
+                        ORDER_TYPE_POS,
+                        ORDER_STATUS_DRAFT,
+                        expiredBefore
+                );
+
+        if (expiredDraftOrders.isEmpty()) {
+            return;
+        }
+
+        for (Order order : expiredDraftOrders) {
+            cancelExpiredDraftOrder(order);
+        }
+
+        System.out.println(
+                "Đã tự hủy " + expiredDraftOrders.size()
+                        + " hóa đơn POS nháp quá "
+                        + POS_DRAFT_EXPIRE_MINUTES
+                        + " phút lúc "
+                        + LocalDateTime.now()
+        );
+    }
+
+    private void cancelExpiredDraftOrder(Order order) {
+        List<OrderItem> items = orderItemRepository.findByOrder_Id(order.getId());
+
+        for (OrderItem item : items) {
+            ProductVariant variant = getLockedVariantOrThrow(
+                    item.getProductVariant().getId()
+            );
+
+            increaseVariantStock(variant, item.getQuantity());
+
+            createInventoryTransaction(
+                    variant,
+                    order.getStore(),
+                    item.getQuantity(),
+                    INVENTORY_IN,
+                    "POS-DRAFT-EXPIRED-" + order.getId()
+            );
+        }
+
+        order.setStatus(ORDER_STATUS_CANCELLED);
+        order.setNote(
+                appendNote(
+                        order.getNote(),
+                        "Hóa đơn POS nháp tự hủy do quá "
+                                + POS_DRAFT_EXPIRE_MINUTES
+                                + " phút chưa thanh toán."
+                )
+        );
+
+        orderRepository.save(order);
+        saveOrderStatusHistory(order, ORDER_STATUS_DRAFT, ORDER_STATUS_CANCELLED);
+    }
+
+    private String appendNote(String oldNote, String newNote) {
+        if (oldNote == null || oldNote.isBlank()) {
+            return newNote;
+        }
+
+        return oldNote + " | " + newNote;
     }
 }

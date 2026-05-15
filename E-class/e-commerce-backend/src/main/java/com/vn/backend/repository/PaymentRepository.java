@@ -19,4 +19,10 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             Long orderId,
             String paymentMethodCode
     );
+
+    Optional<Payment> findTopByOrder_IdAndPaymentMethod_CodeAndStatusOrderByIdDesc(
+            Long orderId,
+            String paymentMethodCode,
+            String status
+    );
 }

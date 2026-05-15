@@ -16,6 +16,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.vn.backend.entity.Employee;
+import com.vn.backend.repository.EmployeeRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +29,7 @@ public class AuthService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final EmployeeRepository employeeRepository;
 
     public LoginResponse login(LoginRequest request) {
         User user = userRepository.findByUsername(request.getUsername())
@@ -43,11 +46,16 @@ public class AuthService {
         String roleCode = user.getRole().getCode();
         String token = jwtUtil.generateToken(user.getUsername(), roleCode);
 
+        Long employeeId = employeeRepository.findByUserProfile(user.getUserProfile())
+                .map(Employee::getId)
+                .orElse(null);
+
         return new LoginResponse(
                 token,
                 user.getId(),
                 user.getUsername(),
-                roleCode
+                roleCode,
+                employeeId
         );
     }
 

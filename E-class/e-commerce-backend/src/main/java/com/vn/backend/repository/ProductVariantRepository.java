@@ -99,4 +99,20 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
             order by p.name asc, v.id asc
             """)
     List<ProductVariant> searchForPos(@Param("keyword") String keyword);
+
+    @Query("""
+    select distinct v
+    from ProductVariant v
+    left join fetch v.product p
+    left join fetch p.brand
+    left join fetch v.variantAttributeValues vav
+    left join fetch vav.attributeValue av
+    left join fetch av.attribute a
+    where v.deletedAt is null
+      and v.isActive = true
+      and p.deletedAt is null
+      and p.isActive = true
+      and v.barcode = :barcode
+""")
+    Optional<ProductVariant> findActiveByBarcodeWithAttributes(@Param("barcode") String barcode);
 }

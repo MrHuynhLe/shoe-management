@@ -17,7 +17,7 @@ public interface PosService {
 
     List<PosProductSearchResponse> searchProducts(String keyword);
 
-   // PosProductSearchResponse getProductByBarcode(String barcode);
+    PosProductSearchResponse getProductByBarcode(String barcode);
 
     PosOrderResponse addItem(Long orderId, PosAddItemRequest request);
 

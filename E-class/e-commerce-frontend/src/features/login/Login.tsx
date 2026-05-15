@@ -1,5 +1,16 @@
 import { LockOutlined, UserOutlined } from "@ant-design/icons";
-import { Button, Card, Checkbox, Col, Form, Input, Row, Space, Typography, message } from "antd";
+import {
+  Button,
+  Card,
+  Checkbox,
+  Col,
+  Form,
+  Input,
+  Row,
+  Space,
+  Typography,
+  message,
+} from "antd";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import logo from "@/assets/logo-shoe-shop.png";
 import { axiosClient } from "@/services/axiosClient";
@@ -26,6 +37,7 @@ const Login = () => {
           userId: data.userId,
           username: data.username,
           role: data.role,
+          employeeId: data.employeeId ?? null,
         };
 
         login(data.token, user);
@@ -38,7 +50,10 @@ const Login = () => {
         }
       }
     } catch (error: any) {
-      if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+      if (
+        error.response &&
+        (error.response.status === 401 || error.response.status === 403)
+      ) {
         message.error("Tên đăng nhập hoặc mật khẩu không đúng.");
       } else {
         message.error("Đã có lỗi xảy ra. Vui lòng thử lại.");
@@ -60,8 +75,16 @@ const Login = () => {
       <Col xs={24} sm={18} md={12} lg={8} xl={6}>
         <Card style={{ borderRadius: 10 }}>
           <Space direction="vertical" size={24} style={{ width: "100%" }}>
-            <Space direction="vertical" align="center" style={{ width: "100%" }}>
-              <img src={logo} alt="S-Shop Logo" style={{ width: 72, height: 72 }} />
+            <Space
+              direction="vertical"
+              align="center"
+              style={{ width: "100%" }}
+            >
+              <img
+                src={logo}
+                alt="S-Shop Logo"
+                style={{ width: 72, height: 72 }}
+              />
               <div style={{ textAlign: "center" }}>
                 <Title level={2} style={{ margin: 0 }}>
                   Đăng nhập
@@ -74,9 +97,14 @@ const Login = () => {
               <Form.Item
                 name="username"
                 label="Tên đăng nhập"
-                rules={[{ required: true, message: "Vui lòng nhập tên đăng nhập" }]}
+                rules={[
+                  { required: true, message: "Vui lòng nhập tên đăng nhập" },
+                ]}
               >
-                <Input prefix={<UserOutlined />} placeholder="Nhập tên đăng nhập" />
+                <Input
+                  prefix={<UserOutlined />}
+                  placeholder="Nhập tên đăng nhập"
+                />
               </Form.Item>
 
               <Form.Item
@@ -84,11 +112,20 @@ const Login = () => {
                 label="Mật khẩu"
                 rules={[{ required: true, message: "Vui lòng nhập mật khẩu" }]}
               >
-                <Input.Password prefix={<LockOutlined />} placeholder="Nhập mật khẩu" />
+                <Input.Password
+                  prefix={<LockOutlined />}
+                  placeholder="Nhập mật khẩu"
+                />
               </Form.Item>
 
               <Form.Item>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 12,
+                  }}
+                >
                   <Form.Item name="remember" valuePropName="checked" noStyle>
                     <Checkbox>Ghi nhớ đăng nhập</Checkbox>
                   </Form.Item>
