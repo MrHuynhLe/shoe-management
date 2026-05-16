@@ -102,6 +102,7 @@ public class OrderServiceImpl implements OrderService {
     private final ReviewRepository reviewRepository;
 
     private static final String ORDER_TYPE_ONLINE = "ONLINE";
+    private static final String ORDER_TYPE_POS = "POS";
 
     private static final String ORDER_STATUS_PENDING = "PENDING";
     private static final String ORDER_STATUS_CONFIRMED = "CONFIRMED";
@@ -341,6 +342,17 @@ public class OrderServiceImpl implements OrderService {
         String province = shippingDetails != null ? shippingDetails.getProvince() : null;
         String district = shippingDetails != null ? shippingDetails.getDistrict() : null;
         String ward = shippingDetails != null ? shippingDetails.getWard() : null;
+
+        if (ORDER_TYPE_POS.equalsIgnoreCase(order.getOrderType())
+                && shippingDetails == null
+                && order.getCustomer() != null
+                && order.getCustomer().getUserProfile() != null) {
+            UserProfile profile = order.getCustomer().getUserProfile();
+            customerName = defaultText(profile.getFullName(), "N/A");
+            phone = defaultText(profile.getPhone(), "N/A");
+            address = defaultText(profile.getAddress(), "N/A");
+        }
+
         String fullAddress = buildFullAddress(address, ward, district, province);
 
         Long employeeId = order.getEmployee() != null ? order.getEmployee().getId() : null;
@@ -359,6 +371,7 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal discountAmount = defaultZero(order.getDiscountAmount());
         BigDecimal productRevenue = resolveProductRevenue(order, subtotalAmount, discountAmount);
         BigDecimal discountPercent = calculateDiscountPercent(subtotalAmount, discountAmount);
+        BigDecimal finalTotal = resolveFinalTotal(order, subtotalAmount, discountAmount);
 
         List<OrderStatusHistoryResponse> statusHistory = orderStatusHistoryRepository
                 .findByOrder_IdOrderByChangedAtAsc(order.getId())
@@ -384,8 +397,8 @@ public class OrderServiceImpl implements OrderService {
                 subtotalAmount,
                 discountAmount,
                 productRevenue,
-                order.getTotalAmount(),
-                order.getTotalAmount(),
+                finalTotal,
+                finalTotal,
                 order.getVoucherCode(),
                 discountAmount,
                 discountPercent,
@@ -764,6 +777,7 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal discountAmount = defaultZero(order.getDiscountAmount());
         BigDecimal productRevenue = resolveProductRevenue(order, subtotalAmount, discountAmount);
         BigDecimal discountPercent = calculateDiscountPercent(subtotalAmount, discountAmount);
+        BigDecimal finalTotal = resolveFinalTotal(order, subtotalAmount, discountAmount);
 
         Payment latestPayment = paymentRepository.findByOrder_Id(order.getId())
                 .stream()
@@ -788,7 +802,7 @@ public class OrderServiceImpl implements OrderService {
                 .code(order.getCode())
                 .discountAmount(discountAmount)
                 .discountPercent(discountPercent)
-                .totalAmount(order.getTotalAmount())
+                .totalAmount(finalTotal)
                 .subtotalAmount(subtotalAmount)
                 .originalSubtotal(originalSubtotal)
                 .productDiscountTotal(productDiscountTotal)
@@ -797,7 +811,7 @@ public class OrderServiceImpl implements OrderService {
                 .productRevenue(productRevenue)
                 .shippingFee(defaultZero(order.getShippingFee()))
                 .voucherCode(order.getVoucherCode())
-                .finalTotal(order.getTotalAmount())
+                .finalTotal(finalTotal)
                 .status(order.getStatus())
                 .createdAt(order.getCreatedAt())
                 .customer(customerResponse)
@@ -887,6 +901,23 @@ public class OrderServiceImpl implements OrderService {
         }
 
         return defaultZero(subtotalBeforeVoucher).subtract(defaultZero(discountAmount)).max(BigDecimal.ZERO);
+    }
+
+    private BigDecimal resolveFinalTotal(
+            Order order,
+            BigDecimal subtotalBeforeVoucher,
+            BigDecimal discountAmount
+    ) {
+        BigDecimal subtotal = defaultZero(subtotalBeforeVoucher);
+
+        if (subtotal.compareTo(BigDecimal.ZERO) <= 0) {
+            return defaultZero(order.getTotalAmount());
+        }
+
+        return subtotal
+                .subtract(defaultZero(discountAmount))
+                .add(defaultZero(order.getShippingFee()))
+                .max(BigDecimal.ZERO);
     }
 
     private BigDecimal calculateDiscountPercent(BigDecimal subtotalAmount, BigDecimal discountAmount) {
